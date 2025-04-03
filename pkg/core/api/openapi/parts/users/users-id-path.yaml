@@ -1,0 +1,50 @@
+get:
+  description: Returns a user based on a single ID, if the user does not have access to the user
+  operationId: getUserByID
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user to fetch
+      required: true
+      schema:
+        type: string
+  responses:
+    "200":
+      description: user response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/User"
+put:
+  description: Updates a new user in the store. Duplicates are allowed
+  operationId: updateUser
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user to fetch
+      required: true
+      schema:
+        type: string
+  requestBody:
+    description: User to update to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/User"
+  responses:
+    "204":
+      description: user updated
+delete:
+  description: deletes a single user based on the ID supplied
+  operationId: deleteUser
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user to delete
+      required: true
+      schema:
+        type: string
+  responses:
+    "204":
+      description: user deleted

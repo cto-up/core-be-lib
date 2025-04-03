@@ -1,0 +1,29 @@
+get:
+  description: |
+    Returns current tenant profile.
+  operationId: getTenantProfile
+  parameters:
+  responses:
+    "200":
+      description: tenant response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/TenantProfile"
+put:
+  description: Updates a tenant profile in the store.
+  operationId: UpdateTenantProfile
+  requestBody:
+    description: Tenant profile to update to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/TenantProfile"
+  responses:
+    "200":
+      description: tenant response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/TenantProfile"

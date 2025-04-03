@@ -1,0 +1,14 @@
+#oapi-codegen -config ./openapi/parts/admin/oapi-schema-config.yaml ./openapi/core/core-schema.yaml
+package: core
+output: backend/src/api/openapi/core/core-service.go
+generate:
+  gin-server: true
+  models: true
+output-options:
+  # to make sure that all types are generated
+  skip-prune: false
+import-mapping:
+  ../../../core-schema.yaml: "-"
+  ../../core-schema.yaml: "-"
+  ../core-schema.yaml: "-"
+  ./core-schema.yaml: "-"

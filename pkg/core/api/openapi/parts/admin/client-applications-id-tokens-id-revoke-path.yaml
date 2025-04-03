@@ -1,0 +1,31 @@
+patch:
+  description: Revokes an API token
+  operationId: revokeAPIToken
+  parameters:
+    - name: id
+      in: path
+      description: ID of client application
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: tokenId
+      in: path
+      description: ID of API token
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    description: Revocation details
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/APITokenRevoke"
+  responses:
+    "200":
+      description: API token revoked
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/APIToken"

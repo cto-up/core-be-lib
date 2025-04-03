@@ -1,0 +1,12 @@
+get:
+  description: |
+    Returns current tenant.
+  operationId: getPublicTenant
+  parameters:
+  responses:
+    "200":
+      description: tenant response
+      content:
+        application/json:
+          schema:
+            $ref: "./public-tenant-schema.yaml"

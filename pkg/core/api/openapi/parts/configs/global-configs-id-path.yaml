@@ -1,0 +1,57 @@
+get:
+  description: Returns a global config based on a single ID, if the user does not have access to the global config
+  operationId: getGlobalConfigByID
+  parameters:
+    - name: id
+      in: path
+      description: ID of global config to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "200":
+      description: global config response
+      content:
+        application/json:
+          schema:
+            $ref: "./config-schema.yaml"
+put:
+  description: Updates a global config in the store.
+  operationId: updateGlobalConfig
+  parameters:
+    - name: id
+      in: path
+      description: ID of global config to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    description: Global config to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "./config-schema.yaml"
+  responses:
+    "200":
+      description: global config response
+      content:
+        application/json:
+          schema:
+            $ref: "./config-schema.yaml"
+delete:
+  description: deletes a single global config based on the ID supplied
+  operationId: deleteGlobalConfig
+  parameters:
+    - name: id
+      in: path
+      description: ID of global config to delete
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: global config deleted

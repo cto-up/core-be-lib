@@ -1,0 +1,43 @@
+get:
+  description: Returns tenant features.
+  operationId: getTenantFeatures
+  parameters:
+    - name: tenantid
+      in: path
+      description: ID of tenant to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "200":
+      description: tenant response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/TenantFeatures"
+put:
+  description: Updates a tenant in the store.
+  operationId: UpdateTenantFeatures
+  parameters:
+    - name: tenantid
+      in: path
+      description: ID of tenant to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    description: Tenant to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/TenantFeatures"
+  responses:
+    "200":
+      description: tenant response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/TenantFeatures"

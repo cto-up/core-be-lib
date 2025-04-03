@@ -1,0 +1,14 @@
+patch:
+  description: Deactivates a client application
+  operationId: deactivateClientApplication
+  parameters:
+    - name: id
+      in: path
+      description: ID of client application to deactivate
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: client application deactivated

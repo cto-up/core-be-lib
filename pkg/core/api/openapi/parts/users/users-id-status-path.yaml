@@ -1,0 +1,20 @@
+post:
+  description: Act on user
+  operationId: UpdateUserStatus
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user
+      required: true
+      schema:
+        type: string
+  requestBody:
+    description: Project to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "./user-action-schema.yaml"
+  responses:
+    "204":
+      description: role assigned to user

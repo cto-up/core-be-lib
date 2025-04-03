@@ -1,0 +1,27 @@
+post:
+  description: Act on user
+  operationId: UpdateUserStatusFromSuperAdmin
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user to fetch
+      required: true
+      schema:
+        type: string
+    - name: tenantid
+      in: path
+      description: ID of tenant
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    description: Action to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "./user-action-schema.yaml"
+  responses:
+    "204":
+      description: role assigned to user

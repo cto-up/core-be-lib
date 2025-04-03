@@ -1,0 +1,53 @@
+get:
+  description: Returns a user based on a single ID, if the user does not have access to the role
+  operationId: getRoleByID
+  parameters:
+    - name: id
+      in: path
+      description: ID of role to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "200":
+      description: role response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/Role"
+put:
+  description: Updates a new role in the store. Duplicates are allowed
+  operationId: updateRole
+  parameters:
+    - name: id
+      in: path
+      description: ID of role to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    description: Role to update to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/Role"
+  responses:
+    "204":
+      description: role updated
+delete:
+  description: deletes a single role based on the ID supplied
+  operationId: deleteRole
+  parameters:
+    - name: id
+      in: path
+      description: ID of role to delete
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: role deleted

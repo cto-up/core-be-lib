@@ -1,0 +1,46 @@
+get:
+  description: Returns an API token by ID
+  operationId: getAPITokenById
+  parameters:
+    - name: id
+      in: path
+      description: ID of client application
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: tokenId
+      in: path
+      description: ID of API token
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "200":
+      description: API token response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/APIToken"
+delete:
+  description: Deletes an API token
+  operationId: deleteAPIToken
+  parameters:
+    - name: id
+      in: path
+      description: ID of client application
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: tokenId
+      in: path
+      description: ID of API token
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: API token deleted

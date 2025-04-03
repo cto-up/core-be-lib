@@ -1,0 +1,57 @@
+get:
+  description: Returns a tenant config based on a single ID, if the user does not have access to the tenant config
+  operationId: getTenantConfigByID
+  parameters:
+    - name: id
+      in: path
+      description: ID of tenant config to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "200":
+      description: tenant config response
+      content:
+        application/json:
+          schema:
+            $ref: "./config-schema.yaml"
+put:
+  description: Updates a tenant config in the store.
+  operationId: updateTenantConfig
+  parameters:
+    - name: id
+      in: path
+      description: ID of tenant config to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    description: Tenant config to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "./config-schema.yaml"
+  responses:
+    "200":
+      description: tenant config response
+      content:
+        application/json:
+          schema:
+            $ref: "./config-schema.yaml"
+delete:
+  description: deletes a single tenant config based on the ID supplied
+  operationId: deleteTenantConfig
+  parameters:
+    - name: id
+      in: path
+      description: ID of tenant config to delete
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: tenant config deleted

@@ -1,0 +1,57 @@
+get:
+  description: Returns a tenant based on a single ID, if the user does not have access to the tenant
+  operationId: getTenantByID
+  parameters:
+    - name: tenantid
+      in: path
+      description: ID of tenant to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "200":
+      description: tenant response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/Tenant"
+put:
+  description: Updates a tenant in the store.
+  operationId: updateTenant
+  parameters:
+    - name: tenantid
+      in: path
+      description: ID of tenant to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    description: Tenant to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/Tenant"
+  responses:
+    "200":
+      description: tenant response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/Tenant"
+delete:
+  description: deletes a single tenant based on the ID supplied
+  operationId: deleteTenant
+  parameters:
+    - name: tenantid
+      in: path
+      description: ID of tenant to delete
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: tenant deleted

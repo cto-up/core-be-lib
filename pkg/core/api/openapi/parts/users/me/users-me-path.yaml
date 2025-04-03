@@ -1,0 +1,10 @@
+post:
+  description: Creates a new empty user in the store. Duplicates are not allowed
+  operationId: CreateMeUser
+  responses:
+    "201":
+      description: user response
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/User"

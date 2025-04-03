@@ -1,0 +1,70 @@
+get:
+  description: |
+    Returns all users from the system that the user has access to
+  operationId: listUsers
+  parameters:
+    - name: page
+      in: query
+      description: page number
+      required: false
+      schema:
+        type: integer
+        format: int32
+    - name: pageSize
+      in: query
+      description: maximum number of results to return
+      required: false
+      schema:
+        type: integer
+        format: int32
+    - name: sortBy
+      in: query
+      description: field to sort by
+      required: false
+      schema:
+        type: string
+    - name: order
+      in: query
+      description: sort order
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+    - name: q
+      in: query
+      description: starts with
+      required: false
+      schema:
+        type: string
+    - name: detail
+      in: query
+      description: basic or full (default to full)
+      required: false
+      schema:
+        type: string
+  responses:
+    "200":
+      description: user response
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../../core-schema.yaml#/components/schemas/User"
+post:
+  description: Creates a new user in the store. Duplicates are not allowed
+  operationId: AddUser
+  requestBody:
+    description: User to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/NewUser"
+  responses:
+    "201":
+      description: user response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/User"

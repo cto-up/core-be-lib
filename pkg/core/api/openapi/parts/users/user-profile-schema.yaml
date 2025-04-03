@@ -1,0 +1,26 @@
+type: object
+required:
+  - name
+properties:
+  name:
+    type: string
+  title:
+    type: string
+  about:
+    type: string
+  pictureURL:
+    type: string
+  backgroundPictureURL:
+    type: string
+  socialMedias:
+    type: array
+    items:
+      type: string
+  interests:
+    type: array
+    items:
+      type: string
+  skills:
+    type: array
+    items:
+      type: string

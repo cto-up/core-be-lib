@@ -1,0 +1,78 @@
+get:
+  description: Returns all API tokens for a client application
+  operationId: listAPITokens
+  parameters:
+    - name: id
+      in: path
+      description: ID of client application
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: page
+      in: query
+      description: page number
+      schema:
+        type: integer
+        format: int32
+    - name: pageSize
+      in: query
+      description: maximum number of results to return
+      schema:
+        type: integer
+        format: int32
+    - name: sortBy
+      in: query
+      description: field to sort by
+      schema:
+        type: string
+    - name: order
+      in: query
+      description: sort order
+      schema:
+        type: string
+        enum: [asc, desc]
+    - name: includeRevoked
+      in: query
+      description: include revoked tokens
+      schema:
+        type: boolean
+    - name: includeExpired
+      in: query
+      description: include expired tokens
+      schema:
+        type: boolean
+  responses:
+    "200":
+      description: API tokens response
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../../core-schema.yaml#/components/schemas/APIToken"
+post:
+  description: Creates a new API token for a client application
+  operationId: createAPIToken
+  parameters:
+    - name: id
+      in: path
+      description: ID of client application
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    description: API token to create
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/NewAPIToken"
+  responses:
+    "201":
+      description: API token created
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/APITokenCreated"

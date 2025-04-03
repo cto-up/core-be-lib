@@ -1,0 +1,39 @@
+get:
+  description: Returns audit logs for an API token
+  operationId: getAPITokenAuditLogs
+  parameters:
+    - name: id
+      in: path
+      description: ID of client application
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: tokenId
+      in: path
+      description: ID of API token
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: page
+      in: query
+      description: page number
+      schema:
+        type: integer
+        format: int32
+    - name: pageSize
+      in: query
+      description: maximum number of results to return
+      schema:
+        type: integer
+        format: int32
+  responses:
+    "200":
+      description: API token audit logs response
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../../core-schema.yaml#/components/schemas/APITokenAuditLog"

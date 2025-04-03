@@ -1,0 +1,17 @@
+get:
+  description: Returns a user based on a single ID, if the user does not have access to the user
+  operationId: GetProfilePicture
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user to fetch
+      required: true
+      schema:
+        type: string
+  responses:
+    "200":
+      description: image file response
+      x-is-file: true
+      schema:
+        type: string
+        format: binary

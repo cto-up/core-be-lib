@@ -1,0 +1,28 @@
+type: object
+required:
+  - status
+  - version
+properties:
+  status:
+    type: string
+    enum: [pass, fail, warn]
+    description: The overall health status of the API
+  version:
+    type: string
+    description: The version of the API
+  releaseId:
+    type: string
+    description: An identifier for this deployment or release of the API
+  notes:
+    type: array
+    items:
+      type: string
+    description: Array of notes relevant to current state of health
+  output:
+    type: string
+    description: Raw error output, in case of "fail" or "warn" states
+  checks:
+    type: object
+    additionalProperties:
+      $ref: "./check-details-schema.yaml"
+    description: Detailed health check results for API components or dependencies

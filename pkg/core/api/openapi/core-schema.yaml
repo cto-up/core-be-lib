@@ -1,0 +1,341 @@
+components:
+  schemas:
+    # Tenant related schemas
+    NewTenant:
+      type: object
+      required:
+        - name
+        - subdomain
+        - enable_email_link_sign_in
+        - allow_password_sign_up
+      properties:
+        name:
+          type: string
+        subdomain:
+          type: string
+        enable_email_link_sign_in:
+          type: boolean
+        allow_password_sign_up:
+          type: boolean
+
+    Tenant:
+      allOf:
+        - $ref: "#/components/schemas/NewTenant"
+        - type: object
+          required:
+            - id
+            - tenant_id
+          properties:
+            id:
+              type: string
+              format: uuid
+            tenant_id:
+              type: string
+
+    TenantProfile:
+      type: object
+      required:
+        - displayName
+        - companyName
+        - lightColors
+        - darkColors
+      properties:
+        displayName:
+          type: string
+        companyName:
+          type: string
+        values:
+          type: string
+        storeRAGDocument:
+          type: boolean
+        lightColors:
+          $ref: "#/components/schemas/ColorSchema"
+        darkColors:
+          $ref: "#/components/schemas/ColorSchema"
+
+    TenantFeatures:
+      type: object
+      required:
+        - meetings
+        - projects
+        - seriousGames
+        - RAGDocuments
+        - demoComponents
+        - demoLearning
+        - automation
+        - skeellscoach
+      properties:
+        recruitment:
+          type: boolean
+        projects:
+          type: boolean
+        seriousGames:
+          type: boolean
+        RAGDocuments:
+          type: boolean
+        demoComponents:
+          type: boolean
+        demoLearning:
+          type: boolean
+        automation:
+          type: boolean
+        skeellscoach:
+          type: boolean
+
+    ColorSchema:
+      type: object
+      properties:
+        background:
+          type: string
+        primary:
+          type: string
+        secondary:
+          type: string
+        tertiary:
+          type: string
+        accent:
+          type: string
+        positive:
+          type: string
+        negative:
+          type: string
+        info:
+          type: string
+        warning:
+          type: string
+        text:
+          type: string
+    # Users
+    NewUser:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        disabled:
+          type: boolean
+        email_verified:
+          type: boolean
+        profile:
+          $ref: "#/components/schemas/UserProfileSchema"
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        created_at:
+          type: string
+          format: date-time
+    UserProfileSchema:
+      $ref: "./parts/users/user-profile-schema.yaml"
+    UserActionSchema:
+      $ref: "./parts/users/user-action-schema.yaml"
+
+    # Role related schemas
+    NewRole:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+
+    Role:
+      allOf:
+        - $ref: "#/components/schemas/NewRole"
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: string
+              format: uuid
+
+    # Client Application related schemas
+    NewClientApplication:
+      type: object
+      required:
+        - name
+        - active
+        - description
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        active:
+          type: boolean
+        lastUsed:
+          type: string
+          format: date-time
+
+    ClientApplication:
+      allOf:
+        - $ref: "#/components/schemas/NewClientApplication"
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: string
+              format: uuid
+            lastUsedAt:
+              type: string
+              format: date-time
+            tenantId:
+              type: string
+              nullable: true
+              description: If null, this is a global application managed by SUPER_ADMIN
+
+    # API Token related schemas
+    NewAPIToken:
+      type: object
+      required:
+        - name
+        - clientApplicationId
+        - applicationName
+        - tokenPrefix
+        - expiresAt
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        clientApplicationId:
+          type: string
+          format: uuid
+          description: ID of the client application this token belongs to
+        applicationName:
+          type: string
+          description: Name of the client application
+        tokenPrefix:
+          type: string
+          description: First few characters of the token for identification
+        scopes:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Permission scopes for this token
+
+    APIToken:
+      allOf:
+        - $ref: "#/components/schemas/NewAPIToken"
+        - type: object
+          required:
+            - id
+            - status
+            - revoked
+            - createdBy
+            - createdAt
+            - updatedAt
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [ACTIVE, REVOKED, EXPIRED]
+            revoked:
+              type: boolean
+              description: Whether this token has been revoked
+            revokedAt:
+              type: string
+              format: date-time
+              description: Token revoked at timestamp
+            revokedReason:
+              type: string
+              description: Revoked reason
+            revokedBy:
+              type: string
+              description: User of the token revoker
+            lastUsedAt:
+              type: string
+              format: date-time
+              description: Last used timestamp
+            lastUsedIp:
+              type: string
+              description: Last used IP address
+            createdBy:
+              type: string
+              description: User ID of the token creator
+            createdAt:
+              type: string
+              format: date-time
+              description: Token creation timestamp
+            updatedAt:
+              type: string
+              format: date-time
+              description: Token last update timestamp
+
+    APITokenCreated:
+      type: object
+      required:
+        - token
+        - apiToken
+      properties:
+        token:
+          type: string
+          description: The full token value (only returned once upon creation)
+        apiToken:
+          $ref: "#/components/schemas/APIToken"
+
+    APITokenRevoke:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+
+    APITokenAuditLog:
+      type: object
+      required:
+        - id
+        - tokenId
+        - action
+        - timestamp
+      properties:
+        id:
+          type: string
+          format: uuid
+        tokenId:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [CREATED, USED, REVOKED, UPDATED]
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+        additionalData:
+          type: object
+          nullable: true

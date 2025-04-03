@@ -1,0 +1,12 @@
+type: object
+required:
+  - name
+  - id
+properties:
+  name:
+    type: string
+  id:
+    type: string
+    format: uuid
+  icon:
+    type: string

@@ -1,0 +1,29 @@
+get:
+  description: |
+    Returns current user profile.
+  operationId: getMeProfile
+  parameters:
+  responses:
+    "200":
+      description: user response
+      content:
+        application/json:
+          schema:
+            $ref: "../user-profile-schema.yaml"
+put:
+  description: Updates a user in the store.
+  operationId: UpdateMeProfile
+  requestBody:
+    description: User to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../user-profile-schema.yaml"
+  responses:
+    "200":
+      description: user response
+      content:
+        application/json:
+          schema:
+            $ref: "../user-profile-schema.yaml"

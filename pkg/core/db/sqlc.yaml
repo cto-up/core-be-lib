@@ -1,0 +1,41 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./query/"
+    schema: "./migration/"
+    gen:
+      go:
+        package: "repository"
+        sql_package: "pgx/v5"
+        out: "./repository"
+        emit_prepared_queries: false
+        emit_interface: false
+        emit_json_tags: true
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        overrides:
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "varchar"
+            go_type: "string"
+          - db_type: "text"
+            go_type: "string"
+          - column: core_tenants.profile
+            go_type:
+              import: ctoup.com/coreapp/pkg/shared/repository/subentity
+              package: subentity
+              type: TenantProfile
+          - column: core_tenants.features
+            go_type:
+              import: ctoup.com/coreapp/pkg/shared/repository/subentity
+              package: subentity
+              type: TenantFeatures
+          - column: core_users.profile
+            go_type:
+              import: ctoup.com/coreapp/pkg/shared/repository/subentity
+              package: subentity
+              type: UserProfile
+        rename:
+          get_user_role_by_id_row: "UserRole"

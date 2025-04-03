@@ -1,0 +1,11 @@
+allOf:
+  - $ref: "../core-schema.yaml#/components/schemas/Tenant"
+  - type: object
+    required:
+      - profile
+      - features
+    properties:
+      profile:
+        $ref: "../core-schema.yaml#/components/schemas/TenantProfile"
+      features:
+        $ref: "../core-schema.yaml#/components/schemas/TenantFeatures"

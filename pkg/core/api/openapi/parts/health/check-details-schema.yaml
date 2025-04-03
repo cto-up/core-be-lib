@@ -1,0 +1,22 @@
+type: object
+required:
+  - componentType
+  - status
+properties:
+  componentType:
+    type: string
+    description: The type of component (e.g., database, cache, external service)
+  componentName:
+    type: string
+    description: The name of the component being checked
+  status:
+    type: string
+    enum: [pass, fail, warn]
+    description: The status of this particular component
+  time:
+    type: string
+    format: date-time
+    description: The time at which this check was performed
+  output:
+    type: string
+    description: Any additional information or error output for this check

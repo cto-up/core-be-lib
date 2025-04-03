@@ -1,0 +1,21 @@
+post:
+  description: Upload user profile picture
+  operationId: UploadProfilePicture
+  requestBody:
+    description: User to add to the store
+    required: true
+    content:
+      multipart/form-data:
+        schema:
+          type: object
+          properties:
+            fileName:
+              type: string
+              format: binary
+  responses:
+    "200":
+      description: user response
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/User"

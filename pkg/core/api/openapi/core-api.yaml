@@ -1,0 +1,169 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Core Alpha API
+  description: A sample API that uses a userstore as an example to demonstrate features in the OpenAPI 3.0 specification
+  termsOfService: http://swagger.io/terms/
+  contact:
+    name: Swagger API Team
+    email: apiteam@swagger.io
+    url: http://swagger.io
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+#servers:
+#  - url: https://userstore.swagger.io/v2
+paths:
+  /superadmin-api/v1/configs/global-configs:
+    $ref: "./parts/configs/global-configs-path.yaml"
+  /superadmin-api/v1/configs/global-configs/{id}:
+    $ref: "./parts/configs/global-configs-id-path.yaml"
+  /api/v1/configs/tenant-configs:
+    $ref: "./parts/configs/tenant-configs-path.yaml"
+  /api/v1/configs/tenant-configs/{id}:
+    $ref: "./parts/configs/tenant-configs-id-path.yaml"
+
+  # health
+  /public-api/v1/health:
+    $ref: "./parts/health/health-path.yaml"
+  # users
+  /api/v1/users/{userid}:
+    $ref: "./parts/users/users-id-path.yaml"
+  /api/v1/users/{userid}/status:
+    $ref: "./parts/users/users-id-status-path.yaml"
+  /api/v1/users/{userid}/roles/{roleid}/assign:
+    $ref: "./parts/users/users-id-role-assign-path.yaml"
+  /api/v1/users/{userid}/roles/{roleid}/unassign:
+    $ref: "./parts/users/users-id-role-unassign-path.yaml"
+  /api/v1/users:
+    $ref: "./parts/users/users-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}:
+    $ref: "./parts/users/super-admin-users-id-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/status:
+    $ref: "./parts/users/super-admin-users-id-status-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{roleid}/assign:
+    $ref: "./parts/users/super-admin-users-id-role-assign-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{roleid}/unassign:
+    $ref: "./parts/users/super-admin-users-id-role-unassign-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users:
+    $ref: "./parts/users/super-admin-users-path.yaml"
+
+  # me
+  /api/v1/me:
+    $ref: "./parts/users/me/users-me-path.yaml"
+  /api/v1/me/profile:
+    $ref: "./parts/users/me/users-me-profile-path.yaml"
+  /api/v1/me/profile/picture:
+    $ref: "./parts/users/me/users-me-profile-picture-path.yaml"
+
+  # password
+  /api/v1/users/{userid}/password-reset-request:
+    $ref: "./parts/users/password/users-id-password-reset-request-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/password-reset-request:
+    $ref: "./parts/users/password/super-admin-users-id-password-reset-request-path.yaml"
+
+  # public - passwords
+  /public-api/v1/password-reset-request:
+    $ref: "./parts/users/password/public-password-reset-request-path.yaml"
+
+  # public - user profile picture
+  /public-api/v1/users/{userid}/profile/picture:
+    $ref: "./parts/users/users-id-profile-picture-path.yaml"
+
+  # public - tenants
+  /public-api/v1/tenant:
+    $ref: "./parts/public-tenant-path.yaml"
+
+  # admin
+  /api/v1/tenant/profile:
+    $ref: "./parts/admin/tenant-profile-path.yaml"
+  /api/v1/roles:
+    $ref: "./parts/admin/roles-path.yaml"
+  /api/v1/roles/{id}:
+    $ref: "./parts/admin/roles-id-path.yaml"
+  /superadmin-api/v1/tenants:
+    $ref: "./parts/admin/tenants-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}:
+    $ref: "./parts/admin/tenants-id-path.yaml"
+  /superadmin-api/v1/tenant/{tenantid}/features:
+    $ref: "./parts/admin/super-admin-tenant-features-path.yaml"
+
+  # Client Applications and API Tokens (SUPER_ADMIN only)
+  /superadmin-api/v1/client-applications:
+    $ref: "./parts/admin/client-applications-path.yaml"
+  /superadmin-api/v1/client-applications/{id}:
+    $ref: "./parts/admin/client-applications-id-path.yaml"
+  /superadmin-api/v1/client-applications/{id}/deactivate:
+    $ref: "./parts/admin/client-applications-id-deactivate-path.yaml"
+  /superadmin-api/v1/client-applications/{id}/tokens:
+    $ref: "./parts/admin/client-applications-id-tokens-path.yaml"
+  /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}:
+    $ref: "./parts/admin/client-applications-id-tokens-id-path.yaml"
+  /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke:
+    $ref: "./parts/admin/client-applications-id-tokens-id-revoke-path.yaml"
+  /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/audit:
+    $ref: "./parts/admin/client-applications-id-tokens-id-audit-path.yaml"
+
+components:
+  schemas:
+    NewConfig:
+      $ref: "./parts/configs/config-new-schema.yaml"
+    Config:
+      $ref: "./parts/configs/config-schema.yaml"
+
+    # Client Applications and API Tokens
+    ClientApplication:
+      $ref: "./core-schema.yaml#/components/schemas/ClientApplication"
+    NewClientApplication:
+      $ref: "./core-schema.yaml#/components/schemas/NewClientApplication"
+    APIToken:
+      $ref: "./core-schema.yaml#/components/schemas/APIToken"
+    NewAPIToken:
+      $ref: "./core-schema.yaml#/components/schemas/NewAPIToken"
+    APITokenCreated:
+      $ref: "./core-schema.yaml#/components/schemas/APITokenCreated"
+    APITokenRevoke:
+      $ref: "./core-schema.yaml#/components/schemas/APITokenRevoke"
+    APITokenAuditLog:
+      $ref: "./core-schema.yaml#/components/schemas/APITokenAuditLog"
+    # Common
+    BasicEntity:
+      $ref: "./parts/basic-entity-schema.yaml"
+    ErrorSchema:
+      $ref: "./parts/error-schema.yaml"
+
+    # Public
+    PublicTenantSchema:
+      $ref: "./parts/public-tenant-schema.yaml"
+
+    # Health
+    HealthResponse:
+      $ref: "./parts/health/health-response-schema.yaml"
+    CheckDetails:
+      $ref: "./parts/health/check-details-schema.yaml"
+
+    # Admin
+    NewRole:
+      $ref: "./core-schema.yaml#/components/schemas/NewRole"
+    Role:
+      $ref: "./core-schema.yaml#/components/schemas/Role"
+    NewTenant:
+      $ref: "./core-schema.yaml#/components/schemas/NewTenant"
+    Tenant:
+      $ref: "./core-schema.yaml#/components/schemas/Tenant"
+    ColorSchema:
+      $ref: "./core-schema.yaml#/components/schemas/ColorSchema"
+    TenantProfileSchema:
+      $ref: "./core-schema.yaml#/components/schemas/TenantProfile"
+    TenantFeatures:
+      $ref: "./core-schema.yaml#/components/schemas/TenantFeatures"
+
+    # Users
+    NewUser:
+      $ref: "./core-schema.yaml#/components/schemas/NewUser"
+    User:
+      $ref: "./core-schema.yaml#/components/schemas/User"
+    UserProfileSchema:
+      $ref: "./core-schema.yaml#/components/schemas/UserProfileSchema"
+    UserActionSchema:
+      $ref: "./parts/users/user-action-schema.yaml"

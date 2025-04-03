@@ -1,0 +1,19 @@
+get:
+  summary: API Health Check
+  description: Returns the health status of the API and its dependencies
+  operationId: getHealthCheck
+  tags:
+    - Health
+  responses:
+    "200":
+      description: Healthy
+      content:
+        application/json:
+          schema:
+            $ref: "./health-response-schema.yaml"
+    "503":
+      description: Unhealthy
+      content:
+        application/json:
+          schema:
+            $ref: "./health-response-schema.yaml"

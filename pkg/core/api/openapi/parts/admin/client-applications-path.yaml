@@ -1,0 +1,63 @@
+get:
+  description: Returns all client applications the user has access to
+  operationId: listClientApplications
+  parameters:
+    - name: page
+      in: query
+      description: page number
+      schema:
+        type: integer
+        format: int32
+    - name: pageSize
+      in: query
+      description: maximum number of results to return
+      schema:
+        type: integer
+        format: int32
+    - name: sortBy
+      in: query
+      description: field to sort by
+      schema:
+        type: string
+    - name: order
+      in: query
+      description: sort order
+      schema:
+        type: string
+        enum: [asc, desc]
+    - name: q
+      in: query
+      description: search query
+      schema:
+        type: string
+    - name: includeInactive
+      in: query
+      description: include inactive applications
+      schema:
+        type: boolean
+  responses:
+    "200":
+      description: client applications response
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../../core-schema.yaml#/components/schemas/ClientApplication"
+post:
+  description: Creates a new client application
+  operationId: createClientApplication
+  requestBody:
+    description: Client application to create
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/NewClientApplication"
+  responses:
+    "201":
+      description: client application created
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ClientApplication"

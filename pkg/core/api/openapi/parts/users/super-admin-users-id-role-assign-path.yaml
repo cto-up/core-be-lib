@@ -1,0 +1,27 @@
+post:
+  description: Assign a role to a user based
+  operationId: AssignRoleFromSuperAdmin
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user to fetch
+      required: true
+      schema:
+        type: string
+    - name: tenantid
+      in: path
+      description: ID of tenant
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: roleid
+      in: path
+      description: ID of role to assign
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: role assigned to user

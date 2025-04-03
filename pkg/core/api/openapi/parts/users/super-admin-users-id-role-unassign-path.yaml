@@ -1,0 +1,27 @@
+post:
+  description: Unassign a role to a user based
+  operationId: UnassignRoleFromSuperAdmin
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user to fetch
+      required: true
+      schema:
+        type: string
+    - name: tenantid
+      in: path
+      description: ID of tenant
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: roleid
+      in: path
+      description: ID of role to unassign
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: role unassigned from user
