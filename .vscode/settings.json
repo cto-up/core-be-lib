@@ -1,0 +1,6 @@
+{
+  "editor.formatOnSave": true,
+  "makefile.configureOnOpen": false,
+  "go.testTags": "testutils",
+  "go.buildTags": "testutils"
+}

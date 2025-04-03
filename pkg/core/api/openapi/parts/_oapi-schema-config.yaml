@@ -1,6 +1,6 @@
 #oapi-codegen -config ./openapi/parts/admin/oapi-schema-config.yaml ./openapi/parts/admin/core-schema.yaml
 package: core
-output: backend/src/api/openapi/core/core-schema.go
+output: api/openapi/core/core-schema.go
 generate:
   models: true
 output-options:
