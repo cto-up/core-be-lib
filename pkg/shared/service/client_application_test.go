@@ -6,7 +6,9 @@ import (
 	commontestutils "ctoup.com/coreapp/internal/testutils"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+
 	"ctoup.com/coreapp/pkg/core/db/testutils"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
