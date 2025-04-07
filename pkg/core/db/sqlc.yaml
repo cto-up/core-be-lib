@@ -22,16 +22,16 @@ sql:
             go_type: "string"
           - db_type: "text"
             go_type: "string"
-          - column: core_tenants.profile
-            go_type:
-              import: ctoup.com/coreapp/pkg/shared/repository/subentity
-              package: subentity
-              type: TenantProfile
           - column: core_tenants.features
             go_type:
               import: ctoup.com/coreapp/pkg/shared/repository/subentity
               package: subentity
               type: TenantFeatures
+          - column: core_tenants.profile
+            go_type:
+              import: ctoup.com/coreapp/pkg/shared/repository/subentity
+              package: subentity
+              type: TenantProfile
           - column: core_users.profile
             go_type:
               import: ctoup.com/coreapp/pkg/shared/repository/subentity

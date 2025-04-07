@@ -3,14 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 
-export type TenantFeatures = {
-    recruitment?: boolean;
-    projects: boolean;
-    seriousGames: boolean;
-    RAGDocuments: boolean;
-    demoComponents: boolean;
-    demoLearning: boolean;
-    automation: boolean;
-    skeellscoach: boolean;
-};
-
+/**
+ * Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
+ */
+export type TenantFeatures = Record<string, boolean>;

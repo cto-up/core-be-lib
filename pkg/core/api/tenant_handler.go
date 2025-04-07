@@ -36,13 +36,7 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 		c.JSON(http.StatusOK, repository.CoreTenant{
 			Subdomain: "www",
 			Name:      "Administration",
-			Features: subentity.TenantFeatures{
-				Projects:       true,
-				SeriousGames:   true,
-				RAGDocuments:   true,
-				DemoComponents: true,
-				DemoLearning:   true,
-			},
+			Features:  subentity.TenantFeatures{},
 			Profile: subentity.TenantProfile{
 				DisplayName: "Administration",
 				LightColors: subentity.Colors{},

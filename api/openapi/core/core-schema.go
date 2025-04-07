@@ -196,17 +196,8 @@ type Tenant struct {
 	TenantId              string             `json:"tenant_id"`
 }
 
-// TenantFeatures defines model for TenantFeatures.
-type TenantFeatures struct {
-	RAGDocuments   bool  `json:"RAGDocuments"`
-	Automation     bool  `json:"automation"`
-	DemoComponents bool  `json:"demoComponents"`
-	DemoLearning   bool  `json:"demoLearning"`
-	Projects       bool  `json:"projects"`
-	Recruitment    *bool `json:"recruitment,omitempty"`
-	SeriousGames   bool  `json:"seriousGames"`
-	Skeellscoach   bool  `json:"skeellscoach"`
-}
+// TenantFeatures Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
+type TenantFeatures map[string]bool
 
 // TenantProfile defines model for TenantProfile.
 type TenantProfile struct {

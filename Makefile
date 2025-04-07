@@ -32,16 +32,7 @@ sqlc:
 	sqlc generate
 
 BASE_API_BE_DIR := api/openapi
-BASE_API_FE_DIR := frontend/openapi
-
-openapi:
-	# reads the OpenAPI specification file core-api.yaml, removes the default responses from all paths, and then writes the modified content to a new file named core-fe-api.yaml in the same directory. 
-	yq 'del(.paths.[].[].responses.default)' ./openapi/core-api.yaml > ./openapi/core-fe-api.yaml
-	openapi --input ./openapi/core-fe-api.yaml --output ./frontend/src/openapi --client axios
-	rm ./openapi/core-fe-api.yaml
-	rm -f $(BASE_API_BE_DIR)/*.go
-	oapi-codegen -generate gin,types -package openapi openapi/core-api.yaml > $(BASE_API_BE_DIR)/api.go
-
+BASE_API_FE_DIR := ../core-fe-lib/lib/openapi
 
 # Define the pattern to search for and replace
 SEARCH_STRING_1 := from \'./core

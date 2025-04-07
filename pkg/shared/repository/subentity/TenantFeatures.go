@@ -1,12 +1,5 @@
 package subentity
 
-type TenantFeatures struct {
-	Projects       bool `json:"projects"`
-	Recruitment    bool `json:"recruitment"`
-	SeriousGames   bool `json:"seriousGames"`
-	RAGDocuments   bool `json:"RAGDocuments"`
-	DemoComponents bool `json:"demoComponents"`
-	DemoLearning   bool `json:"demoLearning"`
-	Automation     bool `json:"automation"`
-	Skeellscoach   bool `json:"skeellscoach"`
-}
+// TenantFeatures represents dynamic feature flags for tenants
+// Each key represents a feature name and the boolean value indicates if it's enabled
+type TenantFeatures map[string]bool

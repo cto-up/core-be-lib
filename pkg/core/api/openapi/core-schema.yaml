@@ -55,32 +55,9 @@ components:
 
     TenantFeatures:
       type: object
-      required:
-        - meetings
-        - projects
-        - seriousGames
-        - RAGDocuments
-        - demoComponents
-        - demoLearning
-        - automation
-        - skeellscoach
-      properties:
-        recruitment:
-          type: boolean
-        projects:
-          type: boolean
-        seriousGames:
-          type: boolean
-        RAGDocuments:
-          type: boolean
-        demoComponents:
-          type: boolean
-        demoLearning:
-          type: boolean
-        automation:
-          type: boolean
-        skeellscoach:
-          type: boolean
+      additionalProperties:
+        type: boolean
+      description: "Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled"
 
     ColorSchema:
       type: object
