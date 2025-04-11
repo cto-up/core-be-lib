@@ -51,6 +51,14 @@ openapi:
 	oapi-codegen -config $(BASE_OPENAPI_CORE_DIR)/parts/_oapi-schema-config.yaml $(BASE_OPENAPI_CORE_DIR)/core-schema.yaml
 	oapi-codegen -config $(BASE_OPENAPI_CORE_DIR)/parts/_oapi-service-config.yaml $(BASE_OPENAPI_CORE_DIR)/core-api.yaml
 
+release:
+	@echo "Creating release"
+	if [ -z "$(VERSION)" ]; then \
+		echo "Error: VERSION parameter is required. Use 'v.x.x.x' format."; \
+		exit 1; \
+	fi; \	
+	gh release create $(VERSION) --title "$(VERSION)" --notes "$(NOTES)"
+
 include .env
 export $(shell sed 's/=.*//' .env)
 DB_CONNECTION = postgres://${DATABASE_USERNAME}:${DATABASE_PASSWORD}@${DATABASE_URL}
