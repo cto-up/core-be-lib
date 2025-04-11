@@ -1,0 +1,23 @@
+type: object
+required:
+  - name
+  - content
+  - tags
+  - parameters
+properties:
+  name:
+    type: string
+    maxLength: 100
+  content:
+    type: string
+  tags:
+    type: array
+    items:
+      type: string
+    default: []
+
+  parameters:
+    type: array
+    items:
+      type: string
+    default: []

@@ -63,6 +63,18 @@ type CoreGlobalConfig struct {
 	UpdatedAt time.Time   `json:"updated_at"`
 }
 
+type CorePrompt struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	Content    string    `json:"content"`
+	Tags       []string  `json:"tags"`
+	Parameters []string  `json:"parameters"`
+	UserID     string    `json:"user_id"`
+	TenantID   string    `json:"tenant_id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 type CoreRole struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    string    `json:"user_id"`

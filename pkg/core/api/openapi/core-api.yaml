@@ -90,22 +90,34 @@ paths:
 
   # Client Applications and API Tokens (SUPER_ADMIN only)
   /superadmin-api/v1/client-applications:
-    $ref: "./parts/admin/client-applications-path.yaml"
+    $ref: "./parts/tokens/client-applications-path.yaml"
   /superadmin-api/v1/client-applications/{id}:
-    $ref: "./parts/admin/client-applications-id-path.yaml"
+    $ref: "./parts/tokens/client-applications-id-path.yaml"
   /superadmin-api/v1/client-applications/{id}/deactivate:
-    $ref: "./parts/admin/client-applications-id-deactivate-path.yaml"
+    $ref: "./parts/tokens/client-applications-id-deactivate-path.yaml"
   /superadmin-api/v1/client-applications/{id}/tokens:
-    $ref: "./parts/admin/client-applications-id-tokens-path.yaml"
+    $ref: "./parts/tokens/client-applications-id-tokens-path.yaml"
   /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}:
-    $ref: "./parts/admin/client-applications-id-tokens-id-path.yaml"
+    $ref: "./parts/tokens/client-applications-id-tokens-id-path.yaml"
   /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke:
-    $ref: "./parts/admin/client-applications-id-tokens-id-revoke-path.yaml"
+    $ref: "./parts/tokens/client-applications-id-tokens-id-revoke-path.yaml"
   /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/audit:
-    $ref: "./parts/admin/client-applications-id-tokens-id-audit-path.yaml"
+    $ref: "./parts/tokens/client-applications-id-tokens-id-audit-path.yaml"
+  /api/v1/prompts:
+    $ref: "./parts/prompts/prompts-path.yaml"
+  /api/v1/prompts/{id}:
+    $ref: "./parts/prompts/prompts-id-path.yaml"
+  /api/v1/prompts/execute:
+    $ref: "./parts/prompts/prompts-execute-path.yaml"
 
 components:
   schemas:
+    NewPrompt:
+      $ref: "./parts/prompts/prompt-new-schema.yaml"
+    Prompt:
+      $ref: "./parts/prompts/prompt-schema.yaml"
+    ExecutePromptResponse:
+      $ref: "./parts/prompts/prompt-response-execute-schema.yaml"
     NewConfig:
       $ref: "./parts/configs/config-new-schema.yaml"
     Config:

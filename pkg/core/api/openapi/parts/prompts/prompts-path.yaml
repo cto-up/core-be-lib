@@ -1,0 +1,70 @@
+get:
+  description: |
+    Returns all prompts from the system that the user has access to
+  operationId: listPrompts
+  parameters:
+    - name: page
+      in: query
+      description: page number
+      required: false
+      schema:
+        type: integer
+        format: int32
+    - name: pageSize
+      in: query
+      description: maximum number of results to return
+      required: false
+      schema:
+        type: integer
+        format: int32
+    - name: sortBy
+      in: query
+      description: field to sort by
+      required: false
+      schema:
+        type: string
+    - name: order
+      in: query
+      description: sort order
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+    - name: q
+      in: query
+      description: starts with
+      required: false
+      schema:
+        type: string
+    - name: detail
+      in: query
+      description: basic or full
+      required: false
+      schema:
+        type: string
+  responses:
+    "200":
+      description: prompt response
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "./prompt-schema.yaml"
+post:
+  description: Creates a new prompt in the store. Duplicates are allowed
+  operationId: addPrompt
+  requestBody:
+    description: Prompt to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "./prompt-new-schema.yaml"
+  responses:
+    "201":
+      description: prompt response
+      content:
+        application/json:
+          schema:
+            $ref: "./prompt-schema.yaml"

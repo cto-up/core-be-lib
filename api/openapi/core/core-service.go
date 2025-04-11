@@ -18,6 +18,12 @@ const (
 	ListTenantConfigsParamsOrderDesc ListTenantConfigsParamsOrder = "desc"
 )
 
+// Defines values for ListPromptsParamsOrder.
+const (
+	ListPromptsParamsOrderAsc  ListPromptsParamsOrder = "asc"
+	ListPromptsParamsOrderDesc ListPromptsParamsOrder = "desc"
+)
+
 // Defines values for ListRolesParamsOrder.
 const (
 	ListRolesParamsOrderAsc  ListRolesParamsOrder = "asc"
@@ -62,8 +68,8 @@ const (
 
 // Defines values for ListUsersFromSuperAdminParamsOrder.
 const (
-	ListUsersFromSuperAdminParamsOrderAsc  ListUsersFromSuperAdminParamsOrder = "asc"
-	ListUsersFromSuperAdminParamsOrderDesc ListUsersFromSuperAdminParamsOrder = "desc"
+	Asc  ListUsersFromSuperAdminParamsOrder = "asc"
+	Desc ListUsersFromSuperAdminParamsOrder = "desc"
 )
 
 // Defines values for UpdateUserStatusFromSuperAdminJSONBodyName.
@@ -124,6 +130,61 @@ type UpdateMeProfileJSONBody struct {
 // UploadProfilePictureMultipartBody defines parameters for UploadProfilePicture.
 type UploadProfilePictureMultipartBody struct {
 	FileName *openapi_types.File `json:"fileName,omitempty"`
+}
+
+// ListPromptsParams defines parameters for ListPrompts.
+type ListPromptsParams struct {
+	// Page page number
+	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize maximum number of results to return
+	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+
+	// SortBy field to sort by
+	SortBy *string `form:"sortBy,omitempty" json:"sortBy,omitempty"`
+
+	// Order sort order
+	Order *ListPromptsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+
+	// Q starts with
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Detail basic or full
+	Detail *string `form:"detail,omitempty" json:"detail,omitempty"`
+}
+
+// ListPromptsParamsOrder defines parameters for ListPrompts.
+type ListPromptsParamsOrder string
+
+// AddPromptJSONBody defines parameters for AddPrompt.
+type AddPromptJSONBody struct {
+	Content    string   `json:"content"`
+	Name       string   `json:"name"`
+	Parameters []string `json:"parameters"`
+	Tags       []string `json:"tags"`
+}
+
+// ExecutePromptJSONBody defines parameters for ExecutePrompt.
+type ExecutePromptJSONBody struct {
+	Parameters *map[string]string `json:"parameters,omitempty"`
+}
+
+// ExecutePromptParams defines parameters for ExecutePrompt.
+type ExecutePromptParams struct {
+	// Id ID of prompt to execute
+	Id *openapi_types.UUID `form:"id,omitempty" json:"id,omitempty"`
+
+	// Name Name of prompt to execute
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+}
+
+// UpdatePromptJSONBody defines parameters for UpdatePrompt.
+type UpdatePromptJSONBody struct {
+	Content    string             `json:"content"`
+	Id         openapi_types.UUID `json:"id"`
+	Name       string             `json:"name"`
+	Parameters []string           `json:"parameters"`
+	Tags       []string           `json:"tags"`
 }
 
 // ListRolesParams defines parameters for ListRoles.
@@ -355,6 +416,15 @@ type UpdateMeProfileJSONRequestBody UpdateMeProfileJSONBody
 // UploadProfilePictureMultipartRequestBody defines body for UploadProfilePicture for multipart/form-data ContentType.
 type UploadProfilePictureMultipartRequestBody UploadProfilePictureMultipartBody
 
+// AddPromptJSONRequestBody defines body for AddPrompt for application/json ContentType.
+type AddPromptJSONRequestBody AddPromptJSONBody
+
+// ExecutePromptJSONRequestBody defines body for ExecutePrompt for application/json ContentType.
+type ExecutePromptJSONRequestBody ExecutePromptJSONBody
+
+// UpdatePromptJSONRequestBody defines body for UpdatePrompt for application/json ContentType.
+type UpdatePromptJSONRequestBody UpdatePromptJSONBody
+
 // AddRoleJSONRequestBody defines body for AddRole for application/json ContentType.
 type AddRoleJSONRequestBody = NewRole
 
@@ -447,6 +517,24 @@ type ServerInterface interface {
 
 	// (POST /api/v1/me/profile/picture)
 	UploadProfilePicture(c *gin.Context)
+
+	// (GET /api/v1/prompts)
+	ListPrompts(c *gin.Context, params ListPromptsParams)
+
+	// (POST /api/v1/prompts)
+	AddPrompt(c *gin.Context)
+
+	// (POST /api/v1/prompts/execute)
+	ExecutePrompt(c *gin.Context, params ExecutePromptParams)
+
+	// (DELETE /api/v1/prompts/{id})
+	DeletePrompt(c *gin.Context, id openapi_types.UUID)
+
+	// (GET /api/v1/prompts/{id})
+	GetPromptByID(c *gin.Context, id openapi_types.UUID)
+
+	// (PUT /api/v1/prompts/{id})
+	UpdatePrompt(c *gin.Context, id openapi_types.UUID)
 
 	// (GET /api/v1/roles)
 	ListRoles(c *gin.Context, params ListRolesParams)
@@ -818,6 +906,191 @@ func (siw *ServerInterfaceWrapper) UploadProfilePicture(c *gin.Context) {
 	}
 
 	siw.Handler.UploadProfilePicture(c)
+}
+
+// ListPrompts operation middleware
+func (siw *ServerInterfaceWrapper) ListPrompts(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPromptsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "sortBy" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sortBy", c.Request.URL.Query(), &params.SortBy)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sortBy: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "order" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "order", c.Request.URL.Query(), &params.Order)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter order: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "q", c.Request.URL.Query(), &params.Q)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter q: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "detail" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "detail", c.Request.URL.Query(), &params.Detail)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter detail: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListPrompts(c, params)
+}
+
+// AddPrompt operation middleware
+func (siw *ServerInterfaceWrapper) AddPrompt(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AddPrompt(c)
+}
+
+// ExecutePrompt operation middleware
+func (siw *ServerInterfaceWrapper) ExecutePrompt(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExecutePromptParams
+
+	// ------------- Optional query parameter "id" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "id", c.Request.URL.Query(), &params.Id)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "name" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "name", c.Request.URL.Query(), &params.Name)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter name: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ExecutePrompt(c, params)
+}
+
+// DeletePrompt operation middleware
+func (siw *ServerInterfaceWrapper) DeletePrompt(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeletePrompt(c, id)
+}
+
+// GetPromptByID operation middleware
+func (siw *ServerInterfaceWrapper) GetPromptByID(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetPromptByID(c, id)
+}
+
+// UpdatePrompt operation middleware
+func (siw *ServerInterfaceWrapper) UpdatePrompt(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdatePrompt(c, id)
 }
 
 // ListRoles operation middleware
@@ -2460,6 +2733,12 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/api/v1/me/profile", wrapper.GetMeProfile)
 	router.PUT(options.BaseURL+"/api/v1/me/profile", wrapper.UpdateMeProfile)
 	router.POST(options.BaseURL+"/api/v1/me/profile/picture", wrapper.UploadProfilePicture)
+	router.GET(options.BaseURL+"/api/v1/prompts", wrapper.ListPrompts)
+	router.POST(options.BaseURL+"/api/v1/prompts", wrapper.AddPrompt)
+	router.POST(options.BaseURL+"/api/v1/prompts/execute", wrapper.ExecutePrompt)
+	router.DELETE(options.BaseURL+"/api/v1/prompts/:id", wrapper.DeletePrompt)
+	router.GET(options.BaseURL+"/api/v1/prompts/:id", wrapper.GetPromptByID)
+	router.PUT(options.BaseURL+"/api/v1/prompts/:id", wrapper.UpdatePrompt)
 	router.GET(options.BaseURL+"/api/v1/roles", wrapper.ListRoles)
 	router.POST(options.BaseURL+"/api/v1/roles", wrapper.AddRole)
 	router.DELETE(options.BaseURL+"/api/v1/roles/:id", wrapper.DeleteRole)

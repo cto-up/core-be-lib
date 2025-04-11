@@ -1,0 +1,58 @@
+
+get:
+  description: Returns a prompt based on a single ID, if the user does not have access to the prompt
+  operationId: getPromptByID
+  parameters:
+    - name: id
+      in: path
+      description: ID of prompt to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "200":
+      description: prompt response
+      content:
+        application/json:
+          schema:
+            $ref: "./prompt-schema.yaml"
+put:
+  description: Updates a prompt in the store.
+  operationId: updatePrompt
+  parameters:
+    - name: id
+      in: path
+      description: ID of prompt to fetch
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    description: Prompt to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "./prompt-schema.yaml"
+  responses:
+    "200":
+      description: prompt response
+      content:
+        application/json:
+          schema:
+            $ref: "./prompt-schema.yaml"
+delete:
+  description: deletes a single prompt based on the ID supplied
+  operationId: deletePrompt
+  parameters:
+    - name: id
+      in: path
+      description: ID of prompt to delete
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: prompt deleted

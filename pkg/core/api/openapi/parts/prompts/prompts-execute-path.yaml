@@ -1,0 +1,38 @@
+post:
+  description: Execute a prompt with parameters
+  operationId: executePrompt
+  parameters:
+    - name: id
+      in: query
+      description: ID of prompt to execute
+      schema:
+        type: string
+        format: uuid
+    - name: name
+      in: query
+      description: Name of prompt to execute
+      schema:
+        type: string
+  requestBody:
+    description: Parameters for the prompt
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            parameters:
+              type: object
+              additionalProperties:
+                type: string
+  responses:
+    "200":
+      description: Prompt execution result
+      content:
+        application/json:
+          schema:
+            $ref: "./prompt-response-execute-schema.yaml"
+    "404":
+      description: Prompt not found
+    "400":
+      description: Invalid parameters

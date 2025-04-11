@@ -134,6 +134,11 @@ type ColorSchema struct {
 	Warning    *string `json:"warning,omitempty"`
 }
 
+// ExecutePromptResponse defines model for ExecutePromptResponse.
+type ExecutePromptResponse struct {
+	Result string `json:"result"`
+}
+
 // NewAPIToken defines model for NewAPIToken.
 type NewAPIToken struct {
 	// ApplicationName Name of the client application
