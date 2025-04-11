@@ -10,8 +10,8 @@ CREATE TABLE public.core_prompts (
     tenant_id varchar(64) NOT NULL,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT prompts_pk PRIMARY KEY (id),
-    CONSTRAINT unique_prompt_name_per_tenant UNIQUE (tenant_id, name)
+    CONSTRAINT core_prompts_pk PRIMARY KEY (id),
+    CONSTRAINT core_unique_prompt_name_per_tenant UNIQUE (tenant_id, name)
 );
 CREATE INDEX idx_core_prompts_tenant_id ON public.core_prompts ("tenant_id");
 
