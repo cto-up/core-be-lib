@@ -202,6 +202,11 @@ type PgNullableTypes interface {
 // FromNullable converts pgtype nullable types to pointers of Go primitive types
 func FromNullable[T any, P PgNullableTypes](value P) *T {
 	switch v := any(value).(type) {
+	case pgtype.UUID:
+		if v.Valid {
+			uuid, _ := uuid.FromBytes(v.Bytes[:])
+			return any(&uuid).(*T)
+		}
 	case pgtype.Text:
 		if v.Valid {
 			return any(&v.String).(*T)
@@ -301,4 +306,13 @@ func FromNullableTimestamp(value pgtype.Timestamp) *time.Time {
 		return &value.Time
 	}
 	return nil
+}
+
+// Converts a pgtype.UUID to a *uuid.UUID
+func FromNullableUUID(value pgtype.UUID) *uuid.UUID {
+	if !value.Valid {
+		return nil
+	}
+	uuid, _ := uuid.FromBytes(value.Bytes[:])
+	return &uuid
 }
