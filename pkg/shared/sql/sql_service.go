@@ -32,11 +32,12 @@ func (r ErrorConnector) Connect() (*pgxpool.Pool, error) {
 }
 
 type PostgresConnector struct {
+	dbConnection string
 }
 
 // Connect always throws error
 func (r PostgresConnector) Connect() (*pgxpool.Pool, error) {
-	connPool, err := pgxpool.New(context.Background(), DB_CONNECTION)
+	connPool, err := pgxpool.New(context.Background(), r.dbConnection)
 	if err != nil {
 		log.Printf("connect error %v \n", err)
 	}
@@ -71,8 +72,6 @@ func (r ConnectorRetryDecorator) ConnectWithRetry(ctx context.Context) (*pgxpool
 	return nil, fmt.Errorf("connect error")
 }
 
-var DB_CONNECTION string
-
 // MigrationDirection represents the direction of database migration
 type MigrationDirection string
 
@@ -83,17 +82,17 @@ const (
 	MigrationDirectionDown MigrationDirection = "down"
 )
 
-func MigrateUp(path string, prefix string) error {
-	return migrateMe(path, prefix, MigrationDirectionUp)
+func MigrateUp(dbConnection string, path string, prefix string) error {
+	return migrateMe(dbConnection, path, prefix, MigrationDirectionUp)
 }
-func MigrateDown(path string, prefix string) error {
-	return migrateMe(path, prefix, MigrationDirectionDown)
+func MigrateDown(dbConnection string, path string, prefix string) error {
+	return migrateMe(dbConnection, path, prefix, MigrationDirectionDown)
 }
 
-func migrateMe(path string, prefix string, direction MigrationDirection) error {
+func migrateMe(dbConnection string, path string, prefix string, direction MigrationDirection) error {
 	m, err := migrate.New(
 		path,
-		DB_CONNECTION+"&x-migrations-table="+prefix+"_migrations",
+		dbConnection+"&x-migrations-table="+prefix+"_migrations",
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create migration!")

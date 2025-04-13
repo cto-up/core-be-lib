@@ -28,7 +28,7 @@ type Store struct {
 }
 
 func NewStore(connPool *pgxpool.Pool) *Store {
-	migrate()
+	migrate(connPool.Config().ConnString())
 	return &Store{
 		Queries:  repository.New(connPool),
 		ConnPool: connPool,
@@ -37,11 +37,11 @@ func NewStore(connPool *pgxpool.Pool) *Store {
 
 var once = sync.Once{}
 
-func migrate() {
+func migrate(dbConnection string) {
 	once.Do(func() {
 		path := getMigrationPath()
 		prefix := "core"
-		log.Info().Msg("Migrating... " + path + " " + prefix)
-		sqlservice.MigrateUp(path, prefix)
+		log.Info().Msg("Migrating... " + path + " with prefix " + prefix)
+		sqlservice.MigrateUp(dbConnection, path, prefix)
 	})
 }

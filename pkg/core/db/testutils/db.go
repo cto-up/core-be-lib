@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -35,18 +34,37 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+const (
+	// ModuleIdentifier is the file used to identify the module root
+	ModuleIdentifier = "go.mod"
+	// MigrationRelativePath is the path from module root to migrations
+	MigrationRelativePath = "pkg/core/db/migration"
+	// PostgresImage is the Docker image used for testing
+	PostgresImage = "pgvector/pgvector:pg17"
+	// PostgresPort is the default Postgres port
+	PostgresPort = "5432"
+	// TestDBUser is the username for test database
+	TestDBUser = "testuser"
+	// TestDBPassword is the password for test database
+	TestDBPassword = "testpassword"
+	// TestDBName is the name of the test database
+	TestDBName = "testdb"
+	// PostgresScheme is the database connection scheme
+	PostgresScheme = "postgres"
+)
+
 var DB_CONNECTION string
 
 func SetupPostgresContainer() (*pgxpool.Pool, func(), error) {
 	ctx := context.Background()
 
 	req := testcontainers.ContainerRequest{
-		Image:        "pgvector/pgvector:pg17",
-		ExposedPorts: []string{"5432/tcp"},
+		Image:        PostgresImage,
+		ExposedPorts: []string{PostgresPort + "/tcp"},
 		Env: map[string]string{
-			"POSTGRES_USER":     "testuser",
-			"POSTGRES_PASSWORD": "testpassword",
-			"POSTGRES_DB":       "testdb",
+			"POSTGRES_USER":     TestDBUser,
+			"POSTGRES_PASSWORD": TestDBPassword,
+			"POSTGRES_DB":       TestDBName,
 		},
 		WaitingFor: wait.ForLog("database system is ready to accept connections").
 			WithStartupTimeout(60 * time.Second),
@@ -65,12 +83,23 @@ func SetupPostgresContainer() (*pgxpool.Pool, func(), error) {
 		return nil, nil, fmt.Errorf("failed to get host: %w", err)
 	}
 
-	port, err := postgresC.MappedPort(ctx, "5432")
+	mappedPort, err := postgresC.MappedPort(ctx, PostgresPort+"/tcp")
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get mapped port: %w", err)
 	}
 
-	DB_CONNECTION = fmt.Sprintf("postgres://testuser:testpassword@%s:%s/testdb?sslmode=disable", host, port.Port())
+	// Ensure proper scheme in connection string
+	DB_CONNECTION = fmt.Sprintf("%s://%s:%s@%s:%s/%s?sslmode=disable",
+		PostgresScheme,
+		TestDBUser,
+		TestDBPassword,
+		host,
+		mappedPort.Port(),
+		TestDBName,
+	)
+
+	// Verify connection string format
+	log.Info().Msgf("Database connection string: %s", DB_CONNECTION)
 
 	connPool, err := pgxpool.New(context.Background(), DB_CONNECTION)
 	if err != nil {
@@ -83,7 +112,9 @@ func SetupPostgresContainer() (*pgxpool.Pool, func(), error) {
 
 	cleanup := func() {
 		connPool.Close()
-		postgresC.Terminate(ctx)
+		if err := postgresC.Terminate(ctx); err != nil {
+			log.Error().Err(err).Msg("Failed to terminate container")
+		}
 	}
 
 	return connPool, cleanup, nil
@@ -118,21 +149,25 @@ func RunMigrations(migrationPath string) error {
 		return fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
-	// Find the backend/src directory by walking up the directory tree
-	srcDir := currentDir
+	// Find the module root directory by looking for ModuleIdentifier
+	moduleDir := currentDir
 	for {
-		if strings.HasSuffix(srcDir, "backend/src") || srcDir == "/" {
+		if _, err := os.Stat(filepath.Join(moduleDir, ModuleIdentifier)); err == nil {
 			break
 		}
-		srcDir = filepath.Dir(srcDir)
+		parentDir := filepath.Dir(moduleDir)
+		if parentDir == moduleDir {
+			return fmt.Errorf("could not find %s file", ModuleIdentifier)
+		}
+		moduleDir = parentDir
 	}
 
-	if srcDir == "/" {
-		return fmt.Errorf("could not find backend/src directory")
+	// Construct the absolute path to the migrations directory relative to the module root
+	migrationsDir := filepath.Join(moduleDir, MigrationRelativePath)
+	if _, err := os.Stat(migrationsDir); err != nil {
+		return fmt.Errorf("migrations directory not found at %s: %w", migrationsDir, err)
 	}
 
-	// Construct the absolute path to the migrations directory
-	migrationsDir := filepath.Join(srcDir, "db", "migration")
 	migrationURI := "file://" + filepath.ToSlash(migrationsDir)
 
 	// Create migrate instance
