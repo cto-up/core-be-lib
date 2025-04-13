@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"github.com/tmc/langchaingo/prompts"
 )
 
 type PromptExecutionService struct {
@@ -31,11 +31,18 @@ func (s *PromptExecutionService) ExecutePrompt(ctx context.Context, prompt repos
 		}
 	}
 
-	// Replace parameters in content
-	result := prompt.Content
-	for param, value := range params.Parameters {
-		result = strings.ReplaceAll(result, fmt.Sprintf("{{%s}}", param), value)
+	tpl := prompts.NewPromptTemplate(
+		prompt.Content,
+		prompt.Parameters,
+	)
+
+	// Convert map[string]string to map[string]any
+	paramsAny := make(map[string]any, len(params.Parameters))
+	for k, v := range params.Parameters {
+		paramsAny[k] = v
 	}
 
-	return result, nil
+	formattedPrompt, err := tpl.Format(paramsAny)
+
+	return formattedPrompt, err
 }

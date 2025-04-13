@@ -19,7 +19,7 @@ func TestPromptExecutionService(t *testing.T) {
 		UserID:     "test-user",
 		TenantID:   "test-tenant",
 		Name:       "greeting",
-		Content:    "Hello {{name}}, welcome to {{company}}!",
+		Content:    "Hello {{.name}}, welcome to {{.company}}!",
 		Parameters: []string{"name", "company"},
 		Tags:       []string{"greeting", "welcome"},
 	})
