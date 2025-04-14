@@ -4,6 +4,8 @@ required:
   - content
   - tags
   - parameters
+  - format
+  - formatInstructions
 properties:
   name:
     type: string
@@ -15,9 +17,22 @@ properties:
     items:
       type: string
     default: []
-
   parameters:
     type: array
     items:
       type: string
     default: []
+  sampleParameters:
+    type: object
+    additionalProperties:
+      type: string
+    description: "Example parameter values for the prompt"
+    default: {}
+  format:
+    type: string
+    enum: [json, text, markdown]
+    default: text
+    description: "Output format of the prompt execution"
+  formatInstructions:
+    type: string
+    description: "Instructions for the LLM on how to format the output"

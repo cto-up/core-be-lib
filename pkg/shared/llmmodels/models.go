@@ -1,24 +1,72 @@
 package llmmodels
 
 import (
+	"context"
 	"errors"
 	"os"
 
+	"fmt"
+	"strings"
+
 	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/anthropic"
+	"github.com/tmc/langchaingo/llms/googleai"
 	"github.com/tmc/langchaingo/llms/ollama"
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
+// Provider represents AI provider
+type Provider string
+
 const (
-	MODEL_GPT_3_5_VERSION                                        string = "gpt-3.5-turbo-0125"
-	MODEL_GPT_4_VERSION                                          string = "gpt-4-1106-preview"
-	MODEL_GPT_3_5                                                string = "openai-gpt-3.5"
-	MODEL_GPT_4                                                  string = "openai-gpt-4"
-	MODEL_GPT_4O_MINI                                            string = "gpt-4o-mini"
-	MODEL_LLAMA_2_VERSION                                        string = "llama2:13b"
-	MODEL_MISTRAL_7B_VERSION                                     string = "mistral"
-	MODEL_LLAMA_2                                                string = "llama-2-13b"
-	MODEL_MISTRAL_7B                                             string = "mistral7b"
+	ProviderOpenaAI   Provider = "OPENAI"
+	ProviderGoogleAI  Provider = "GOOGLEAI"
+	ProviderAnthropic Provider = "ANTHROPIC"
+	ProviderOllama    Provider = "OLLAMA"
+)
+
+// IsValid checks if the provider is valid
+func (at Provider) IsValid() bool {
+	switch at {
+	case ProviderAnthropic, ProviderGoogleAI, ProviderOpenaAI, ProviderOllama:
+		return true
+	default:
+		return false
+	}
+}
+
+// String returns the string representation of the provider
+func (at Provider) String() string {
+	return string(at)
+}
+
+// Values returns all possible values of Provider
+func (Provider) Values() []Provider {
+	return []Provider{
+		ProviderGoogleAI,
+		ProviderAnthropic,
+		ProviderOpenaAI,
+		ProviderOllama,
+	}
+}
+
+// Parse converts a string to Provider
+func (Provider) Parse(s string) (Provider, error) {
+	switch strings.ToUpper(s) {
+	case string(ProviderGoogleAI):
+		return ProviderGoogleAI, nil
+	case string(ProviderOpenaAI):
+		return ProviderOpenaAI, nil
+	case string(ProviderAnthropic):
+		return ProviderAnthropic, nil
+	case string(ProviderOllama):
+		return ProviderOllama, nil
+	default:
+		return "", fmt.Errorf("invalid provider: %s", s)
+	}
+}
+
+const (
 	EMBEDDING_MODEL_TEXT_EMBEDDING_ADA_002                       string = "text-embedding-ada-002"
 	EMBEDDING_MODEL_TEXT_NOMIC_EMBED_TEXT                        string = "nomic-embed-text"
 	EMBEDDING_MODEL_TEXT_E5_MISTRAL_7B_INSTRUCT                  string = "hellord/e5-mistral-7b-instruct"
@@ -42,17 +90,39 @@ func newOllamaLLM(model string, serverURL string) (*ollama.LLM, error) {
 	return ollama.New(ollama.WithModel(model), ollama.WithServerURL(serverURL))
 }
 
-func NewLLM(model string, json bool) (llms.Model, error) {
-	switch model {
-	case MODEL_GPT_3_5:
-		return newOpenAILLM(MODEL_GPT_3_5_VERSION, json)
-	case MODEL_GPT_4:
-		return newOpenAILLM(MODEL_GPT_4_VERSION, json)
-	case MODEL_LLAMA_2:
-		return newOllamaLLM(MODEL_LLAMA_2_VERSION, "http://127.0.0.1:11434")
-	case MODEL_MISTRAL_7B:
-		return newOllamaLLM(MODEL_MISTRAL_7B_VERSION, "http://127.0.0.1:11434")
+func newGeminiLLM(model string) (*googleai.GoogleAI, error) {
+	geminiKey := os.Getenv("GOOGLEAI_API_KEY")
+	if geminiKey == "" {
+		return nil, errors.New("GOOGLEAI_API_KEY not set")
+	}
+	return googleai.New(context.Background(), googleai.WithAPIKey(geminiKey), googleai.WithDefaultModel(model))
+}
+
+func newAnthropicLLM(model string) (*anthropic.LLM, error) {
+	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
+	if anthropicKey == "" {
+		return nil, errors.New("ANTHROPIC_API_KEY not set")
+	}
+	return anthropic.New(anthropic.WithModel(model))
+}
+
+func NewLLM(provider Provider, model string, json bool) (llms.Model, error) {
+
+	switch provider {
+	case ProviderOpenaAI:
+		return newOpenAILLM(model, json)
+	case ProviderOllama:
+		ollamaServerURL := os.Getenv("OLLAMA_SERVER_URL")
+		if ollamaServerURL == "" {
+			model := &openai.LLM{}
+			return model, errors.New("OLLAMA_SERVER_URL not set")
+		}
+		return newOllamaLLM(model, ollamaServerURL)
+	case ProviderGoogleAI:
+		return newGeminiLLM(model)
+	case ProviderAnthropic:
+		return newAnthropicLLM(model)
 	default:
-		return nil, errors.New("unsupported model type")
+		return nil, errors.New("unsupported model" + model + " for provider " + provider.String())
 	}
 }

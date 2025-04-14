@@ -14,24 +14,30 @@ import (
 
 const createPrompt = `-- name: CreatePrompt :one
 INSERT INTO core_prompts (
-  user_id, tenant_id, "name", "content", "tags", "parameters"
+  user_id, tenant_id, "name", "content", "tags", "parameters", sample_parameters, "format", "format_instructions"
 ) VALUES (
   $1, $4::text, 
   $2, 
   $3, 
   $5::varchar[], 
-  $6::varchar[]
+  $6::varchar[],
+  $7::jsonb,
+  $8::varchar,
+  $9::text
 )
-RETURNING id, name, content, tags, parameters, user_id, tenant_id, created_at, updated_at
+RETURNING id, name, content, tags, parameters, sample_parameters, format, format_instructions, user_id, tenant_id, created_at, updated_at
 `
 
 type CreatePromptParams struct {
-	UserID     string   `json:"user_id"`
-	Name       string   `json:"name"`
-	Content    string   `json:"content"`
-	TenantID   string   `json:"tenant_id"`
-	Tags       []string `json:"tags"`
-	Parameters []string `json:"parameters"`
+	UserID             string      `json:"user_id"`
+	Name               string      `json:"name"`
+	Content            string      `json:"content"`
+	TenantID           string      `json:"tenant_id"`
+	Tags               []string    `json:"tags"`
+	Parameters         []string    `json:"parameters"`
+	SampleParameters   []byte      `json:"sample_parameters"`
+	Format             string      `json:"format"`
+	FormatInstructions pgtype.Text `json:"format_instructions"`
 }
 
 func (q *Queries) CreatePrompt(ctx context.Context, arg CreatePromptParams) (CorePrompt, error) {
@@ -42,6 +48,9 @@ func (q *Queries) CreatePrompt(ctx context.Context, arg CreatePromptParams) (Cor
 		arg.TenantID,
 		arg.Tags,
 		arg.Parameters,
+		arg.SampleParameters,
+		arg.Format,
+		arg.FormatInstructions,
 	)
 	var i CorePrompt
 	err := row.Scan(
@@ -50,6 +59,9 @@ func (q *Queries) CreatePrompt(ctx context.Context, arg CreatePromptParams) (Cor
 		&i.Content,
 		&i.Tags,
 		&i.Parameters,
+		&i.SampleParameters,
+		&i.Format,
+		&i.FormatInstructions,
 		&i.UserID,
 		&i.TenantID,
 		&i.CreatedAt,
@@ -77,7 +89,7 @@ func (q *Queries) DeletePrompt(ctx context.Context, arg DeletePromptParams) (uui
 }
 
 const getPromptByID = `-- name: GetPromptByID :one
-SELECT id, name, content, tags, parameters, user_id, tenant_id, created_at, updated_at FROM core_prompts
+SELECT id, name, content, tags, parameters, sample_parameters, format, format_instructions, user_id, tenant_id, created_at, updated_at FROM core_prompts
 WHERE id = $1 AND tenant_id = $2::text LIMIT 1
 `
 
@@ -95,6 +107,9 @@ func (q *Queries) GetPromptByID(ctx context.Context, arg GetPromptByIDParams) (C
 		&i.Content,
 		&i.Tags,
 		&i.Parameters,
+		&i.SampleParameters,
+		&i.Format,
+		&i.FormatInstructions,
 		&i.UserID,
 		&i.TenantID,
 		&i.CreatedAt,
@@ -104,7 +119,7 @@ func (q *Queries) GetPromptByID(ctx context.Context, arg GetPromptByIDParams) (C
 }
 
 const getPromptByName = `-- name: GetPromptByName :one
-SELECT id, name, content, tags, parameters, user_id, tenant_id, created_at, updated_at FROM core_prompts
+SELECT id, name, content, tags, parameters, sample_parameters, format, format_instructions, user_id, tenant_id, created_at, updated_at FROM core_prompts
 WHERE name = $1 AND tenant_id = $2
 LIMIT 1
 `
@@ -123,6 +138,9 @@ func (q *Queries) GetPromptByName(ctx context.Context, arg GetPromptByNameParams
 		&i.Content,
 		&i.Tags,
 		&i.Parameters,
+		&i.SampleParameters,
+		&i.Format,
+		&i.FormatInstructions,
 		&i.UserID,
 		&i.TenantID,
 		&i.CreatedAt,
@@ -132,7 +150,7 @@ func (q *Queries) GetPromptByName(ctx context.Context, arg GetPromptByNameParams
 }
 
 const listPrompts = `-- name: ListPrompts :many
-SELECT id, name, content, tags, parameters, user_id, tenant_id, created_at, updated_at FROM core_prompts
+SELECT id, name, content, tags, parameters, sample_parameters, format, format_instructions, user_id, tenant_id, created_at, updated_at FROM core_prompts
 WHERE tenant_id = $3::text
   AND (UPPER(name) LIKE UPPER($4) OR $4 IS NULL)
 ORDER BY
@@ -183,6 +201,9 @@ func (q *Queries) ListPrompts(ctx context.Context, arg ListPromptsParams) ([]Cor
 			&i.Content,
 			&i.Tags,
 			&i.Parameters,
+			&i.SampleParameters,
+			&i.Format,
+			&i.FormatInstructions,
 			&i.UserID,
 			&i.TenantID,
 			&i.CreatedAt,
@@ -203,19 +224,24 @@ UPDATE core_prompts
 SET "name" = COALESCE($2, name),
     "content" = COALESCE($3, content),
     "tags" = COALESCE($4::varchar[], tags),
-    "parameters" = COALESCE($5::varchar[], parameters)
-
-WHERE id = $1 AND tenant_id = $6::text
-RETURNING id, name, content, tags, parameters, user_id, tenant_id, created_at, updated_at
+    "parameters" = COALESCE($5::varchar[], parameters),
+    "sample_parameters" = COALESCE($6::jsonb, sample_parameters),
+    "format" = $7::varchar,
+    "format_instructions" = COALESCE($8::text, format_instructions)
+WHERE id = $1 AND tenant_id = $9::text
+RETURNING id, name, content, tags, parameters, sample_parameters, format, format_instructions, user_id, tenant_id, created_at, updated_at
 `
 
 type UpdatePromptParams struct {
-	ID         uuid.UUID   `json:"id"`
-	Name       pgtype.Text `json:"name"`
-	Content    pgtype.Text `json:"content"`
-	Tags       []string    `json:"tags"`
-	Parameters []string    `json:"parameters"`
-	TenantID   string      `json:"tenant_id"`
+	ID                 uuid.UUID   `json:"id"`
+	Name               pgtype.Text `json:"name"`
+	Content            pgtype.Text `json:"content"`
+	Tags               []string    `json:"tags"`
+	Parameters         []string    `json:"parameters"`
+	SampleParameters   []byte      `json:"sample_parameters"`
+	Format             string      `json:"format"`
+	FormatInstructions pgtype.Text `json:"format_instructions"`
+	TenantID           string      `json:"tenant_id"`
 }
 
 func (q *Queries) UpdatePrompt(ctx context.Context, arg UpdatePromptParams) (CorePrompt, error) {
@@ -225,6 +251,9 @@ func (q *Queries) UpdatePrompt(ctx context.Context, arg UpdatePromptParams) (Cor
 		arg.Content,
 		arg.Tags,
 		arg.Parameters,
+		arg.SampleParameters,
+		arg.Format,
+		arg.FormatInstructions,
 		arg.TenantID,
 	)
 	var i CorePrompt
@@ -234,6 +263,9 @@ func (q *Queries) UpdatePrompt(ctx context.Context, arg UpdatePromptParams) (Cor
 		&i.Content,
 		&i.Tags,
 		&i.Parameters,
+		&i.SampleParameters,
+		&i.Format,
+		&i.FormatInstructions,
 		&i.UserID,
 		&i.TenantID,
 		&i.CreatedAt,

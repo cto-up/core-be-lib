@@ -107,6 +107,8 @@ paths:
     $ref: "./parts/prompts/prompts-path.yaml"
   /api/v1/prompts/{id}:
     $ref: "./parts/prompts/prompts-id-path.yaml"
+  /api/v1/prompts/format:
+    $ref: "./parts/prompts/prompts-format-path.yaml"
   /api/v1/prompts/execute:
     $ref: "./parts/prompts/prompts-execute-path.yaml"
 
@@ -116,8 +118,8 @@ components:
       $ref: "./parts/prompts/prompt-new-schema.yaml"
     Prompt:
       $ref: "./parts/prompts/prompt-schema.yaml"
-    ExecutePromptResponse:
-      $ref: "./parts/prompts/prompt-response-execute-schema.yaml"
+    PromptResponse:
+      $ref: "./parts/prompts/prompt-response-schema.yaml"
     NewConfig:
       $ref: "./parts/configs/config-new-schema.yaml"
     Config:

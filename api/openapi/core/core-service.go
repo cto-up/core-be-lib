@@ -24,6 +24,35 @@ const (
 	ListPromptsParamsOrderDesc ListPromptsParamsOrder = "desc"
 )
 
+// Defines values for AddPromptJSONBodyFormat.
+const (
+	AddPromptJSONBodyFormatJson     AddPromptJSONBodyFormat = "json"
+	AddPromptJSONBodyFormatMarkdown AddPromptJSONBodyFormat = "markdown"
+	AddPromptJSONBodyFormatText     AddPromptJSONBodyFormat = "text"
+)
+
+// Defines values for ExecutePromptParamsProvider.
+const (
+	ANTHROPIC ExecutePromptParamsProvider = "ANTHROPIC"
+	GOOGLEAI  ExecutePromptParamsProvider = "GOOGLEAI"
+	OLLAMA    ExecutePromptParamsProvider = "OLLAMA"
+	OPENAI    ExecutePromptParamsProvider = "OPENAI"
+)
+
+// Defines values for ExecutePromptParamsOutput.
+const (
+	ExecutePromptParamsOutputJson     ExecutePromptParamsOutput = "json"
+	ExecutePromptParamsOutputMarkdown ExecutePromptParamsOutput = "markdown"
+	ExecutePromptParamsOutputText     ExecutePromptParamsOutput = "text"
+)
+
+// Defines values for UpdatePromptJSONBodyFormat.
+const (
+	Json     UpdatePromptJSONBodyFormat = "json"
+	Markdown UpdatePromptJSONBodyFormat = "markdown"
+	Text     UpdatePromptJSONBodyFormat = "text"
+)
+
 // Defines values for ListRolesParamsOrder.
 const (
 	ListRolesParamsOrderAsc  ListRolesParamsOrder = "asc"
@@ -158,11 +187,23 @@ type ListPromptsParamsOrder string
 
 // AddPromptJSONBody defines parameters for AddPrompt.
 type AddPromptJSONBody struct {
-	Content    string   `json:"content"`
-	Name       string   `json:"name"`
-	Parameters []string `json:"parameters"`
-	Tags       []string `json:"tags"`
+	Content string `json:"content"`
+
+	// Format Output format of the prompt execution
+	Format AddPromptJSONBodyFormat `json:"format"`
+
+	// FormatInstructions Instructions for the LLM on how to format the output
+	FormatInstructions string   `json:"formatInstructions"`
+	Name               string   `json:"name"`
+	Parameters         []string `json:"parameters"`
+
+	// SampleParameters Example parameter values for the prompt
+	SampleParameters *map[string]string `json:"sampleParameters,omitempty"`
+	Tags             []string           `json:"tags"`
 }
+
+// AddPromptJSONBodyFormat defines parameters for AddPrompt.
+type AddPromptJSONBodyFormat string
 
 // ExecutePromptJSONBody defines parameters for ExecutePrompt.
 type ExecutePromptJSONBody struct {
@@ -176,16 +217,60 @@ type ExecutePromptParams struct {
 
 	// Name Name of prompt to execute
 	Name *string `form:"name,omitempty" json:"name,omitempty"`
+
+	// Provider LLM Provider
+	Provider *ExecutePromptParamsProvider `form:"provider,omitempty" json:"provider,omitempty"`
+
+	// Llm LLM to use for execution
+	Llm *string `form:"llm,omitempty" json:"llm,omitempty"`
+
+	// Output Output format of the prompt execution
+	Output *ExecutePromptParamsOutput `form:"output,omitempty" json:"output,omitempty"`
+
+	// MaxTokens Maximum number of tokens to generate
+	MaxTokens *int32 `form:"maxTokens,omitempty" json:"maxTokens,omitempty"`
+}
+
+// ExecutePromptParamsProvider defines parameters for ExecutePrompt.
+type ExecutePromptParamsProvider string
+
+// ExecutePromptParamsOutput defines parameters for ExecutePrompt.
+type ExecutePromptParamsOutput string
+
+// FormatPromptJSONBody defines parameters for FormatPrompt.
+type FormatPromptJSONBody struct {
+	Parameters *map[string]string `json:"parameters,omitempty"`
+}
+
+// FormatPromptParams defines parameters for FormatPrompt.
+type FormatPromptParams struct {
+	// Id ID of prompt to execute
+	Id *openapi_types.UUID `form:"id,omitempty" json:"id,omitempty"`
+
+	// Name Name of prompt to execute
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
 }
 
 // UpdatePromptJSONBody defines parameters for UpdatePrompt.
 type UpdatePromptJSONBody struct {
-	Content    string             `json:"content"`
-	Id         openapi_types.UUID `json:"id"`
-	Name       string             `json:"name"`
-	Parameters []string           `json:"parameters"`
-	Tags       []string           `json:"tags"`
+	Content string `json:"content"`
+
+	// Format Output format of the prompt execution
+	Format UpdatePromptJSONBodyFormat `json:"format"`
+
+	// FormatInstructions Instructions for the LLM on how to format the output
+	FormatInstructions string             `json:"formatInstructions"`
+	Id                 openapi_types.UUID `json:"id"`
+	Name               string             `json:"name"`
+	Parameters         []string           `json:"parameters"`
+
+	// SampleParameters Example parameter values for the prompt
+	SampleParameters *map[string]string `json:"sampleParameters,omitempty"`
+	Tags             []string           `json:"tags"`
 }
+
+// UpdatePromptJSONBodyFormat defines parameters for UpdatePrompt.
+type UpdatePromptJSONBodyFormat string
 
 // ListRolesParams defines parameters for ListRoles.
 type ListRolesParams struct {
@@ -422,6 +507,9 @@ type AddPromptJSONRequestBody AddPromptJSONBody
 // ExecutePromptJSONRequestBody defines body for ExecutePrompt for application/json ContentType.
 type ExecutePromptJSONRequestBody ExecutePromptJSONBody
 
+// FormatPromptJSONRequestBody defines body for FormatPrompt for application/json ContentType.
+type FormatPromptJSONRequestBody FormatPromptJSONBody
+
 // UpdatePromptJSONRequestBody defines body for UpdatePrompt for application/json ContentType.
 type UpdatePromptJSONRequestBody UpdatePromptJSONBody
 
@@ -526,6 +614,9 @@ type ServerInterface interface {
 
 	// (POST /api/v1/prompts/execute)
 	ExecutePrompt(c *gin.Context, params ExecutePromptParams)
+
+	// (POST /api/v1/prompts/format)
+	FormatPrompt(c *gin.Context, params FormatPromptParams)
 
 	// (DELETE /api/v1/prompts/{id})
 	DeletePrompt(c *gin.Context, id openapi_types.UUID)
@@ -1011,6 +1102,38 @@ func (siw *ServerInterfaceWrapper) ExecutePrompt(c *gin.Context) {
 		return
 	}
 
+	// ------------- Optional query parameter "provider" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "provider", c.Request.URL.Query(), &params.Provider)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter provider: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "llm" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "llm", c.Request.URL.Query(), &params.Llm)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter llm: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "output" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "output", c.Request.URL.Query(), &params.Output)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter output: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "maxTokens" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "maxTokens", c.Request.URL.Query(), &params.MaxTokens)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter maxTokens: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -1019,6 +1142,40 @@ func (siw *ServerInterfaceWrapper) ExecutePrompt(c *gin.Context) {
 	}
 
 	siw.Handler.ExecutePrompt(c, params)
+}
+
+// FormatPrompt operation middleware
+func (siw *ServerInterfaceWrapper) FormatPrompt(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params FormatPromptParams
+
+	// ------------- Optional query parameter "id" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "id", c.Request.URL.Query(), &params.Id)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "name" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "name", c.Request.URL.Query(), &params.Name)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter name: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.FormatPrompt(c, params)
 }
 
 // DeletePrompt operation middleware
@@ -2736,6 +2893,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/api/v1/prompts", wrapper.ListPrompts)
 	router.POST(options.BaseURL+"/api/v1/prompts", wrapper.AddPrompt)
 	router.POST(options.BaseURL+"/api/v1/prompts/execute", wrapper.ExecutePrompt)
+	router.POST(options.BaseURL+"/api/v1/prompts/format", wrapper.FormatPrompt)
 	router.DELETE(options.BaseURL+"/api/v1/prompts/:id", wrapper.DeletePrompt)
 	router.GET(options.BaseURL+"/api/v1/prompts/:id", wrapper.GetPromptByID)
 	router.PUT(options.BaseURL+"/api/v1/prompts/:id", wrapper.UpdatePrompt)

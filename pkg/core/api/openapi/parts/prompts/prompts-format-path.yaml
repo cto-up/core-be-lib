@@ -1,6 +1,6 @@
 post:
   description: Execute a prompt with parameters
-  operationId: executePrompt
+  operationId: formatPrompt
   parameters:
     - name: id
       in: query
@@ -13,29 +13,6 @@ post:
       description: Name of prompt to execute
       schema:
         type: string
-    - name: provider
-      in: query
-      description: LLM Provider
-      schema:
-        type: string
-        enum: [OPENAI, GOOGLEAI, ANTHROPIC, OLLAMA]    
-    - name: llm
-      in: query
-      description: LLM to use for execution
-      schema:
-        type: string
-    - name: output
-      in: query
-      description: Output format of the prompt execution
-      schema:
-        type: string
-        enum: [text, markdown, json]
-    - name: maxTokens
-      in: query
-      description: Maximum number of tokens to generate
-      schema:
-        type: integer
-        format: int32
   requestBody:
     description: Parameters for the prompt
     required: true

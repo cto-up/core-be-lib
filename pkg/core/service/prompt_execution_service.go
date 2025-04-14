@@ -6,16 +6,20 @@ import (
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	gochains "ctoup.com/coreapp/pkg/core/service/gochains"
+	"github.com/tmc/langchaingo/memory"
 	"github.com/tmc/langchaingo/prompts"
 )
 
 type PromptExecutionService struct {
-	store *db.Store
+	chainFactory *gochains.ChainFactory
+	store        *db.Store
 }
 
 func NewPromptExecutionService(store *db.Store) *PromptExecutionService {
 	return &PromptExecutionService{
-		store: store,
+		store:        store,
+		chainFactory: gochains.NewChainFactory(memory.NewSimple()),
 	}
 }
 

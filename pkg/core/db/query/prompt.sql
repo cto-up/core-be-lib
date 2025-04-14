@@ -30,13 +30,16 @@ OFFSET $2;
 
 -- name: CreatePrompt :one
 INSERT INTO core_prompts (
-  user_id, tenant_id, "name", "content", "tags", "parameters"
+  user_id, tenant_id, "name", "content", "tags", "parameters", sample_parameters, "format", "format_instructions"
 ) VALUES (
   $1, sqlc.arg('tenant_id')::text, 
   $2, 
   $3, 
   sqlc.narg('tags')::varchar[], 
-  sqlc.narg('parameters')::varchar[]
+  sqlc.narg('parameters')::varchar[],
+  sqlc.narg('sample_parameters')::jsonb,
+  sqlc.arg('format')::varchar,
+  sqlc.narg('format_instructions')::text
 )
 RETURNING *;
 
@@ -45,8 +48,10 @@ UPDATE core_prompts
 SET "name" = COALESCE(sqlc.narg('name'), name),
     "content" = COALESCE(sqlc.narg('content'), content),
     "tags" = COALESCE(sqlc.narg('tags')::varchar[], tags),
-    "parameters" = COALESCE(sqlc.narg('parameters')::varchar[], parameters)
-
+    "parameters" = COALESCE(sqlc.narg('parameters')::varchar[], parameters),
+    "sample_parameters" = COALESCE(sqlc.narg('sample_parameters')::jsonb, sample_parameters),
+    "format" = sqlc.arg('format')::varchar,
+    "format_instructions" = COALESCE(sqlc.narg('format_instructions')::text, format_instructions)
 WHERE id = $1 AND tenant_id = sqlc.arg('tenant_id')::text
 RETURNING *;
 
