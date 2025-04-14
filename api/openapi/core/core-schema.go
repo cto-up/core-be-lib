@@ -24,6 +24,13 @@ const (
 	APITokenAuditLogActionUSED    APITokenAuditLogAction = "USED"
 )
 
+// Defines values for PromptFormat.
+const (
+	Json     PromptFormat = "json"
+	Markdown PromptFormat = "markdown"
+	Text     PromptFormat = "text"
+)
+
 // Defines values for UserActionSchemaName.
 const (
 	DISABLED      UserActionSchemaName = "DISABLED"
@@ -179,6 +186,27 @@ type NewUser struct {
 	Name     string `json:"name"`
 	Password string `json:"password"`
 }
+
+// Prompt defines model for Prompt.
+type Prompt struct {
+	Content string `json:"content"`
+
+	// Format Output format of the prompt execution
+	Format PromptFormat `json:"format"`
+
+	// FormatInstructions Instructions for the LLM on how to format the output
+	FormatInstructions string             `json:"formatInstructions"`
+	Id                 openapi_types.UUID `json:"id"`
+	Name               string             `json:"name"`
+	Parameters         []string           `json:"parameters"`
+
+	// SampleParameters Example parameter values for the prompt
+	SampleParameters *map[string]string `json:"sampleParameters,omitempty"`
+	Tags             []string           `json:"tags"`
+}
+
+// PromptFormat Output format of the prompt execution
+type PromptFormat string
 
 // PromptResponse defines model for PromptResponse.
 type PromptResponse struct {

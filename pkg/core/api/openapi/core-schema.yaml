@@ -316,5 +316,7 @@ components:
         additionalData:
           type: object
           nullable: true
+    Prompt:
+      $ref: "./parts/prompts/prompt-schema.yaml"
     PromptResponse:
       $ref: "./parts/prompts/prompt-response-schema.yaml"

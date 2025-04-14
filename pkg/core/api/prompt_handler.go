@@ -125,7 +125,7 @@ func (exh *PromptHandler) GetPromptByID(c *gin.Context, id uuid.UUID) {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
-	prompt, err := exh.store.GetPromptByID(c, repository.GetPromptByIDParams{
+	promptDB, err := exh.store.GetPromptByID(c, repository.GetPromptByIDParams{
 		ID:       id,
 		TenantID: tenantID.(string),
 	})
@@ -137,6 +137,20 @@ func (exh *PromptHandler) GetPromptByID(c *gin.Context, id uuid.UUID) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+
+	sampleParameters := util.FromJSONB[map[string]string](promptDB.SampleParameters)
+
+	prompt := api.Prompt{
+		Id:                 promptDB.ID,
+		Name:               promptDB.Name,
+		Content:            promptDB.Content,
+		Tags:               promptDB.Tags,
+		Parameters:         promptDB.Parameters,
+		SampleParameters:   &sampleParameters,
+		Format:             api.PromptFormat(promptDB.Format),
+		FormatInstructions: promptDB.FormatInstructions.String,
+	}
+
 	c.JSON(http.StatusOK, prompt)
 }
 
