@@ -175,3 +175,11 @@ components:
       $ref: "./core-schema.yaml#/components/schemas/UserProfileSchema"
     UserActionSchema:
       $ref: "./parts/users/user-action-schema.yaml"
+    
+    # Prompts
+    Prompt:
+      $ref: "./core-schema.yaml#/components/schemas/Prompt"
+    PromptResponse:
+      $ref: "./core-schema.yaml#/components/schemas/PromptResponse"
+    NewPrompt:
+      $ref: "./core-schema.yaml#/components/schemas/NewPrompt"
