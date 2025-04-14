@@ -24,11 +24,18 @@ const (
 	APITokenAuditLogActionUSED    APITokenAuditLogAction = "USED"
 )
 
+// Defines values for NewPromptFormat.
+const (
+	NewPromptFormatJson     NewPromptFormat = "json"
+	NewPromptFormatMarkdown NewPromptFormat = "markdown"
+	NewPromptFormatText     NewPromptFormat = "text"
+)
+
 // Defines values for PromptFormat.
 const (
-	Json     PromptFormat = "json"
-	Markdown PromptFormat = "markdown"
-	Text     PromptFormat = "text"
+	PromptFormatJson     PromptFormat = "json"
+	PromptFormatMarkdown PromptFormat = "markdown"
+	PromptFormatText     PromptFormat = "text"
 )
 
 // Defines values for UserActionSchemaName.
@@ -166,6 +173,26 @@ type NewClientApplication struct {
 	LastUsed    *time.Time `json:"lastUsed,omitempty"`
 	Name        string     `json:"name"`
 }
+
+// NewPrompt defines model for NewPrompt.
+type NewPrompt struct {
+	Content string `json:"content"`
+
+	// Format Output format of the prompt execution
+	Format NewPromptFormat `json:"format"`
+
+	// FormatInstructions Instructions for the LLM on how to format the output
+	FormatInstructions string   `json:"formatInstructions"`
+	Name               string   `json:"name"`
+	Parameters         []string `json:"parameters"`
+
+	// SampleParameters Example parameter values for the prompt
+	SampleParameters *map[string]string `json:"sampleParameters,omitempty"`
+	Tags             []string           `json:"tags"`
+}
+
+// NewPromptFormat Output format of the prompt execution
+type NewPromptFormat string
 
 // NewRole defines model for NewRole.
 type NewRole struct {

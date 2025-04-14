@@ -114,12 +114,6 @@ paths:
 
 components:
   schemas:
-    NewPrompt:
-      $ref: "./parts/prompts/prompt-new-schema.yaml"
-    Prompt:
-      $ref: "./parts/prompts/prompt-schema.yaml"
-    PromptResponse:
-      $ref: "./parts/prompts/prompt-response-schema.yaml"
     NewConfig:
       $ref: "./parts/configs/config-new-schema.yaml"
     Config:
