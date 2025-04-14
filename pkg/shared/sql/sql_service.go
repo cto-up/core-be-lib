@@ -35,6 +35,10 @@ type PostgresConnector struct {
 	dbConnection string
 }
 
+func NewPostgresConnector(dbConnection string) PostgresConnector {
+	return PostgresConnector{dbConnection: dbConnection}
+}
+
 // Connect always throws error
 func (r PostgresConnector) Connect() (*pgxpool.Pool, error) {
 	connPool, err := pgxpool.New(context.Background(), r.dbConnection)
