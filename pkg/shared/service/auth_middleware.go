@@ -1,6 +1,7 @@
 package service
 
 import (
+	"net/http"
 	"strings"
 
 	"ctoup.com/coreapp/pkg/shared/util"
@@ -54,17 +55,25 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					return
 				} else {
 					// API token is invalid
+					c.JSON(http.StatusForbidden, gin.H{
+						"status":  http.StatusForbidden,
+						"message": "Invalid API token",
+					})
 					c.Abort()
+					return
 				}
 			} else {
 				_, failed := am.firebaseAuth.verifyToken(c)
 				if failed {
-					abort(am.firebaseAuth, c)
+					// No API token and Firebase auth failed
+					c.JSON(http.StatusUnauthorized, gin.H{
+						"status":  http.StatusUnauthorized,
+						"message": "Authentication required",
+					})
+					c.Abort()
 					return
 				}
-
 			}
-
 		} else {
 			idToken, failed := am.firebaseAuth.verifyToken(c)
 			if failed {
@@ -77,6 +86,10 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					if idToken.Claims["ADMIN"] == true || idToken.Claims[FIREBASE_CLAIM_EMAIL] == "jcantonio@alineo.com" {
 						// OK
 					} else {
+						c.JSON(http.StatusForbidden, gin.H{
+							"status":  http.StatusForbidden,
+							"message": "Need to be an ADMIN to perform such operation",
+						})
 						c.Abort()
 						return
 					}
@@ -87,6 +100,10 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					if idToken.Claims["SUPER_ADMIN"] == true || idToken.Claims[FIREBASE_CLAIM_EMAIL] == "jcantonio@alineo.com" {
 						// OK
 					} else {
+						c.JSON(http.StatusForbidden, gin.H{
+							"status":  http.StatusForbidden,
+							"message": "Need to be a SUPER_ADMIN to perform such operation",
+						})
 						c.Abort()
 						return
 					}
