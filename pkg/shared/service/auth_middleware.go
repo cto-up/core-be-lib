@@ -51,6 +51,9 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					// API token is valid, store info and continue
 					c.Set("api_token", tokenRow)
 					c.Set("api_token_scopes", tokenRow.Scopes)
+					// c.Set(AUTH_EMAIL,)
+					//c.Set(AUTH_CLAIMS, idToken.Claims)
+					c.Set(AUTH_USER_ID, tokenRow.CreatedBy)
 					c.Next()
 					return
 				} else {
