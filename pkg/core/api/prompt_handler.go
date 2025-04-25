@@ -364,10 +364,13 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	}
 	provider := llmmodels.Provider(*queryParams.Provider)
 
+	var generatedAnswer string
+	var generationError error
+
 	go func() {
 		defer func() {
 			clientChan <- event.NewProgressEvent("INFO",
-				"Answer Generation Ended", 100)
+				generatedAnswer, 100)
 			close(clientChan)
 		}()
 
@@ -395,9 +398,9 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			return
 		}
 
-		_, err = h.executionService.GenerateAnswer(c,
+		generatedAnswer, err = h.executionService.GenerateAnswer(c,
 			chainConfig,
-			params, // pass the converted params
+			params,
 			userID.(string),
 			clientChan,
 		)
@@ -415,6 +418,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		if msg, ok := <-clientChan; ok {
 			c.SSEvent("message", msg)
 			if msg.EventType == "ERROR" || msg.Progress == 100 {
+				generationError = errors.New(msg.Message)
 				return false
 			}
 			return true
@@ -422,21 +426,13 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		return false
 	})
 
-	result, err := h.executionService.ExecutePrompt(c, prompt, service.ExecutePromptParams{
-		Parameters: *req.Parameters,
-	})
-
-	if err != nil {
-		if strings.HasPrefix(err.Error(), "missing required parameter:") {
-			c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
-			return
-		}
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+	if generationError != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(generationError))
 		return
 	}
 
 	c.JSON(http.StatusOK, api.PromptResponse{
-		Result: result,
+		Result: generatedAnswer,
 	})
 }
 
