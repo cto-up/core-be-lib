@@ -364,6 +364,50 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	}
 	provider := llmmodels.Provider(*queryParams.Provider)
 
+	// Convert *map[string]string to map[string]any for GenerateAnswer
+	params := make(map[string]any)
+	if req.Parameters != nil {
+		for k, v := range *req.Parameters {
+			params[k] = v
+		}
+	}
+
+	chainConfig, err := gochains.NewBaseChain(
+		prompt.Content,
+		prompt.Parameters,
+		prompt.FormatInstructions.String,
+		maxTokens,
+		provider,
+		llm,
+		prompt.Format == "json",
+	)
+	if err != nil {
+		log.Printf("Error NewBaseChain: %v", err)
+		c.JSON(http.StatusBadRequest, "NewBaseChain error")
+		return
+	}
+
+	streaming := c.GetHeader("Accept") == "text/event-stream"
+
+	if !streaming {
+		generatedAnswer, err := h.executionService.GenerateAnswer(c,
+			chainConfig,
+			params,
+			userID.(string),
+			nil,
+		)
+
+		if err != nil {
+			log.Printf("Error generating answer: %v", err)
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
+
+		c.JSON(http.StatusOK, api.PromptResponse{
+			Result: generatedAnswer,
+		})
+		return
+	}
 	var generatedAnswer string
 	var generationError error
 
@@ -373,30 +417,6 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 				generatedAnswer, 100)
 			close(clientChan)
 		}()
-
-		// Convert *map[string]string to map[string]any for GenerateAnswer
-		params := make(map[string]any)
-		if req.Parameters != nil {
-			for k, v := range *req.Parameters {
-				params[k] = v
-			}
-		}
-
-		chainConfig, err := gochains.NewBaseChain(
-			prompt.Content,
-			prompt.Parameters,
-			prompt.FormatInstructions.String,
-			maxTokens,
-			provider,
-			llm,
-			prompt.Format == "json",
-		)
-		if err != nil {
-			log.Printf("Error generating answer: %v", err)
-			clientChan <- event.NewProgressEvent("ERROR",
-				"Generation answer error NewBaseChain", 10)
-			return
-		}
 
 		generatedAnswer, err = h.executionService.GenerateAnswer(c,
 			chainConfig,

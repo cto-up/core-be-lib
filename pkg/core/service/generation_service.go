@@ -46,16 +46,23 @@ func (s *PromptExecutionService) GenerateAnswer(ctx context.Context, chainConfig
 		OutputKey:    _llmChainDefaultOutputKey,
 	}
 
-	res, err := chains.Call(ctx, chain, params, chains.WithMaxTokens(chainConfig.GetMaxTokens()),
-		chains.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
-			clientChan <- event.NewProgressEvent("MSG",
-				string(chunk), 50)
-			return nil
-		}))
+	if clientChan != nil {
+		res, err := chains.Call(ctx, chain, params, chains.WithMaxTokens(chainConfig.GetMaxTokens()),
+			chains.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+				clientChan <- event.NewProgressEvent("MSG",
+					string(chunk), 50)
+				return nil
+			}))
 
-	if err != nil {
-		return "", err
+		if err != nil {
+			return "", err
+		}
+		return res["text"].(string), nil
+	} else {
+		res, err := chains.Call(ctx, chain, params, chains.WithMaxTokens(chainConfig.GetMaxTokens()))
+		if err != nil {
+			return "", err
+		}
+		return res["text"].(string), nil
 	}
-
-	return res["text"].(string), nil
 }
