@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"time"
@@ -51,7 +52,7 @@ func ToNullableInt4(value *int32) pgtype.Int4 {
 	return pgtype.Int4{Int32: *value, Valid: true}
 }
 
-func ToNullableNumeric(value *int64) pgtype.Numeric {
+func ToNullableNumericFromInt(value *int64) pgtype.Numeric {
 	if value == nil {
 		return pgtype.Numeric{Valid: false}
 	}
@@ -146,6 +147,47 @@ func ToNullableSlice(ptr *[]string) []string {
 		return []string{}
 	}
 	return *ptr
+}
+
+func ToNullableNumericReal(value float64, nberOfDecimal int) (pgtype.Numeric, error) {
+	r := new(big.Rat).SetFloat64(value)
+	if r == nil {
+		fmt.Println("Could not convert float64 to big.Rat")
+		return pgtype.Numeric{}, nil
+	}
+
+	scale := new(big.Rat).SetFloat64(math.Pow10(nberOfDecimal))
+	r.Mul(r, scale) // Scale up
+
+	// Now r is scaled, but still a *big.Rat (fraction)
+	// We need an integer: r.Num() / r.Denom()
+
+	// Divide numerator by denominator to get the final integer
+	intVal := new(big.Int).Quo(r.Num(), r.Denom())
+	scoreDB := pgtype.Numeric{
+		Int:   intVal,
+		Exp:   int32(-nberOfDecimal),
+		Valid: true,
+	}
+	return scoreDB, nil
+}
+func FromNullableReal(num pgtype.Numeric) float32 {
+	if !num.Valid {
+		return 0
+	}
+
+	// Create a big.Rat from the Numeric's components
+	r := new(big.Rat).SetFrac(num.Int, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-num.Exp)), nil))
+
+	// Convert to float64
+	f, exact := r.Float32()
+	if !exact {
+		// The conversion wasn't exact, but we'll still return the approximate value
+		// You might want to handle this case differently depending on your needs
+		return 0
+	}
+
+	return f
 }
 
 // Helper functions for the generic version
