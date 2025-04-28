@@ -149,7 +149,7 @@ func ToNullableSlice(ptr *[]string) []string {
 	return *ptr
 }
 
-func ToNullableNumericReal(value float64, nberOfDecimal int) (pgtype.Numeric, error) {
+func ToNullableNumericDecimal(value float64, nberOfDecimal int) (pgtype.Numeric, error) {
 	r := new(big.Rat).SetFloat64(value)
 	if r == nil {
 		fmt.Println("Could not convert float64 to big.Rat")
@@ -171,7 +171,7 @@ func ToNullableNumericReal(value float64, nberOfDecimal int) (pgtype.Numeric, er
 	}
 	return scoreDB, nil
 }
-func FromNullableReal(num pgtype.Numeric) float32 {
+func FromNullableDecimal(num pgtype.Numeric) float32 {
 	if !num.Valid {
 		return 0
 	}
