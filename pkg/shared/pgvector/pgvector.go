@@ -259,7 +259,7 @@ SELECT %s, 1 - (%s <=> $1) as similarity_score
 FROM %s LEFT JOIN docu_documents ON %s.document_id = docu_documents.id 
 WHERE 1 - (embedding <=> $1) > %v 
 AND (docu_documents.acl IS NULL OR docu_documents.acl = '{}' OR docu_documents.acl && array['%s'])
-AND (docu_documents.tags && array['%s'] OR '%s' IS NULL OR '%s' = '{}')
+AND (docu_documents.tags && array['%s'] OR '%s' = '' OR '%s' IS NULL OR '%s' = '{}')
 AND %s.tenant_id = '%s'
 ORDER BY similarity_score DESC LIMIT %d`
 
@@ -279,6 +279,8 @@ func (store Store) generateSelectQuery(numDocuments int, threshold float32, tena
 		selectedColumns = store.textColumnName
 	}
 
+	tagsString := strings.Join(tags, "','")
+
 	// Build query using strings.Builder
 	fmt.Fprintf(&queryBuilder, baseQueryFormat,
 		selectedColumns,                // Columns
@@ -287,9 +289,10 @@ func (store Store) generateSelectQuery(numDocuments int, threshold float32, tena
 		store.tableName,                // Join condition
 		threshold,                      // Similarity threshold
 		strings.Join(roles, "','"),     // Roles for ACL check
-		strings.Join(tags, "','"),      // Tags for tag check
-		strings.Join(tags, "','"),      // Tags for tag check
-		strings.Join(tags, "','"),      // Tags for tag check
+		tagsString,                     // Tags for tag check
+		tagsString,                     // Tags for tag check
+		tagsString,                     // Tags for tag check
+		tagsString,                     // Tags for tag check
 		store.tableName,                // Table name
 		tenantID,                       // Tenant ID
 		numDocuments,                   // Limit on results
