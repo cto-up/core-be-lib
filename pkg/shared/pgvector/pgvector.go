@@ -27,11 +27,15 @@ type ColumnValue struct {
 
 type OptionFilter struct {
 	TenantIDColumn ColumnValue
+	TagsColumn     ColumnValue
 	RolesColumn    ColumnValue
 }
 
 func (option OptionFilter) GetRoles() []string {
 	return option.RolesColumn.Value.([]string)
+}
+func (option OptionFilter) GetTags() []string {
+	return option.TagsColumn.Value.([]string)
 }
 func (option OptionFilter) GetTenantID() string {
 	return option.TenantIDColumn.Value.(string)
@@ -199,15 +203,17 @@ func (store Store) SimilaritySearch(ctx context.Context, searchString string, nu
 	}
 
 	roles := []string{}
+	tags := []string{}
 	tenantID := ""
 	opts := store.getOptions(options...)
 	if opts.Filters != nil {
 		filter := opts.Filters.(OptionFilter)
 		roles = filter.GetRoles()
+		tags = filter.GetTags()
 		tenantID = filter.GetTenantID()
 	}
 
-	query, err := store.generateSelectQuery(numDocuments, opts.ScoreThreshold, tenantID, roles)
+	query, err := store.generateSelectQuery(numDocuments, opts.ScoreThreshold, tenantID, roles, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -251,11 +257,13 @@ func (store Store) SimilaritySearch(ctx context.Context, searchString string, nu
 const baseQueryFormat = `
 SELECT %s, 1 - (%s <=> $1) as similarity_score 
 FROM %s LEFT JOIN docu_documents ON %s.document_id = docu_documents.id 
-WHERE 1 - (embedding <=> $1) > %v AND docu_documents.acl && array['%s'] 
+WHERE 1 - (embedding <=> $1) > %v 
+AND (docu_documents.acl IS NULL OR docu_documents.acl = '{}' OR docu_documents.acl && array['%s'])
+AND (docu_documents.tags && array['%s'] OR '%s' IS NULL OR '%s' = '{}')
 AND %s.tenant_id = '%s'
 ORDER BY similarity_score DESC LIMIT %d`
 
-func (store Store) generateSelectQuery(numDocuments int, threshold float32, tenantID string, roles []string) (string, error) {
+func (store Store) generateSelectQuery(numDocuments int, threshold float32, tenantID string, roles []string, tags []string) (string, error) {
 	var queryBuilder strings.Builder
 	var selectedColumns string
 
@@ -279,6 +287,9 @@ func (store Store) generateSelectQuery(numDocuments int, threshold float32, tena
 		store.tableName,                // Join condition
 		threshold,                      // Similarity threshold
 		strings.Join(roles, "','"),     // Roles for ACL check
+		strings.Join(tags, "','"),      // Tags for tag check
+		strings.Join(tags, "','"),      // Tags for tag check
+		strings.Join(tags, "','"),      // Tags for tag check
 		store.tableName,                // Table name
 		tenantID,                       // Tenant ID
 		numDocuments,                   // Limit on results
