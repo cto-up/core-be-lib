@@ -48,9 +48,9 @@ var (
 	serverConfigOnce     sync.Once
 )
 
-func NewServerConfig(connPool *pgxpool.Pool, dbConnection string, additionalChecks ...checks.Check) *ServerConfig {
+func NewServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gin.HandlerFunc, additionalChecks ...checks.Check) *ServerConfig {
 	serverConfigOnce.Do(func() {
-		serverConfigInstance = initializeServerConfig(connPool, dbConnection, additionalChecks...)
+		serverConfigInstance = initializeServerConfig(connPool, dbConnection, cors, additionalChecks...)
 	})
 	return serverConfigInstance
 }
@@ -66,7 +66,7 @@ func setupHealthCheck(router *gin.Engine, defaultChecks ...checks.Check) {
 	healthcheck.New(router, config.DefaultConfig(), allChecks)
 }
 
-func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, additionalChecks ...checks.Check) *ServerConfig {
+func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gin.HandlerFunc, additionalChecks ...checks.Check) *ServerConfig {
 	coreStore := db.NewStore(connPool)
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
@@ -74,7 +74,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, additio
 		v.RegisterValidation("uuid", helpers.ValidateUUID)
 	}
 	router := gin.Default()
-	router.Use(helpers.CORS())
+	router.Use(cors)
 
 	// to be removed when https://github.com/jackc/pgx/pull/1718 can inclide sql
 	db, err := sql.Open("postgres", dbConnection)

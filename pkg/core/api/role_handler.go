@@ -170,10 +170,6 @@ func (rh *RoleHandler) ListRoles(c *gin.Context, params core.ListRolesParams) {
 }
 
 func NewRoleHandler(store *db.Store) *RoleHandler {
-	router := gin.Default()
-	router.Use(helpers.CORS())
-
 	handler := &RoleHandler{store: store}
-
 	return handler
 }
