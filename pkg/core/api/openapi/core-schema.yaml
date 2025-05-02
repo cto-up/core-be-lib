@@ -2,86 +2,15 @@ components:
   schemas:
     # Tenant related schemas
     NewTenant:
-      type: object
-      required:
-        - name
-        - subdomain
-        - enable_email_link_sign_in
-        - allow_password_sign_up
-      properties:
-        name:
-          type: string
-        subdomain:
-          type: string
-        enable_email_link_sign_in:
-          type: boolean
-        allow_password_sign_up:
-          type: boolean
-
+      $ref: "./parts/tenant-new-schema.yaml"
     Tenant:
-      allOf:
-        - $ref: "#/components/schemas/NewTenant"
-        - type: object
-          required:
-            - id
-            - tenant_id
-          properties:
-            id:
-              type: string
-              format: uuid
-            tenant_id:
-              type: string
-
+      $ref: "./parts/tenant-schema.yaml"
     TenantProfile:
-      type: object
-      required:
-        - displayName
-        - companyName
-        - lightColors
-        - darkColors
-      properties:
-        displayName:
-          type: string
-        companyName:
-          type: string
-        values:
-          type: string
-        storeRAGDocument:
-          type: boolean
-        lightColors:
-          $ref: "#/components/schemas/ColorSchema"
-        darkColors:
-          $ref: "#/components/schemas/ColorSchema"
-
+      $ref: "./parts/tenant-profile-schema.yaml"
     TenantFeatures:
-      type: object
-      additionalProperties:
-        type: boolean
-      description: "Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled"
-
+      $ref: "./parts/tenant-features-schema.yaml"
     ColorSchema:
-      type: object
-      properties:
-        background:
-          type: string
-        primary:
-          type: string
-        secondary:
-          type: string
-        tertiary:
-          type: string
-        accent:
-          type: string
-        positive:
-          type: string
-        negative:
-          type: string
-        info:
-          type: string
-        warning:
-          type: string
-        text:
-          type: string
+      $ref: "./parts/tenant-color-schema.yaml"
     # Users
     NewUser:
       type: object
@@ -278,7 +207,6 @@ components:
           description: The full token value (only returned once upon creation)
         apiToken:
           $ref: "#/components/schemas/APIToken"
-
     APITokenRevoke:
       type: object
       required:
@@ -286,7 +214,6 @@ components:
       properties:
         reason:
           type: string
-
     APITokenAuditLog:
       type: object
       required:
@@ -322,3 +249,29 @@ components:
       $ref: "./parts/prompts/prompt-response-schema.yaml"
     NewPrompt:
       $ref: "./parts/prompts/prompt-new-schema.yaml"
+    NewConfig:
+      $ref: "./parts/configs/config-new-schema.yaml"
+    Config:
+      $ref: "./parts/configs/config-schema.yaml"
+
+    # Common
+    BasicEntity:
+      $ref: "./parts/basic-entity-schema.yaml"
+    ErrorSchema:
+      $ref: "./parts/error-schema.yaml"
+
+    # Public
+    PublicTenantSchema:
+      $ref: "./parts/public-tenant-schema.yaml"
+
+    # Health
+    HealthResponse:
+      $ref: "./parts/health/health-response-schema.yaml"
+    CheckDetails:
+      $ref: "./parts/health/check-details-schema.yaml"
+
+    # Translations
+    NewTranslation:
+      $ref: "./parts/translations/translation-new-schema.yaml"
+    Translation:
+      $ref: "./parts/translations/translation-schema.yaml"

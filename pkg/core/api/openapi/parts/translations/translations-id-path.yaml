@@ -1,0 +1,81 @@
+get:
+  description: Returns a translation by ID
+  operationId: getTranslationByID
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: lang
+      in: query
+      schema:
+        type: string
+        enum: [en, fr]
+        default: en
+  responses:
+    "200":
+      description: Translation found
+      content:
+        application/json:
+          schema:
+            $ref: "./translation-schema.yaml"
+    "401":
+      description: Unauthorized
+    "403":
+      description: Forbidden
+    "404":
+      description: Translation not found
+
+put:
+  description: Updates a translation
+  operationId: updateTranslation
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "./translation-new-schema.yaml"
+  responses:
+    "200":
+      description: Translation updated
+      content:
+        application/json:
+          schema:
+            $ref: "./translation-schema.yaml"
+    "400":
+      description: Invalid input
+    "401":
+      description: Unauthorized
+    "403":
+      description: Forbidden
+    "404":
+      description: Translation not found
+
+delete:
+  description: Deletes a translation
+  operationId: deleteTranslation
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    "204":
+      description: Translation deleted
+    "401":
+      description: Unauthorized
+    "403":
+      description: Forbidden
+    "404":
+      description: Translation not found

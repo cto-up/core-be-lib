@@ -111,75 +111,13 @@ paths:
     $ref: "./parts/prompts/prompts-format-path.yaml"
   /api/v1/prompts/execute:
     $ref: "./parts/prompts/prompts-execute-path.yaml"
+  ## translations
+  /api/v1/translations:
+    $ref: "./parts/translations/translations-path.yaml"
+  /api/v1/translations/search:
+    $ref: "./parts/translations/translations-search-path.yaml"
+  /api/v1/translations/{id}:
+    $ref: "./parts/translations/translations-id-path.yaml"
 
 components:
-  schemas:
-    NewConfig:
-      $ref: "./parts/configs/config-new-schema.yaml"
-    Config:
-      $ref: "./parts/configs/config-schema.yaml"
-
-    # Client Applications and API Tokens
-    ClientApplication:
-      $ref: "./core-schema.yaml#/components/schemas/ClientApplication"
-    NewClientApplication:
-      $ref: "./core-schema.yaml#/components/schemas/NewClientApplication"
-    APIToken:
-      $ref: "./core-schema.yaml#/components/schemas/APIToken"
-    NewAPIToken:
-      $ref: "./core-schema.yaml#/components/schemas/NewAPIToken"
-    APITokenCreated:
-      $ref: "./core-schema.yaml#/components/schemas/APITokenCreated"
-    APITokenRevoke:
-      $ref: "./core-schema.yaml#/components/schemas/APITokenRevoke"
-    APITokenAuditLog:
-      $ref: "./core-schema.yaml#/components/schemas/APITokenAuditLog"
-    # Common
-    BasicEntity:
-      $ref: "./parts/basic-entity-schema.yaml"
-    ErrorSchema:
-      $ref: "./parts/error-schema.yaml"
-
-    # Public
-    PublicTenantSchema:
-      $ref: "./parts/public-tenant-schema.yaml"
-
-    # Health
-    HealthResponse:
-      $ref: "./parts/health/health-response-schema.yaml"
-    CheckDetails:
-      $ref: "./parts/health/check-details-schema.yaml"
-
-    # Admin
-    NewRole:
-      $ref: "./core-schema.yaml#/components/schemas/NewRole"
-    Role:
-      $ref: "./core-schema.yaml#/components/schemas/Role"
-    NewTenant:
-      $ref: "./core-schema.yaml#/components/schemas/NewTenant"
-    Tenant:
-      $ref: "./core-schema.yaml#/components/schemas/Tenant"
-    ColorSchema:
-      $ref: "./core-schema.yaml#/components/schemas/ColorSchema"
-    TenantProfileSchema:
-      $ref: "./core-schema.yaml#/components/schemas/TenantProfile"
-    TenantFeatures:
-      $ref: "./core-schema.yaml#/components/schemas/TenantFeatures"
-
-    # Users
-    NewUser:
-      $ref: "./core-schema.yaml#/components/schemas/NewUser"
-    User:
-      $ref: "./core-schema.yaml#/components/schemas/User"
-    UserProfileSchema:
-      $ref: "./core-schema.yaml#/components/schemas/UserProfileSchema"
-    UserActionSchema:
-      $ref: "./parts/users/user-action-schema.yaml"
-    
-    # Prompts
-    Prompt:
-      $ref: "./core-schema.yaml#/components/schemas/Prompt"
-    PromptResponse:
-      $ref: "./core-schema.yaml#/components/schemas/PromptResponse"
-    NewPrompt:
-      $ref: "./core-schema.yaml#/components/schemas/NewPrompt"
+  $ref: "./core-schema.yaml#/components"

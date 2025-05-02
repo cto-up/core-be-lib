@@ -1,0 +1,15 @@
+type: object
+required:
+  - name
+  - subdomain
+  - enable_email_link_sign_in
+  - allow_password_sign_up
+properties:
+  name:
+    type: string
+  subdomain:
+    type: string
+  enable_email_link_sign_in:
+    type: boolean
+  allow_password_sign_up:
+    type: boolean

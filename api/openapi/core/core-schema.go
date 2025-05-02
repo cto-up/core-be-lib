@@ -24,6 +24,27 @@ const (
 	APITokenAuditLogActionUSED    APITokenAuditLogAction = "USED"
 )
 
+// Defines values for CheckDetailsStatus.
+const (
+	CheckDetailsStatusFail CheckDetailsStatus = "fail"
+	CheckDetailsStatusPass CheckDetailsStatus = "pass"
+	CheckDetailsStatusWarn CheckDetailsStatus = "warn"
+)
+
+// Defines values for HealthResponseChecksStatus.
+const (
+	HealthResponseChecksStatusFail HealthResponseChecksStatus = "fail"
+	HealthResponseChecksStatusPass HealthResponseChecksStatus = "pass"
+	HealthResponseChecksStatusWarn HealthResponseChecksStatus = "warn"
+)
+
+// Defines values for HealthResponseStatus.
+const (
+	Fail HealthResponseStatus = "fail"
+	Pass HealthResponseStatus = "pass"
+	Warn HealthResponseStatus = "warn"
+)
+
 // Defines values for NewPromptFormat.
 const (
 	NewPromptFormatJson     NewPromptFormat = "json"
@@ -121,6 +142,34 @@ type APITokenRevoke struct {
 	Reason string `json:"reason"`
 }
 
+// BasicEntity defines model for BasicEntity.
+type BasicEntity struct {
+	Icon *string            `json:"icon,omitempty"`
+	Id   openapi_types.UUID `json:"id"`
+	Name string             `json:"name"`
+}
+
+// CheckDetails defines model for CheckDetails.
+type CheckDetails struct {
+	// ComponentName The name of the component being checked
+	ComponentName *string `json:"componentName,omitempty"`
+
+	// ComponentType The type of component (e.g., database, cache, external service)
+	ComponentType string `json:"componentType"`
+
+	// Output Any additional information or error output for this check
+	Output *string `json:"output,omitempty"`
+
+	// Status The status of this particular component
+	Status CheckDetailsStatus `json:"status"`
+
+	// Time The time at which this check was performed
+	Time *time.Time `json:"time,omitempty"`
+}
+
+// CheckDetailsStatus The status of this particular component
+type CheckDetailsStatus string
+
 // ClientApplication defines model for ClientApplication.
 type ClientApplication struct {
 	Active      bool               `json:"active"`
@@ -148,6 +197,61 @@ type ColorSchema struct {
 	Warning    *string `json:"warning,omitempty"`
 }
 
+// Config defines model for Config.
+type Config struct {
+	Id    openapi_types.UUID `json:"id"`
+	Name  string             `json:"name"`
+	Value *string            `json:"value,omitempty"`
+}
+
+// ErrorSchema defines model for ErrorSchema.
+type ErrorSchema struct {
+	Code    int32  `json:"code"`
+	Message string `json:"message"`
+}
+
+// HealthResponse defines model for HealthResponse.
+type HealthResponse struct {
+	// Checks Detailed health check results for API components or dependencies
+	Checks *map[string]struct {
+		// ComponentName The name of the component being checked
+		ComponentName *string `json:"componentName,omitempty"`
+
+		// ComponentType The type of component (e.g., database, cache, external service)
+		ComponentType string `json:"componentType"`
+
+		// Output Any additional information or error output for this check
+		Output *string `json:"output,omitempty"`
+
+		// Status The status of this particular component
+		Status HealthResponseChecksStatus `json:"status"`
+
+		// Time The time at which this check was performed
+		Time *time.Time `json:"time,omitempty"`
+	} `json:"checks,omitempty"`
+
+	// Notes Array of notes relevant to current state of health
+	Notes *[]string `json:"notes,omitempty"`
+
+	// Output Raw error output, in case of "fail" or "warn" states
+	Output *string `json:"output,omitempty"`
+
+	// ReleaseId An identifier for this deployment or release of the API
+	ReleaseId *string `json:"releaseId,omitempty"`
+
+	// Status The overall health status of the API
+	Status HealthResponseStatus `json:"status"`
+
+	// Version The version of the API
+	Version string `json:"version"`
+}
+
+// HealthResponseChecksStatus The status of this particular component
+type HealthResponseChecksStatus string
+
+// HealthResponseStatus The overall health status of the API
+type HealthResponseStatus string
+
 // NewAPIToken defines model for NewAPIToken.
 type NewAPIToken struct {
 	// ApplicationName Name of the client application
@@ -172,6 +276,12 @@ type NewClientApplication struct {
 	Description string     `json:"description"`
 	LastUsed    *time.Time `json:"lastUsed,omitempty"`
 	Name        string     `json:"name"`
+}
+
+// NewConfig defines model for NewConfig.
+type NewConfig struct {
+	Name  string  `json:"name"`
+	Value *string `json:"value,omitempty"`
 }
 
 // NewPrompt defines model for NewPrompt.
@@ -207,6 +317,15 @@ type NewTenant struct {
 	Subdomain             string `json:"subdomain"`
 }
 
+// NewTranslation defines model for NewTranslation.
+type NewTranslation struct {
+	EntityId   openapi_types.UUID `json:"entity_id"`
+	EntityType string             `json:"entity_type"`
+	Field      string             `json:"field"`
+	Language   string             `json:"language"`
+	Value      string             `json:"value"`
+}
+
 // NewUser defines model for NewUser.
 type NewUser struct {
 	Email    string `json:"email"`
@@ -240,6 +359,49 @@ type PromptResponse struct {
 	Result string `json:"result"`
 }
 
+// PublicTenantSchema defines model for PublicTenantSchema.
+type PublicTenantSchema struct {
+	AllowPasswordSignUp   bool `json:"allow_password_sign_up"`
+	EnableEmailLinkSignIn bool `json:"enable_email_link_sign_in"`
+
+	// Features Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
+	Features map[string]bool    `json:"features"`
+	Id       openapi_types.UUID `json:"id"`
+	Name     string             `json:"name"`
+	Profile  struct {
+		CompanyName string `json:"companyName"`
+		DarkColors  struct {
+			Accent     *string `json:"accent,omitempty"`
+			Background *string `json:"background,omitempty"`
+			Info       *string `json:"info,omitempty"`
+			Negative   *string `json:"negative,omitempty"`
+			Positive   *string `json:"positive,omitempty"`
+			Primary    *string `json:"primary,omitempty"`
+			Secondary  *string `json:"secondary,omitempty"`
+			Tertiary   *string `json:"tertiary,omitempty"`
+			Text       *string `json:"text,omitempty"`
+			Warning    *string `json:"warning,omitempty"`
+		} `json:"darkColors"`
+		DisplayName string `json:"displayName"`
+		LightColors struct {
+			Accent     *string `json:"accent,omitempty"`
+			Background *string `json:"background,omitempty"`
+			Info       *string `json:"info,omitempty"`
+			Negative   *string `json:"negative,omitempty"`
+			Positive   *string `json:"positive,omitempty"`
+			Primary    *string `json:"primary,omitempty"`
+			Secondary  *string `json:"secondary,omitempty"`
+			Tertiary   *string `json:"tertiary,omitempty"`
+			Text       *string `json:"text,omitempty"`
+			Warning    *string `json:"warning,omitempty"`
+		} `json:"lightColors"`
+		StoreRAGDocument *bool   `json:"storeRAGDocument,omitempty"`
+		Values           *string `json:"values,omitempty"`
+	} `json:"profile"`
+	Subdomain string `json:"subdomain"`
+	TenantId  string `json:"tenant_id"`
+}
+
 // Role defines model for Role.
 type Role struct {
 	Id   openapi_types.UUID `json:"id"`
@@ -261,12 +423,47 @@ type TenantFeatures map[string]bool
 
 // TenantProfile defines model for TenantProfile.
 type TenantProfile struct {
-	CompanyName      string      `json:"companyName"`
-	DarkColors       ColorSchema `json:"darkColors"`
-	DisplayName      string      `json:"displayName"`
-	LightColors      ColorSchema `json:"lightColors"`
-	StoreRAGDocument *bool       `json:"storeRAGDocument,omitempty"`
-	Values           *string     `json:"values,omitempty"`
+	CompanyName string `json:"companyName"`
+	DarkColors  struct {
+		Accent     *string `json:"accent,omitempty"`
+		Background *string `json:"background,omitempty"`
+		Info       *string `json:"info,omitempty"`
+		Negative   *string `json:"negative,omitempty"`
+		Positive   *string `json:"positive,omitempty"`
+		Primary    *string `json:"primary,omitempty"`
+		Secondary  *string `json:"secondary,omitempty"`
+		Tertiary   *string `json:"tertiary,omitempty"`
+		Text       *string `json:"text,omitempty"`
+		Warning    *string `json:"warning,omitempty"`
+	} `json:"darkColors"`
+	DisplayName string `json:"displayName"`
+	LightColors struct {
+		Accent     *string `json:"accent,omitempty"`
+		Background *string `json:"background,omitempty"`
+		Info       *string `json:"info,omitempty"`
+		Negative   *string `json:"negative,omitempty"`
+		Positive   *string `json:"positive,omitempty"`
+		Primary    *string `json:"primary,omitempty"`
+		Secondary  *string `json:"secondary,omitempty"`
+		Tertiary   *string `json:"tertiary,omitempty"`
+		Text       *string `json:"text,omitempty"`
+		Warning    *string `json:"warning,omitempty"`
+	} `json:"lightColors"`
+	StoreRAGDocument *bool   `json:"storeRAGDocument,omitempty"`
+	Values           *string `json:"values,omitempty"`
+}
+
+// Translation defines model for Translation.
+type Translation struct {
+	CreatedAt  time.Time          `json:"created_at"`
+	EntityId   openapi_types.UUID `json:"entity_id"`
+	EntityType string             `json:"entity_type"`
+	Field      string             `json:"field"`
+	Id         openapi_types.UUID `json:"id"`
+	Language   string             `json:"language"`
+	SortOrder  *int               `json:"sort_order,omitempty"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+	Value      string             `json:"value"`
 }
 
 // User defines model for User.

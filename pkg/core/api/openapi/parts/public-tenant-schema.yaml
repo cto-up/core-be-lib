@@ -6,6 +6,6 @@ allOf:
       - features
     properties:
       profile:
-        $ref: "../core-schema.yaml#/components/schemas/TenantProfile"
+        $ref: "./tenant-profile-schema.yaml"
       features:
-        $ref: "../core-schema.yaml#/components/schemas/TenantFeatures"
+        $ref: "./tenant-features-schema.yaml"

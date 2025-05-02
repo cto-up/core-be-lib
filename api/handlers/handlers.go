@@ -21,6 +21,7 @@ func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool *access.FirebaseT
 		UserSuperAdminHandler:    core.NewUserSuperAdminHandler(store, authClientPool),
 		RoleHandler:              core.NewRoleHandler(store),
 		ClientApplicationHandler: core.NewClientApplicationHandler(store, clientAppService),
+		TranslationHandler:       core.NewTranslationHandler(store),
 	}
 	return handlers
 }
@@ -35,4 +36,5 @@ type Handlers struct {
 	*core.UserSuperAdminHandler
 	*core.RoleHandler
 	*core.ClientApplicationHandler
+	*core.TranslationHandler
 }

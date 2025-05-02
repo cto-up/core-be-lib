@@ -1,0 +1,12 @@
+allOf:
+  - $ref: "./tenant-new-schema.yaml"
+  - type: object
+    required:
+      - id
+      - tenant_id
+    properties:
+      id:
+        type: string
+        format: uuid
+      tenant_id:
+        type: string

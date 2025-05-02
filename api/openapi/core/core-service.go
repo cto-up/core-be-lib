@@ -59,6 +59,30 @@ const (
 	ListRolesParamsOrderDesc ListRolesParamsOrder = "desc"
 )
 
+// Defines values for ListTranslationsParamsOrder.
+const (
+	ListTranslationsParamsOrderAsc  ListTranslationsParamsOrder = "asc"
+	ListTranslationsParamsOrderDesc ListTranslationsParamsOrder = "desc"
+)
+
+// Defines values for ListTranslationsParamsLang.
+const (
+	ListTranslationsParamsLangEn ListTranslationsParamsLang = "en"
+	ListTranslationsParamsLangFr ListTranslationsParamsLang = "fr"
+)
+
+// Defines values for GetTranslationParamsLanguage.
+const (
+	GetTranslationParamsLanguageEn GetTranslationParamsLanguage = "en"
+	GetTranslationParamsLanguageFr GetTranslationParamsLanguage = "fr"
+)
+
+// Defines values for GetTranslationByIDParamsLang.
+const (
+	En GetTranslationByIDParamsLang = "en"
+	Fr GetTranslationByIDParamsLang = "fr"
+)
+
 // Defines values for ListUsersParamsOrder.
 const (
 	ListUsersParamsOrderAsc  ListUsersParamsOrder = "asc"
@@ -97,8 +121,8 @@ const (
 
 // Defines values for ListUsersFromSuperAdminParamsOrder.
 const (
-	Asc  ListUsersFromSuperAdminParamsOrder = "asc"
-	Desc ListUsersFromSuperAdminParamsOrder = "desc"
+	ListUsersFromSuperAdminParamsOrderAsc  ListUsersFromSuperAdminParamsOrder = "asc"
+	ListUsersFromSuperAdminParamsOrderDesc ListUsersFromSuperAdminParamsOrder = "desc"
 )
 
 // Defines values for UpdateUserStatusFromSuperAdminJSONBodyName.
@@ -292,6 +316,61 @@ type ListRolesParams struct {
 
 // ListRolesParamsOrder defines parameters for ListRoles.
 type ListRolesParamsOrder string
+
+// ListTranslationsParams defines parameters for ListTranslations.
+type ListTranslationsParams struct {
+	Page     *int32                       `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int32                       `form:"page_size,omitempty" json:"page_size,omitempty"`
+	SortBy   *string                      `form:"sort_by,omitempty" json:"sort_by,omitempty"`
+	Order    *ListTranslationsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+	Q        *string                      `form:"q,omitempty" json:"q,omitempty"`
+	Lang     *ListTranslationsParamsLang  `form:"lang,omitempty" json:"lang,omitempty"`
+	Type     *string                      `form:"type,omitempty" json:"type,omitempty"`
+	Key      *string                      `form:"key,omitempty" json:"key,omitempty"`
+}
+
+// ListTranslationsParamsOrder defines parameters for ListTranslations.
+type ListTranslationsParamsOrder string
+
+// ListTranslationsParamsLang defines parameters for ListTranslations.
+type ListTranslationsParamsLang string
+
+// CreateTranslationJSONBody defines parameters for CreateTranslation.
+type CreateTranslationJSONBody struct {
+	EntityId   openapi_types.UUID `json:"entity_id"`
+	EntityType string             `json:"entity_type"`
+	Field      string             `json:"field"`
+	Language   string             `json:"language"`
+	Value      string             `json:"value"`
+}
+
+// GetTranslationParams defines parameters for GetTranslation.
+type GetTranslationParams struct {
+	EntityType string                       `form:"entityType" json:"entityType"`
+	EntityId   openapi_types.UUID           `form:"entityId" json:"entityId"`
+	Field      string                       `form:"field" json:"field"`
+	Language   GetTranslationParamsLanguage `form:"language" json:"language"`
+}
+
+// GetTranslationParamsLanguage defines parameters for GetTranslation.
+type GetTranslationParamsLanguage string
+
+// GetTranslationByIDParams defines parameters for GetTranslationByID.
+type GetTranslationByIDParams struct {
+	Lang *GetTranslationByIDParamsLang `form:"lang,omitempty" json:"lang,omitempty"`
+}
+
+// GetTranslationByIDParamsLang defines parameters for GetTranslationByID.
+type GetTranslationByIDParamsLang string
+
+// UpdateTranslationJSONBody defines parameters for UpdateTranslation.
+type UpdateTranslationJSONBody struct {
+	EntityId   openapi_types.UUID `json:"entity_id"`
+	EntityType string             `json:"entity_type"`
+	Field      string             `json:"field"`
+	Language   string             `json:"language"`
+	Value      string             `json:"value"`
+}
 
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
@@ -522,6 +601,12 @@ type UpdateRoleJSONRequestBody = Role
 // UpdateTenantProfileJSONRequestBody defines body for UpdateTenantProfile for application/json ContentType.
 type UpdateTenantProfileJSONRequestBody = TenantProfile
 
+// CreateTranslationJSONRequestBody defines body for CreateTranslation for application/json ContentType.
+type CreateTranslationJSONRequestBody CreateTranslationJSONBody
+
+// UpdateTranslationJSONRequestBody defines body for UpdateTranslation for application/json ContentType.
+type UpdateTranslationJSONRequestBody UpdateTranslationJSONBody
+
 // AddUserJSONRequestBody defines body for AddUser for application/json ContentType.
 type AddUserJSONRequestBody = NewUser
 
@@ -647,6 +732,24 @@ type ServerInterface interface {
 
 	// (PUT /api/v1/tenant/profile)
 	UpdateTenantProfile(c *gin.Context)
+
+	// (GET /api/v1/translations)
+	ListTranslations(c *gin.Context, params ListTranslationsParams)
+
+	// (POST /api/v1/translations)
+	CreateTranslation(c *gin.Context)
+
+	// (GET /api/v1/translations/search)
+	GetTranslation(c *gin.Context, params GetTranslationParams)
+
+	// (DELETE /api/v1/translations/{id})
+	DeleteTranslation(c *gin.Context, id openapi_types.UUID)
+
+	// (GET /api/v1/translations/{id})
+	GetTranslationByID(c *gin.Context, id openapi_types.UUID, params GetTranslationByIDParams)
+
+	// (PUT /api/v1/translations/{id})
+	UpdateTranslation(c *gin.Context, id openapi_types.UUID)
 
 	// (GET /api/v1/users)
 	ListUsers(c *gin.Context, params ListUsersParams)
@@ -1417,6 +1520,262 @@ func (siw *ServerInterfaceWrapper) UpdateTenantProfile(c *gin.Context) {
 	}
 
 	siw.Handler.UpdateTenantProfile(c)
+}
+
+// ListTranslations operation middleware
+func (siw *ServerInterfaceWrapper) ListTranslations(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTranslationsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page_size", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page_size: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "sort_by" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sort_by", c.Request.URL.Query(), &params.SortBy)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sort_by: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "order" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "order", c.Request.URL.Query(), &params.Order)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter order: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "q", c.Request.URL.Query(), &params.Q)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter q: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "lang" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "lang", c.Request.URL.Query(), &params.Lang)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter lang: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "type" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "type", c.Request.URL.Query(), &params.Type)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter type: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "key" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "key", c.Request.URL.Query(), &params.Key)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter key: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListTranslations(c, params)
+}
+
+// CreateTranslation operation middleware
+func (siw *ServerInterfaceWrapper) CreateTranslation(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CreateTranslation(c)
+}
+
+// GetTranslation operation middleware
+func (siw *ServerInterfaceWrapper) GetTranslation(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetTranslationParams
+
+	// ------------- Required query parameter "entityType" -------------
+
+	if paramValue := c.Query("entityType"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument entityType is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "entityType", c.Request.URL.Query(), &params.EntityType)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter entityType: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Required query parameter "entityId" -------------
+
+	if paramValue := c.Query("entityId"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument entityId is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "entityId", c.Request.URL.Query(), &params.EntityId)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter entityId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Required query parameter "field" -------------
+
+	if paramValue := c.Query("field"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument field is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "field", c.Request.URL.Query(), &params.Field)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter field: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Required query parameter "language" -------------
+
+	if paramValue := c.Query("language"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument language is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "language", c.Request.URL.Query(), &params.Language)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter language: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTranslation(c, params)
+}
+
+// DeleteTranslation operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTranslation(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteTranslation(c, id)
+}
+
+// GetTranslationByID operation middleware
+func (siw *ServerInterfaceWrapper) GetTranslationByID(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetTranslationByIDParams
+
+	// ------------- Optional query parameter "lang" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "lang", c.Request.URL.Query(), &params.Lang)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter lang: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTranslationByID(c, id, params)
+}
+
+// UpdateTranslation operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTranslation(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateTranslation(c, id)
 }
 
 // ListUsers operation middleware
@@ -2904,6 +3263,12 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.PUT(options.BaseURL+"/api/v1/roles/:id", wrapper.UpdateRole)
 	router.GET(options.BaseURL+"/api/v1/tenant/profile", wrapper.GetTenantProfile)
 	router.PUT(options.BaseURL+"/api/v1/tenant/profile", wrapper.UpdateTenantProfile)
+	router.GET(options.BaseURL+"/api/v1/translations", wrapper.ListTranslations)
+	router.POST(options.BaseURL+"/api/v1/translations", wrapper.CreateTranslation)
+	router.GET(options.BaseURL+"/api/v1/translations/search", wrapper.GetTranslation)
+	router.DELETE(options.BaseURL+"/api/v1/translations/:id", wrapper.DeleteTranslation)
+	router.GET(options.BaseURL+"/api/v1/translations/:id", wrapper.GetTranslationByID)
+	router.PUT(options.BaseURL+"/api/v1/translations/:id", wrapper.UpdateTranslation)
 	router.GET(options.BaseURL+"/api/v1/users", wrapper.ListUsers)
 	router.POST(options.BaseURL+"/api/v1/users", wrapper.AddUser)
 	router.DELETE(options.BaseURL+"/api/v1/users/:userid", wrapper.DeleteUser)

@@ -1,0 +1,19 @@
+allOf:
+  - $ref: "./translation-new-schema.yaml"
+  - type: object
+    required:
+      - id
+      - created_at
+      - updated_at
+    properties:
+      id:
+        type: string
+        format: uuid
+      sort_order:
+        type: integer
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time

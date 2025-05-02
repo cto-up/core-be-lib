@@ -1,0 +1,22 @@
+type: object
+properties:
+  background:
+    type: string
+  primary:
+    type: string
+  secondary:
+    type: string
+  tertiary:
+    type: string
+  accent:
+    type: string
+  positive:
+    type: string
+  negative:
+    type: string
+  info:
+    type: string
+  warning:
+    type: string
+  text:
+    type: string

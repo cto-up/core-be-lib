@@ -1,0 +1,39 @@
+get:
+  description: Returns a translation
+  operationId: getTranslation
+  parameters:
+    - name: entityType
+      in: query
+      required: true
+      schema:
+        type: string
+    - name: entityId
+      in: query
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: field
+      in: query
+      required: true
+      schema:
+        type: string
+    - name: language
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [en, fr]
+  responses:
+    "200":
+      description: Translation found
+      content:
+        application/json:
+          schema:
+            $ref: "./translation-schema.yaml"
+    "401":
+      description: Unauthorized
+    "403":
+      description: Forbidden
+    "404":
+      description: Translation not found

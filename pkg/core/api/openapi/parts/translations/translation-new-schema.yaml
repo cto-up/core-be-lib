@@ -1,0 +1,22 @@
+type: object
+required:
+  - entity_type
+  - entity_id
+  - language
+  - field
+  - value
+properties:
+  entity_type:
+    type: string
+    maxLength: 255
+  entity_id:
+    type: string
+    format: uuid
+  language:
+    type: string
+    maxLength: 10
+  field:
+    type: string
+    maxLength: 255
+  value:
+    type: string

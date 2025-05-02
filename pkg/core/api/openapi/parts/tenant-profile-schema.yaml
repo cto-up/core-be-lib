@@ -1,0 +1,19 @@
+type: object
+required:
+  - displayName
+  - companyName
+  - lightColors
+  - darkColors
+properties:
+  displayName:
+    type: string
+  companyName:
+    type: string
+  values:
+    type: string
+  storeRAGDocument:
+    type: boolean
+  lightColors:
+    $ref: "./tenant-color-schema.yaml"
+  darkColors:
+    $ref: "./tenant-color-schema.yaml"
