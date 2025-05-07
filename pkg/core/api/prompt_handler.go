@@ -265,9 +265,22 @@ func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptPara
 			return
 		}
 	}
+	var content string
+	if req.Content != nil {
+		content = *req.Content
+	} else {
+		content = prompt.Content
+	}
 
-	result, err := h.executionService.ExecutePrompt(c, prompt, service.ExecutePromptParams{
-		Parameters: *req.Parameters,
+	var parameters []string
+	if req.Parameters != nil {
+		parameters = *req.Parameters
+	} else {
+		parameters = prompt.Parameters
+	}
+
+	result, err := h.executionService.ExecutePrompt(c, content, parameters, service.ExecutePromptParams{
+		Parameters: *req.ParametersValues,
 	})
 
 	if err != nil {
@@ -364,22 +377,46 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	}
 	provider := llmmodels.Provider(*queryParams.Provider)
 
-	// Convert *map[string]string to map[string]any for GenerateAnswer
-	params := make(map[string]any)
+	temperature := 0.7
+	if queryParams.Temperature != nil {
+		temperature = float64(*queryParams.Temperature)
+	}
+
+	var content string
+	if req.Content != nil {
+		content = *req.Content
+	} else {
+		content = prompt.Content
+	}
+	var parameters []string
 	if req.Parameters != nil {
-		for k, v := range *req.Parameters {
-			params[k] = v
-		}
+		parameters = *req.Parameters
+	} else {
+		parameters = prompt.Parameters
+	}
+	formatInstructions := ""
+	if req.FormatInstructions != nil {
+		formatInstructions = *req.FormatInstructions
+	} else {
+		formatInstructions = prompt.FormatInstructions.String
+	}
+
+	format := "markdown"
+	if req.Format != nil {
+		format = string(*req.Format)
+	} else {
+		format = prompt.Format
 	}
 
 	chainConfig, err := gochains.NewBaseChain(
-		prompt.Content,
-		prompt.Parameters,
-		prompt.FormatInstructions.String,
+		content,
+		parameters,
+		formatInstructions,
 		maxTokens,
+		temperature,
 		provider,
 		llm,
-		prompt.Format == "json",
+		format == "json",
 	)
 	if err != nil {
 		log.Printf("Error NewBaseChain: %v", err)
@@ -389,10 +426,18 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 
 	streaming := c.GetHeader("Accept") == "text/event-stream"
 
+	// Convert *map[string]string to map[string]any for GenerateAnswer
+	parametersValues := make(map[string]any)
+	if req.ParametersValues != nil {
+		for k, v := range *req.ParametersValues {
+			parametersValues[k] = v
+		}
+	}
+
 	if !streaming {
 		generatedAnswer, err := h.executionService.GenerateAnswer(c,
 			chainConfig,
-			params,
+			parametersValues,
 			userID.(string),
 			nil,
 		)
@@ -420,7 +465,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 
 		generatedAnswer, err = h.executionService.GenerateAnswer(c,
 			chainConfig,
-			params,
+			parametersValues,
 			userID.(string),
 			clientChan,
 		)

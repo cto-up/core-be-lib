@@ -64,7 +64,7 @@ func TestPromptExecutionService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := service.ExecutePrompt(context.Background(), prompt, tt.params)
+			result, err := service.ExecutePrompt(context.Background(), prompt.Content, prompt.Parameters, tt.params)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)

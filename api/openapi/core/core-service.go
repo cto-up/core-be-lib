@@ -46,11 +46,18 @@ const (
 	ExecutePromptParamsOutputText     ExecutePromptParamsOutput = "text"
 )
 
+// Defines values for ExecutePromptJSONBodyFormat.
+const (
+	ExecutePromptJSONBodyFormatJson     ExecutePromptJSONBodyFormat = "json"
+	ExecutePromptJSONBodyFormatMarkdown ExecutePromptJSONBodyFormat = "markdown"
+	ExecutePromptJSONBodyFormatText     ExecutePromptJSONBodyFormat = "text"
+)
+
 // Defines values for UpdatePromptJSONBodyFormat.
 const (
-	Json     UpdatePromptJSONBodyFormat = "json"
-	Markdown UpdatePromptJSONBodyFormat = "markdown"
-	Text     UpdatePromptJSONBodyFormat = "text"
+	UpdatePromptJSONBodyFormatJson     UpdatePromptJSONBodyFormat = "json"
+	UpdatePromptJSONBodyFormatMarkdown UpdatePromptJSONBodyFormat = "markdown"
+	UpdatePromptJSONBodyFormatText     UpdatePromptJSONBodyFormat = "text"
 )
 
 // Defines values for ListRolesParamsOrder.
@@ -231,7 +238,18 @@ type AddPromptJSONBodyFormat string
 
 // ExecutePromptJSONBody defines parameters for ExecutePrompt.
 type ExecutePromptJSONBody struct {
-	Parameters *map[string]string `json:"parameters,omitempty"`
+	// Content Override the prompt with a custom prompt. Used for tests.
+	Content *string `json:"content,omitempty"`
+
+	// Format Override the output format. Used for tests.
+	Format *ExecutePromptJSONBodyFormat `json:"format,omitempty"`
+
+	// FormatInstructions Override the format instructions with custom instructions. Used for tests.
+	FormatInstructions *string `json:"formatInstructions,omitempty"`
+
+	// Parameters Override the parameters with a custom list of parameters. Used for tests.
+	Parameters       *[]string          `json:"parameters,omitempty"`
+	ParametersValues *map[string]string `json:"parametersValues,omitempty"`
 }
 
 // ExecutePromptParams defines parameters for ExecutePrompt.
@@ -253,6 +271,9 @@ type ExecutePromptParams struct {
 
 	// MaxTokens Maximum number of tokens to generate
 	MaxTokens *int32 `form:"maxTokens,omitempty" json:"maxTokens,omitempty"`
+
+	// Temperature Temperature for LLM generation (0.0-1.0)
+	Temperature *float32 `form:"temperature,omitempty" json:"temperature,omitempty"`
 }
 
 // ExecutePromptParamsProvider defines parameters for ExecutePrompt.
@@ -260,6 +281,9 @@ type ExecutePromptParamsProvider string
 
 // ExecutePromptParamsOutput defines parameters for ExecutePrompt.
 type ExecutePromptParamsOutput string
+
+// ExecutePromptJSONBodyFormat defines parameters for ExecutePrompt.
+type ExecutePromptJSONBodyFormat string
 
 // FormatPromptJSONBody defines parameters for FormatPrompt.
 type FormatPromptJSONBody struct {
@@ -1234,6 +1258,14 @@ func (siw *ServerInterfaceWrapper) ExecutePrompt(c *gin.Context) {
 	err = runtime.BindQueryParameter("form", true, false, "maxTokens", c.Request.URL.Query(), &params.MaxTokens)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter maxTokens: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "temperature" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "temperature", c.Request.URL.Query(), &params.Temperature)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter temperature: %w", err), http.StatusBadRequest)
 		return
 	}
 

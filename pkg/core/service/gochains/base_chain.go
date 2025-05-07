@@ -19,6 +19,7 @@ type BaseChain struct {
 	paramDefinition []string
 	outputParser    schema.OutputParser[any]
 	maxTokens       int
+	temperature     float64
 	model           llms.Model
 }
 
@@ -39,11 +40,15 @@ func (bc *BaseChain) GetMaxTokens() int {
 	return bc.maxTokens
 }
 
+func (bc *BaseChain) GetTemperature() float64 {
+	return bc.temperature
+}
+
 func (bc *BaseChain) GetModel() llms.Model {
 	return bc.model
 }
 
-func NewBaseChain(templateText string, paramDefinition []string, formatInstructions string, maxTokens int, provider llmmodels.Provider, model string, isJson bool) (*BaseChain, error) {
+func NewBaseChain(templateText string, paramDefinition []string, formatInstructions string, maxTokens int, temperature float64, provider llmmodels.Provider, model string, isJson bool) (*BaseChain, error) {
 	llmmodel, err := llmmodels.NewLLM(provider, model, isJson)
 	if err != nil {
 		return nil, err
@@ -59,6 +64,7 @@ func NewBaseChain(templateText string, paramDefinition []string, formatInstructi
 		paramDefinition: paramDefinition,
 		outputParser:    outputParser,
 		maxTokens:       maxTokens,
+		temperature:     temperature,
 		model:           llmmodel,
 	}, nil
 }

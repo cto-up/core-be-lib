@@ -47,7 +47,9 @@ func (s *PromptExecutionService) GenerateAnswer(ctx context.Context, chainConfig
 	}
 
 	if clientChan != nil {
-		res, err := chains.Call(ctx, chain, params, chains.WithMaxTokens(chainConfig.GetMaxTokens()),
+		res, err := chains.Call(ctx, chain, params,
+			chains.WithMaxTokens(chainConfig.GetMaxTokens()),
+			chains.WithTemperature(chainConfig.GetTemperature()),
 			chains.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
 				clientChan <- event.NewProgressEvent("MSG",
 					string(chunk), 50)
@@ -59,7 +61,9 @@ func (s *PromptExecutionService) GenerateAnswer(ctx context.Context, chainConfig
 		}
 		return res["text"].(string), nil
 	} else {
-		res, err := chains.Call(ctx, chain, params, chains.WithMaxTokens(chainConfig.GetMaxTokens()))
+		res, err := chains.Call(ctx, chain, params,
+			chains.WithMaxTokens(chainConfig.GetMaxTokens()),
+			chains.WithTemperature(chainConfig.GetTemperature()))
 		if err != nil {
 			return "", err
 		}

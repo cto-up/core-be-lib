@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"ctoup.com/coreapp/pkg/core/db"
-	"ctoup.com/coreapp/pkg/core/db/repository"
 	gochains "ctoup.com/coreapp/pkg/core/service/gochains"
 	"github.com/tmc/langchaingo/memory"
 	"github.com/tmc/langchaingo/prompts"
@@ -27,22 +26,22 @@ type ExecutePromptParams struct {
 	Parameters map[string]string
 }
 
-func (s *PromptExecutionService) ExecutePrompt(ctx context.Context, prompt repository.CorePrompt, params ExecutePromptParams) (string, error) {
+func (s *PromptExecutionService) ExecutePrompt(ctx context.Context, content string, parameters []string, parametersValues ExecutePromptParams) (string, error) {
 	// Validate that all required parameters are provided
-	for _, requiredParam := range prompt.Parameters {
-		if _, exists := params.Parameters[requiredParam]; !exists {
+	for _, requiredParam := range parameters {
+		if _, exists := parametersValues.Parameters[requiredParam]; !exists {
 			return "", fmt.Errorf("missing required parameter: %s", requiredParam)
 		}
 	}
 
 	tpl := prompts.NewPromptTemplate(
-		prompt.Content,
-		prompt.Parameters,
+		content,
+		parameters,
 	)
 
 	// Convert map[string]string to map[string]any
-	paramsAny := make(map[string]any, len(params.Parameters))
-	for k, v := range params.Parameters {
+	paramsAny := make(map[string]any, len(parametersValues.Parameters))
+	for k, v := range parametersValues.Parameters {
 		paramsAny[k] = v
 	}
 

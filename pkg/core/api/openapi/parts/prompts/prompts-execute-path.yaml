@@ -18,7 +18,7 @@ post:
       description: LLM Provider
       schema:
         type: string
-        enum: [OPENAI, GOOGLEAI, ANTHROPIC, OLLAMA]    
+        enum: [OPENAI, GOOGLEAI, ANTHROPIC, OLLAMA]
     - name: llm
       in: query
       description: LLM to use for execution
@@ -36,15 +36,39 @@ post:
       schema:
         type: integer
         format: int32
+    - name: temperature
+      in: query
+      description: Temperature for LLM generation (0.0-1.0)
+      schema:
+        type: number
+        format: float
+        minimum: 0.0
+        maximum: 1.0
+        default: 0.7
   requestBody:
-    description: Parameters for the prompt
+    description: Optional Overrides for the prompt, except for Parameters Values which will be taken from the request body
     required: true
     content:
       application/json:
         schema:
           type: object
           properties:
+            content:
+              type: string
+              description: Override the prompt with a custom prompt. Used for tests.
             parameters:
+              type: array
+              items:
+                type: string
+              description: Override the parameters with a custom list of parameters. Used for tests.
+            format:
+              type: string
+              enum: [json, text, markdown]
+              description: Override the output format. Used for tests.
+            formatInstructions:
+              type: string
+              description: Override the format instructions with custom instructions. Used for tests.
+            parametersValues:
               type: object
               additionalProperties:
                 type: string
