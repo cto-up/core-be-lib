@@ -11,6 +11,7 @@ import (
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/anthropic"
 	"github.com/tmc/langchaingo/llms/googleai"
+	"github.com/tmc/langchaingo/llms/mistral"
 	"github.com/tmc/langchaingo/llms/ollama"
 	"github.com/tmc/langchaingo/llms/openai"
 )
@@ -21,6 +22,7 @@ type Provider string
 const (
 	ProviderOpenaAI   Provider = "OPENAI"
 	ProviderGoogleAI  Provider = "GOOGLEAI"
+	ProviderMistral   Provider = "MISTRAL"
 	ProviderAnthropic Provider = "ANTHROPIC"
 	ProviderOllama    Provider = "OLLAMA"
 )
@@ -28,7 +30,7 @@ const (
 // IsValid checks if the provider is valid
 func (at Provider) IsValid() bool {
 	switch at {
-	case ProviderAnthropic, ProviderGoogleAI, ProviderOpenaAI, ProviderOllama:
+	case ProviderAnthropic, ProviderGoogleAI, ProviderOpenaAI, ProviderOllama, ProviderMistral:
 		return true
 	default:
 		return false
@@ -44,6 +46,7 @@ func (at Provider) String() string {
 func (Provider) Values() []Provider {
 	return []Provider{
 		ProviderGoogleAI,
+		ProviderMistral,
 		ProviderAnthropic,
 		ProviderOpenaAI,
 		ProviderOllama,
@@ -55,6 +58,8 @@ func (Provider) Parse(s string) (Provider, error) {
 	switch strings.ToUpper(s) {
 	case string(ProviderGoogleAI):
 		return ProviderGoogleAI, nil
+	case string(ProviderMistral):
+		return ProviderMistral, nil
 	case string(ProviderOpenaAI):
 		return ProviderOpenaAI, nil
 	case string(ProviderAnthropic):
@@ -98,6 +103,13 @@ func newGeminiLLM(model string) (*googleai.GoogleAI, error) {
 	return googleai.New(context.Background(), googleai.WithAPIKey(geminiKey), googleai.WithDefaultModel(model))
 }
 
+func newMistralLLM(model string) (*mistral.Model, error) {
+	if mistralKey := os.Getenv("MISTRAL_API_KEY"); mistralKey == "" {
+		return nil, errors.New("MISTRAL_API_KEY not set")
+	}
+	return mistral.New(mistral.WithModel(model))
+}
+
 func newAnthropicLLM(model string) (*anthropic.LLM, error) {
 	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
 	if anthropicKey == "" {
@@ -120,6 +132,8 @@ func NewLLM(provider Provider, model string, json bool) (llms.Model, error) {
 		return newOllamaLLM(model, ollamaServerURL)
 	case ProviderGoogleAI:
 		return newGeminiLLM(model)
+	case ProviderMistral:
+		return newMistralLLM(model)
 	case ProviderAnthropic:
 		return newAnthropicLLM(model)
 	default:
