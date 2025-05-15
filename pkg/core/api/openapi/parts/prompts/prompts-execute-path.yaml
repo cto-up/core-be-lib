@@ -18,7 +18,7 @@ post:
       description: LLM Provider
       schema:
         type: string
-        enum: [OPENAI, GOOGLEAI, ANTHROPIC, OLLAMA]
+        enum: [OPENAI, MISTRAL, GOOGLEAI, ANTHROPIC, OLLAMA]
     - name: llm
       in: query
       description: LLM to use for execution

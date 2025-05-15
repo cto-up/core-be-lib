@@ -35,6 +35,7 @@ const (
 const (
 	ANTHROPIC ExecutePromptParamsProvider = "ANTHROPIC"
 	GOOGLEAI  ExecutePromptParamsProvider = "GOOGLEAI"
+	MISTRAL   ExecutePromptParamsProvider = "MISTRAL"
 	OLLAMA    ExecutePromptParamsProvider = "OLLAMA"
 	OPENAI    ExecutePromptParamsProvider = "OPENAI"
 )
