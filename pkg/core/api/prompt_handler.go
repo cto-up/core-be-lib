@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"ctoup.com/coreapp/api/helpers"
 	api "ctoup.com/coreapp/api/openapi/core"
@@ -318,6 +319,8 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(errors.New("id or name must be provided")))
 		return
 	}
+
+	// Fetch prompt
 	var prompt repository.CorePrompt
 	var err error
 	if id != nil {
@@ -333,7 +336,6 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
-
 	} else {
 		prompt, err = h.store.GetPromptByName(c, repository.GetPromptByNameParams{
 			Name:     *name,
@@ -347,7 +349,6 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
-
 	}
 
 	userID, exist := c.Get(access.AUTH_USER_ID)
@@ -355,8 +356,8 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
 		return
 	}
-	clientChan := make(chan event.ProgressEvent)
 
+	// Set up parameters
 	maxTokens := 2000
 	if queryParams.MaxTokens != nil {
 		maxTokens = int(*queryParams.MaxTokens)
@@ -382,6 +383,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		temperature = float64(*queryParams.Temperature)
 	}
 
+	// Set up content and parameters
 	var content string
 	if req.Content != nil {
 		content = *req.Content
@@ -408,6 +410,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		format = prompt.Format
 	}
 
+	// Create chain config
 	chainConfig, err := gochains.NewBaseChain(
 		content,
 		parameters,
@@ -420,13 +423,14 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	)
 	if err != nil {
 		log.Printf("Error NewBaseChain: %v", err)
-		c.JSON(http.StatusBadRequest, "NewBaseChain error")
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(errors.New("NewBaseChain error")))
 		return
 	}
 
+	// Check if streaming is requested
 	streaming := c.GetHeader("Accept") == "text/event-stream"
 
-	// Convert *map[string]string to map[string]any for GenerateAnswer
+	// Convert parameters
 	parametersValues := make(map[string]any)
 	if req.ParametersValues != nil {
 		for k, v := range *req.ParametersValues {
@@ -434,6 +438,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		}
 	}
 
+	// Handle non-streaming case
 	if !streaming {
 		generatedAnswer, err := h.executionService.GenerateAnswer(c,
 			chainConfig,
@@ -453,17 +458,23 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		})
 		return
 	}
-	var generatedAnswer string
-	var generationError error
 
+	// Handle streaming case
+	clientChan := make(chan event.ProgressEvent)
+	errorChan := make(chan error, 1)
+	resultChan := make(chan string, 1)
+
+	// Set headers for SSE before any data is written
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Transfer-Encoding", "chunked")
+
+	// Start generation in goroutine
 	go func() {
-		defer func() {
-			clientChan <- event.NewProgressEvent("INFO",
-				generatedAnswer, 100)
-			close(clientChan)
-		}()
+		defer close(clientChan)
 
-		generatedAnswer, err = h.executionService.GenerateAnswer(c,
+		answer, err := h.executionService.GenerateAnswer(c,
 			chainConfig,
 			parametersValues,
 			userID.(string),
@@ -471,34 +482,37 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		)
 
 		if err != nil {
-			log.Printf("Error generating answer: %v", err)
-			clientChan <- event.NewProgressEvent("ERROR",
-				"Generation answer error", 55)
+			errorChan <- err
 			return
 		}
+
+		resultChan <- answer
 	}()
 
+	// Stream events to client
 	c.Stream(func(w io.Writer) bool {
-		// Stream message to client from message channel
-		if msg, ok := <-clientChan; ok {
-			c.SSEvent("message", msg)
-			if msg.EventType == "ERROR" || msg.Progress == 100 {
-				generationError = errors.New(msg.Message)
+		select {
+		case msg, ok := <-clientChan:
+			if !ok {
 				return false
 			}
-			return true
+			c.SSEvent("message", msg)
+			return msg.EventType != "ERROR" && msg.Progress != 100
+		case err := <-errorChan:
+			// Send error as SSE event instead of trying to change status code
+			log.Printf("Error in streaming: %v", err)
+			errEvent := event.NewProgressEvent("ERROR", err.Error(), 100)
+			c.SSEvent("message", errEvent)
+			return false
+		case <-time.After(60 * time.Second):
+			// Send timeout as SSE event
+			timeoutEvent := event.NewProgressEvent("ERROR", "Generation timeout", 100)
+			c.SSEvent("message", timeoutEvent)
+			return false
 		}
-		return false
 	})
-
-	if generationError != nil {
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(generationError))
-		return
-	}
-
-	c.JSON(http.StatusOK, api.PromptResponse{
-		Result: generatedAnswer,
-	})
+	// No need to send JSON response after streaming
+	// The client will receive the final result as an SSE event
 }
 
 func NewPromptHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *PromptHandler {
