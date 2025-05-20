@@ -86,7 +86,7 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 				if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
 					util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
 
-					if idToken.Claims["ADMIN"] == true || idToken.Claims[FIREBASE_CLAIM_EMAIL] == "jcantonio@alineo.com" {
+					if idToken.Claims["SUPER_ADMIN"] == true || idToken.Claims["ADMIN"] == true || idToken.Claims[FIREBASE_CLAIM_EMAIL] == "jcantonio@alineo.com" {
 						// OK
 					} else {
 						c.JSON(http.StatusForbidden, gin.H{
