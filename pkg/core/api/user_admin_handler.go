@@ -1,16 +1,23 @@
 package core
 
 import (
+	"encoding/csv"
+	"io"
+	"strings"
+	"time"
+
 	"errors"
 	"fmt"
 	"net/http"
 
+	"firebase.google.com/go/auth"
 	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/api/helpers"
 	core "ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/event"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
@@ -19,14 +26,22 @@ import (
 )
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
-type UserHandler struct {
+type UserAdminHandler struct {
 	store          *db.Store
 	authClientPool *access.FirebaseTenantClientConnectionPool
 	userService    *access.UserService
 }
 
+func NewUserAdminHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserAdminHandler {
+	userService := access.NewUserService(store, authClientPool)
+	handler := &UserAdminHandler{store: store,
+		authClientPool: authClientPool,
+		userService:    userService}
+	return handler
+}
+
 // AddUser implements openapi.ServerInterface.
-func (uh *UserHandler) AddUser(c *gin.Context) {
+func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -53,7 +68,7 @@ func (uh *UserHandler) AddUser(c *gin.Context) {
 }
 
 // (PUT /api/v1/users/{userid})
-func (uh *UserHandler) UpdateUser(c *gin.Context, userid string) {
+func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -80,7 +95,7 @@ func (uh *UserHandler) UpdateUser(c *gin.Context, userid string) {
 }
 
 // DeleteUser implements openapi.ServerInterface.
-func (uh *UserHandler) DeleteUser(c *gin.Context, userid string) {
+func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -102,7 +117,7 @@ func (uh *UserHandler) DeleteUser(c *gin.Context, userid string) {
 }
 
 // FindUserByID implements openapi.ServerInterface.
-func (uh *UserHandler) GetUserByID(c *gin.Context, id string) {
+func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -122,7 +137,7 @@ func (uh *UserHandler) GetUserByID(c *gin.Context, id string) {
 }
 
 // GetUsers implements openapi.ServerInterface.
-func (u *UserHandler) ListUsers(c *gin.Context, params core.ListUsersParams) {
+func (u *UserAdminHandler) ListUsers(c *gin.Context, params core.ListUsersParams) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -171,7 +186,7 @@ func (u *UserHandler) ListUsers(c *gin.Context, params core.ListUsersParams) {
 }
 
 // AssignRole implements openopenapi.ServerInterface.
-func (uh *UserHandler) AssignRole(c *gin.Context, userID string, roleID uuid.UUID) {
+func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, roleID uuid.UUID) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -194,7 +209,7 @@ func (uh *UserHandler) AssignRole(c *gin.Context, userID string, roleID uuid.UUI
 }
 
 // UnassignRole implements openopenapi.ServerInterface.
-func (uh *UserHandler) UnassignRole(c *gin.Context, userID string, roleID uuid.UUID) {
+func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, roleID uuid.UUID) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -216,7 +231,7 @@ func (uh *UserHandler) UnassignRole(c *gin.Context, userID string, roleID uuid.U
 }
 
 // UpdateUserStatus implements openopenapi.ServerInterface.
-func (uh *UserHandler) UpdateUserStatus(c *gin.Context, userID string) {
+func (uh *UserAdminHandler) UpdateUserStatus(c *gin.Context, userID string) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -244,7 +259,7 @@ func (uh *UserHandler) UpdateUserStatus(c *gin.Context, userID string) {
 	c.Status(http.StatusNoContent)
 }
 
-func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
+func (uh *UserAdminHandler) ResetPasswordRequest(c *gin.Context) {
 	var req struct {
 		Email string `json:"email"`
 	}
@@ -269,7 +284,7 @@ func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
 	resetPasswordRequest(c, baseAuthClient, url, req.Email)
 }
 
-func (uh *UserHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID string) {
+func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID string) {
 
 	var req struct {
 		Email string `json:"email"`
@@ -315,10 +330,249 @@ func (uh *UserHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID string
 	resetPasswordRequest(c, baseAuthClient, url, req.Email)
 }
 
-func NewUserHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserHandler {
-	userService := access.NewUserService(store, authClientPool)
-	handler := &UserHandler{store: store,
-		authClientPool: authClientPool,
-		userService:    userService}
-	return handler
+// ImportUsersFromAdmin implements the CSV import functionality
+func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
+	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
+
+	// Get Firebase auth client for tenant
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Get file from form
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(fmt.Errorf("file upload error: %v", err)))
+		return
+	}
+
+	// Open the file
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("error opening file: %v", err)))
+		return
+	}
+	defer src.Close()
+
+	// Parse CSV
+	reader := csv.NewReader(src)
+	reader.Comma = ';' // Set semicolon as delimiter
+
+	// Read header
+	header, err := reader.Read()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(fmt.Errorf("error reading CSV header: %v", err)))
+		return
+	}
+
+	// Validate header
+	requiredColumns := []string{"lastname", "firstname", "password", "email", "roles"}
+	missingColumns := []string{}
+
+	// Create a map of header columns for easy lookup
+	headerMap := make(map[string]int)
+	for i, col := range header {
+		headerMap[strings.ToLower(col)] = i
+	}
+
+	// Check for missing required columns
+	for _, required := range requiredColumns {
+		if _, exists := headerMap[required]; !exists {
+			missingColumns = append(missingColumns, required)
+		}
+	}
+
+	if len(missingColumns) > 0 {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(fmt.Errorf("invalid CSV format. Missing required columns: %v", missingColumns)))
+		return
+	}
+
+	// Fetch all available roles for validation
+	roles, err := uh.store.Queries.ListRoles(c, repository.ListRolesParams{
+		Limit:  100, // Assuming we won't have more than 100 roles
+		Offset: 0,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("error fetching roles: %v", err)))
+		return
+	}
+
+	// Create a map of role names to IDs for quick lookup
+	roleMap := make(map[string]uuid.UUID)
+	for _, role := range roles {
+		roleMap[role.Name] = role.ID
+	}
+	// Process records
+	type ImportError struct {
+		Line  int    `json:"line"`
+		Email string `json:"email"`
+		Error string `json:"error"`
+	}
+
+	var (
+		total         int
+		success       int
+		alreadyExists int
+		failed        int
+		errors        []ImportError
+	)
+
+	// Handle streaming case
+	clientChan := make(chan event.ProgressEvent)
+	errorChan := make(chan error, 1)
+	resultChan := make(chan event.ProgressEvent, 1)
+
+	// Set headers for SSE before any data is written
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Transfer-Encoding", "chunked")
+
+	// Process each line
+	lineNum := 1 // Start from 1 to account for header
+
+	// Start generation in goroutine
+	go func() {
+		defer close(clientChan)
+
+		for {
+			result := fmt.Sprintf(`{
+			"total": %d,
+			"success": %d,
+			"alreadyExists": %d,
+			"failed": %d,
+			"errors": %v
+		}`, total, success, alreadyExists, failed, errors)
+			progress := int(float64(lineNum) / float64(total) * 100)
+			resultChan <- event.NewProgressEvent("INFO", result, progress)
+
+			lineNum++
+			record, err := reader.Read()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				errors = append(errors, ImportError{
+					Line:  lineNum,
+					Error: fmt.Sprintf("error reading line: %v", err),
+				})
+				failed++
+				continue
+			}
+
+			total++
+
+			// Extract user data
+			if len(record) < 4 {
+				errors = append(errors, ImportError{
+					Line:  lineNum,
+					Error: fmt.Sprintf("invalid record format, expected 4 fields, got %d", len(record)),
+				})
+				failed++
+				continue
+			}
+
+			lastname := record[0]
+			firstname := record[1]
+			password := record[2]
+			email := record[3]
+			roleNames := strings.Split(record[4], ",")
+
+			var req core.AddUserJSONRequestBody
+			req.Email = email
+			req.Password = password
+			req.Name = firstname + " " + lastname
+
+			user, err := uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req)
+			if err != nil {
+				// check if error is a firebase error and if so, check if it is a duplicate email error
+				if auth.IsEmailAlreadyExists(err) {
+					errors = append(errors, ImportError{
+						Line:  lineNum,
+						Email: email,
+						Error: "email already exists",
+					})
+					alreadyExists++
+					continue
+				} else {
+					errors = append(errors, ImportError{
+						Line:  lineNum,
+						Email: email,
+						Error: fmt.Sprintf("error creating user: %v", err),
+					})
+					failed++
+					continue
+				}
+			}
+
+			// Assign roles
+			roleAssignErrors := []string{}
+			for _, roleName := range roleNames {
+				roleName = strings.TrimSpace(roleName)
+				if roleName == "" {
+					continue
+				}
+
+				roleID, exists := roleMap[roleName]
+				if !exists {
+					roleAssignErrors = append(roleAssignErrors, fmt.Sprintf("role '%s' not found", roleName))
+					continue
+				}
+
+				err = uh.userService.AssignRole(c, baseAuthClient, tenantID.(string), user.ID, roleID)
+				if err != nil {
+					roleAssignErrors = append(roleAssignErrors, fmt.Sprintf("error assigning role '%s': %v", roleName, err))
+				}
+			}
+
+			if len(roleAssignErrors) > 0 {
+				errors = append(errors, ImportError{
+					Line:  lineNum,
+					Email: email,
+					Error: fmt.Sprintf("user created but role assignment failed: %s", strings.Join(roleAssignErrors, "; ")),
+				})
+			}
+			success++
+		}
+
+		// Return results
+		result := fmt.Sprintf(`{
+			"total": %d,
+			"success": %d,
+			"alreadyExists": %d,
+			"failed": %d,
+			"errors": %v
+		}`, total, success, alreadyExists, failed, errors)
+
+		resultChan <- event.NewProgressEvent("INFO", result, 100)
+	}()
+
+	c.Stream(func(w io.Writer) bool {
+		select {
+		case msg, ok := <-clientChan:
+			if !ok {
+				return false
+			}
+			c.SSEvent("message", msg)
+			return msg.EventType != "ERROR" && msg.Progress != 100
+		case err := <-errorChan:
+			// Send error as SSE event instead of trying to change status code
+			log.Printf("Error in streaming: %v", err)
+			errEvent := event.NewProgressEvent("ERROR", err.Error(), 100)
+			c.SSEvent("message", errEvent)
+			return false
+		case <-time.After(60 * time.Second):
+			// Send timeout as SSE event
+			timeoutEvent := event.NewProgressEvent("ERROR", "Generation timeout", 100)
+			c.SSEvent("message", timeoutEvent)
+			return false
+		}
+	})
+	// Commit transaction if there were successful imports
 }

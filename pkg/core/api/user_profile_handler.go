@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/api/helpers"
+	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	fileservice "ctoup.com/coreapp/pkg/shared/fileservice"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
@@ -18,6 +19,18 @@ import (
 
 	"github.com/jackc/pgx/v5"
 )
+
+type UserHandler struct {
+	store          *db.Store
+	authClientPool *access.FirebaseTenantClientConnectionPool
+}
+
+func NewUserHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserHandler {
+	handler := &UserHandler{store: store,
+		authClientPool: authClientPool,
+	}
+	return handler
+}
 
 func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
 	userID, exist := ctx.Get(access.AUTH_USER_ID)

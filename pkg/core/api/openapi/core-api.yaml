@@ -37,6 +37,9 @@ paths:
     $ref: "./parts/users/users-id-role-unassign-path.yaml"
   /api/v1/users:
     $ref: "./parts/users/users-path.yaml"
+  /api/v1/users/import:
+    $ref: "./parts/users/admin-users-import-path.yaml"
+
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}:
     $ref: "./parts/users/super-admin-users-id-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}/status:

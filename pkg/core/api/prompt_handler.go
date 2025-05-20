@@ -511,8 +511,6 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			return false
 		}
 	})
-	// No need to send JSON response after streaming
-	// The client will receive the final result as an SSE event
 }
 
 func NewPromptHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *PromptHandler {

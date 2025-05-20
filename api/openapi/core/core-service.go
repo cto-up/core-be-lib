@@ -421,6 +421,12 @@ type ListUsersParams struct {
 // ListUsersParamsOrder defines parameters for ListUsers.
 type ListUsersParamsOrder string
 
+// ImportUsersFromAdminMultipartBody defines parameters for ImportUsersFromAdmin.
+type ImportUsersFromAdminMultipartBody struct {
+	// File CSV file with user data (Lastname;Firstname;password;email format)
+	File *openapi_types.File `json:"file,omitempty"`
+}
+
 // ResetPasswordRequestByAdminJSONBody defines parameters for ResetPasswordRequestByAdmin.
 type ResetPasswordRequestByAdminJSONBody struct {
 	// Email email
@@ -635,6 +641,9 @@ type UpdateTranslationJSONRequestBody UpdateTranslationJSONBody
 // AddUserJSONRequestBody defines body for AddUser for application/json ContentType.
 type AddUserJSONRequestBody = NewUser
 
+// ImportUsersFromAdminMultipartRequestBody defines body for ImportUsersFromAdmin for multipart/form-data ContentType.
+type ImportUsersFromAdminMultipartRequestBody ImportUsersFromAdminMultipartBody
+
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = User
 
@@ -781,6 +790,9 @@ type ServerInterface interface {
 
 	// (POST /api/v1/users)
 	AddUser(c *gin.Context)
+
+	// (POST /api/v1/users/import)
+	ImportUsersFromAdmin(c *gin.Context)
 
 	// (DELETE /api/v1/users/{userid})
 	DeleteUser(c *gin.Context, userid string)
@@ -1888,6 +1900,19 @@ func (siw *ServerInterfaceWrapper) AddUser(c *gin.Context) {
 	}
 
 	siw.Handler.AddUser(c)
+}
+
+// ImportUsersFromAdmin operation middleware
+func (siw *ServerInterfaceWrapper) ImportUsersFromAdmin(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ImportUsersFromAdmin(c)
 }
 
 // DeleteUser operation middleware
@@ -3304,6 +3329,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.PUT(options.BaseURL+"/api/v1/translations/:id", wrapper.UpdateTranslation)
 	router.GET(options.BaseURL+"/api/v1/users", wrapper.ListUsers)
 	router.POST(options.BaseURL+"/api/v1/users", wrapper.AddUser)
+	router.POST(options.BaseURL+"/api/v1/users/import", wrapper.ImportUsersFromAdmin)
 	router.DELETE(options.BaseURL+"/api/v1/users/:userid", wrapper.DeleteUser)
 	router.GET(options.BaseURL+"/api/v1/users/:userid", wrapper.GetUserByID)
 	router.PUT(options.BaseURL+"/api/v1/users/:userid", wrapper.UpdateUser)

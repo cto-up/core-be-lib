@@ -1,0 +1,46 @@
+post:
+  description: Import users from CSV file
+  operationId: ImportUsersFromAdmin
+  requestBody:
+    description: CSV file containing user data
+    required: true
+    content:
+      multipart/form-data:
+        schema:
+          type: object
+          properties:
+            file:
+              type: string
+              format: binary
+              description: CSV file with user data (Lastname;Firstname;password;email format)
+  responses:
+    "200":
+      description: Import results
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              total:
+                type: integer
+                description: Total number of records processed
+              success:
+                type: integer
+                description: Number of users successfully created
+              failed:
+                type: integer
+                description: Number of users that failed to be created
+              errors:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    line:
+                      type: integer
+                      description: Line number in CSV
+                    email:
+                      type: string
+                      description: Email of the user that failed
+                    error:
+                      type: string
+                      description: Error message

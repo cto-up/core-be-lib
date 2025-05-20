@@ -18,6 +18,7 @@ func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool *access.FirebaseT
 		HealthHandler:            health.NewHealthHandler(store),
 		TenantHandler:            core.NewTenantHandler(store, authClientPool, multiTenantService),
 		UserHandler:              core.NewUserHandler(store, authClientPool),
+		UserAdminHandler:         core.NewUserAdminHandler(store, authClientPool),
 		UserSuperAdminHandler:    core.NewUserSuperAdminHandler(store, authClientPool),
 		RoleHandler:              core.NewRoleHandler(store),
 		ClientApplicationHandler: core.NewClientApplicationHandler(store, clientAppService),
@@ -33,6 +34,7 @@ type Handlers struct {
 	*health.HealthHandler
 	*core.TenantHandler
 	*core.UserHandler
+	*core.UserAdminHandler
 	*core.UserSuperAdminHandler
 	*core.RoleHandler
 	*core.ClientApplicationHandler
