@@ -3,6 +3,13 @@ SELECT * FROM core_users
 WHERE id = $1
 AND tenant_id = sqlc.arg(tenant_id)::text
 LIMIT 1;
+
+-- name: GetUserByEmail :one
+SELECT * FROM core_users
+WHERE email = sqlc.arg(email)::text
+AND tenant_id = sqlc.arg(tenant_id)::text
+LIMIT 1;
+
 -- name: ListUsers :many
 SELECT * FROM core_users
 WHERE (UPPER(email) LIKE UPPER(sqlc.narg('like')) OR sqlc.narg('like') IS NULL)

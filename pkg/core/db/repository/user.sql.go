@@ -67,6 +67,32 @@ func (q *Queries) DeleteUser(ctx context.Context, arg DeleteUserParams) (string,
 	return id, err
 }
 
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, profile, email, core_roles, created_at, tenant_id FROM core_users
+WHERE email = $1::text
+AND tenant_id = $2::text
+LIMIT 1
+`
+
+type GetUserByEmailParams struct {
+	Email    string `json:"email"`
+	TenantID string `json:"tenant_id"`
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) (CoreUser, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, arg.Email, arg.TenantID)
+	var i CoreUser
+	err := row.Scan(
+		&i.ID,
+		&i.Profile,
+		&i.Email,
+		&i.CoreRoles,
+		&i.CreatedAt,
+		&i.TenantID,
+	)
+	return i, err
+}
+
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, profile, email, core_roles, created_at, tenant_id FROM core_users
 WHERE id = $1
