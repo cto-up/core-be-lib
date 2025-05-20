@@ -462,7 +462,6 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	// Handle streaming case
 	clientChan := make(chan event.ProgressEvent)
 	errorChan := make(chan error, 1)
-	resultChan := make(chan string, 1)
 
 	// Set headers for SSE before any data is written
 	c.Header("Content-Type", "text/event-stream")
@@ -474,7 +473,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	go func() {
 		defer close(clientChan)
 
-		answer, err := h.executionService.GenerateAnswer(c,
+		_, err := h.executionService.GenerateAnswer(c,
 			chainConfig,
 			parametersValues,
 			userID.(string),
@@ -485,8 +484,6 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			errorChan <- err
 			return
 		}
-
-		resultChan <- answer
 	}()
 
 	// Stream events to client

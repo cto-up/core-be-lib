@@ -426,7 +426,6 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	// Handle streaming case
 	clientChan := make(chan event.ProgressEvent)
 	errorChan := make(chan error, 1)
-	resultChan := make(chan event.ProgressEvent, 1)
 
 	// Set headers for SSE before any data is written
 	c.Header("Content-Type", "text/event-stream")
@@ -436,23 +435,21 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 
 	// Process each line
 	lineNum := 1 // Start from 1 to account for header
-
+	// get total number of lines
 	// Start generation in goroutine
 	go func() {
 		defer close(clientChan)
 
 		for {
-			result := fmt.Sprintf(`{
-			"total": %d,
-			"success": %d,
-			"alreadyExists": %d,
-			"failed": %d,
-			"errors": %v
-		}`, total, success, alreadyExists, failed, errors)
-			progress := int(float64(lineNum) / float64(total) * 100)
-			resultChan <- event.NewProgressEvent("INFO", result, progress)
-
 			lineNum++
+			message := fmt.Sprintf(`Processing 
+			line: %d,
+			success: %d,
+			already exists: %d,
+			failed: %d,
+			errors: %v`, lineNum, success, alreadyExists, failed, errors)
+			clientChan <- event.NewProgressEvent("INFO", message, 50)
+
 			record, err := reader.Read()
 			if err == io.EOF {
 				break
@@ -542,15 +539,15 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 		}
 
 		// Return results
-		result := fmt.Sprintf(`{
-			"total": %d,
-			"success": %d,
-			"alreadyExists": %d,
-			"failed": %d,
-			"errors": %v
-		}`, total, success, alreadyExists, failed, errors)
+		result := fmt.Sprintf(`Finished processing CSV file. Results:
+			total: %d,
+			success: %d,
+			already exists: %d,
+			failed: %d,
+			errors: %v`,
+			total, success, alreadyExists, failed, errors)
 
-		resultChan <- event.NewProgressEvent("INFO", result, 100)
+		clientChan <- event.NewProgressEvent("INFO", result, 100)
 	}()
 
 	c.Stream(func(w io.Writer) bool {
