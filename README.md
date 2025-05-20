@@ -141,6 +141,12 @@ make release VERSION=v1.0.0 NOTES="Release notes here"
 └── docker/             # Docker configurations
 ```
 
+## Release Process
+
+```bash
+make release VERSION=v1.0.0 NOTES="Release notes here"
+```
+
 ## License
 
 MIT
