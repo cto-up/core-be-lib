@@ -53,11 +53,24 @@ sudo chmod 750 /app/log
   make openapi
   ```
 
-- **OpenAPI Backend Generator (oapi-codegen)**
-  ```bash
-  # Generate server code
-  make openapi
-  ```
+- **OpenAPI Generator (oapi-codegen)**
+  If you work with core-fe-lib frontend library, you need to clone the repository.
+  and place it in a sibling directory as the core application.
+
+Like:
+
+```
+- core-be-lib
+- core-fe-lib
+```
+
+```bash
+# Generate server code
+make openapi
+```
+
+This generates the API code in the `BASE_API_BE_DIR := api/openapi` directory.
+This also generates the API axios client in the `BASE_API_FE_DIR := ../core-fe-lib/lib/openapi` directory.
 
 ### Database Migration
 
