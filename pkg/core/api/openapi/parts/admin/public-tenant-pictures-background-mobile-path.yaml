@@ -1,0 +1,14 @@
+get:
+  description: Returns the tenant background mobile image. Returns 404 if no background mobile image is set.
+  operationId: getTenantBackgroundMobile
+  responses:
+    "200":
+      description: Background mobile image response
+      content:
+        image/webp:
+          schema:
+            type: string
+            format: binary
+
+    "404":
+      description: Background mobile image not found

@@ -342,6 +342,21 @@ type ListRolesParams struct {
 // ListRolesParamsOrder defines parameters for ListRoles.
 type ListRolesParamsOrder string
 
+// UploadTenantBackgroundMultipartBody defines parameters for UploadTenantBackground.
+type UploadTenantBackgroundMultipartBody struct {
+	Picture *openapi_types.File `json:"picture,omitempty"`
+}
+
+// UploadTenantBackgroundMobileMultipartBody defines parameters for UploadTenantBackgroundMobile.
+type UploadTenantBackgroundMobileMultipartBody struct {
+	Picture *openapi_types.File `json:"picture,omitempty"`
+}
+
+// UploadTenantLogoMultipartBody defines parameters for UploadTenantLogo.
+type UploadTenantLogoMultipartBody struct {
+	Picture *openapi_types.File `json:"picture,omitempty"`
+}
+
 // ListTranslationsParams defines parameters for ListTranslations.
 type ListTranslationsParams struct {
 	Page     *int32                       `form:"page,omitempty" json:"page,omitempty"`
@@ -629,6 +644,15 @@ type AddRoleJSONRequestBody = NewRole
 // UpdateRoleJSONRequestBody defines body for UpdateRole for application/json ContentType.
 type UpdateRoleJSONRequestBody = Role
 
+// UploadTenantBackgroundMultipartRequestBody defines body for UploadTenantBackground for multipart/form-data ContentType.
+type UploadTenantBackgroundMultipartRequestBody UploadTenantBackgroundMultipartBody
+
+// UploadTenantBackgroundMobileMultipartRequestBody defines body for UploadTenantBackgroundMobile for multipart/form-data ContentType.
+type UploadTenantBackgroundMobileMultipartRequestBody UploadTenantBackgroundMobileMultipartBody
+
+// UploadTenantLogoMultipartRequestBody defines body for UploadTenantLogo for multipart/form-data ContentType.
+type UploadTenantLogoMultipartRequestBody UploadTenantLogoMultipartBody
+
 // UpdateTenantProfileJSONRequestBody defines body for UpdateTenantProfile for application/json ContentType.
 type UpdateTenantProfileJSONRequestBody = TenantProfile
 
@@ -761,6 +785,15 @@ type ServerInterface interface {
 	// (PUT /api/v1/roles/{id})
 	UpdateRole(c *gin.Context, id openapi_types.UUID)
 
+	// (POST /api/v1/tenant/pictures/background)
+	UploadTenantBackground(c *gin.Context)
+
+	// (POST /api/v1/tenant/pictures/background-mobile)
+	UploadTenantBackgroundMobile(c *gin.Context)
+
+	// (POST /api/v1/tenant/pictures/logo)
+	UploadTenantLogo(c *gin.Context)
+
 	// (GET /api/v1/tenant/profile)
 	GetTenantProfile(c *gin.Context)
 
@@ -823,6 +856,15 @@ type ServerInterface interface {
 
 	// (GET /public-api/v1/tenant)
 	GetPublicTenant(c *gin.Context)
+
+	// (GET /public-api/v1/tenant/pictures/background)
+	GetTenantBackground(c *gin.Context)
+
+	// (GET /public-api/v1/tenant/pictures/background-mobile)
+	GetTenantBackgroundMobile(c *gin.Context)
+
+	// (GET /public-api/v1/tenant/pictures/logo)
+	GetTenantLogo(c *gin.Context)
 
 	// (GET /public-api/v1/users/{userid}/profile/picture)
 	GetProfilePicture(c *gin.Context, userid string)
@@ -1541,6 +1583,45 @@ func (siw *ServerInterfaceWrapper) UpdateRole(c *gin.Context) {
 	siw.Handler.UpdateRole(c, id)
 }
 
+// UploadTenantBackground operation middleware
+func (siw *ServerInterfaceWrapper) UploadTenantBackground(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UploadTenantBackground(c)
+}
+
+// UploadTenantBackgroundMobile operation middleware
+func (siw *ServerInterfaceWrapper) UploadTenantBackgroundMobile(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UploadTenantBackgroundMobile(c)
+}
+
+// UploadTenantLogo operation middleware
+func (siw *ServerInterfaceWrapper) UploadTenantLogo(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UploadTenantLogo(c)
+}
+
 // GetTenantProfile operation middleware
 func (siw *ServerInterfaceWrapper) GetTenantProfile(c *gin.Context) {
 
@@ -2138,6 +2219,45 @@ func (siw *ServerInterfaceWrapper) GetPublicTenant(c *gin.Context) {
 	}
 
 	siw.Handler.GetPublicTenant(c)
+}
+
+// GetTenantBackground operation middleware
+func (siw *ServerInterfaceWrapper) GetTenantBackground(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTenantBackground(c)
+}
+
+// GetTenantBackgroundMobile operation middleware
+func (siw *ServerInterfaceWrapper) GetTenantBackgroundMobile(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTenantBackgroundMobile(c)
+}
+
+// GetTenantLogo operation middleware
+func (siw *ServerInterfaceWrapper) GetTenantLogo(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTenantLogo(c)
 }
 
 // GetProfilePicture operation middleware
@@ -3319,6 +3439,9 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/api/v1/roles/:id", wrapper.DeleteRole)
 	router.GET(options.BaseURL+"/api/v1/roles/:id", wrapper.GetRoleByID)
 	router.PUT(options.BaseURL+"/api/v1/roles/:id", wrapper.UpdateRole)
+	router.POST(options.BaseURL+"/api/v1/tenant/pictures/background", wrapper.UploadTenantBackground)
+	router.POST(options.BaseURL+"/api/v1/tenant/pictures/background-mobile", wrapper.UploadTenantBackgroundMobile)
+	router.POST(options.BaseURL+"/api/v1/tenant/pictures/logo", wrapper.UploadTenantLogo)
 	router.GET(options.BaseURL+"/api/v1/tenant/profile", wrapper.GetTenantProfile)
 	router.PUT(options.BaseURL+"/api/v1/tenant/profile", wrapper.UpdateTenantProfile)
 	router.GET(options.BaseURL+"/api/v1/translations", wrapper.ListTranslations)
@@ -3340,6 +3463,9 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/public-api/v1/health", wrapper.GetHealthCheck)
 	router.POST(options.BaseURL+"/public-api/v1/password-reset-request", wrapper.ResetPasswordRequest)
 	router.GET(options.BaseURL+"/public-api/v1/tenant", wrapper.GetPublicTenant)
+	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/background", wrapper.GetTenantBackground)
+	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/background-mobile", wrapper.GetTenantBackgroundMobile)
+	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/logo", wrapper.GetTenantLogo)
 	router.GET(options.BaseURL+"/public-api/v1/users/:userid/profile/picture", wrapper.GetProfilePicture)
 	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications", wrapper.ListClientApplications)
 	router.POST(options.BaseURL+"/superadmin-api/v1/client-applications", wrapper.CreateClientApplication)
