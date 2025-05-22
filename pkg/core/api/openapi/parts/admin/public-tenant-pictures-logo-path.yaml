@@ -1,0 +1,14 @@
+get:
+  description: Returns the tenant logo. Returns 404 if no logo is set.
+  operationId: getTenantLogo
+  responses:
+    "200":
+      description: Logo response
+      content:
+        image/webp:
+          schema:
+            type: string
+            format: binary
+
+    "404":
+      description: Logo not found

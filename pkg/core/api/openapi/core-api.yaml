@@ -80,6 +80,18 @@ paths:
   # admin
   /api/v1/tenant/profile:
     $ref: "./parts/admin/tenant-profile-path.yaml"
+  /public-api/v1/tenant/pictures/logo:
+    $ref: "./parts/admin/public-tenant-pictures-logo-path.yaml"
+  /public-api/v1/tenant/pictures/background:
+    $ref: "./parts/admin/public-tenant-pictures-background-path.yaml"
+  /public-api/v1/tenant/pictures/background-mobile:
+    $ref: "./parts/admin/public-tenant-pictures-background-mobile-path.yaml"
+  /api/v1/tenant/pictures/logo:
+    $ref: "./parts/admin/tenant-pictures-logo-path.yaml" 
+  /api/v1/tenant/pictures/background:
+    $ref: "./parts/admin/tenant-pictures-background-path.yaml"
+  /api/v1/tenant/pictures/background-mobile:
+    $ref: "./parts/admin/tenant-pictures-background-mobile-path.yaml"
   /api/v1/roles:
     $ref: "./parts/admin/roles-path.yaml"
   /api/v1/roles/{id}:
