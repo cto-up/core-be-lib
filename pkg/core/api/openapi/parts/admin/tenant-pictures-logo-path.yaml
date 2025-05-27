@@ -1,0 +1,18 @@
+post:
+  description: Uploads a new tenant logo. Only webp files are accepted.
+  operationId: uploadTenantLogo
+  requestBody:
+    required: true
+    content:
+      multipart/form-data:
+        schema:
+          type: object
+          properties:
+            picture:
+              type: string
+              format: binary
+  responses:
+    "204":
+      description: Logo uploaded successfully
+    "400":
+      description: Invalid file format. Only webp files are allowed 

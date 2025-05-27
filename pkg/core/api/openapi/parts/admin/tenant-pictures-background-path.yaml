@@ -1,0 +1,18 @@
+post:
+  description: Uploads a new tenant background image. Only webp files are accepted.
+  operationId: uploadTenantBackground
+  requestBody:
+    required: true
+    content:
+      multipart/form-data:
+        schema:
+          type: object
+          properties:
+            picture:
+              type: string
+              format: binary
+  responses:
+    "204":
+      description: Background image uploaded successfully
+    "400":
+      description: Invalid file format. Only webp files are allowed 
