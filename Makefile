@@ -53,7 +53,7 @@ openapi:
 
 release:
 	@echo "Creating release"
-	if [ -z "$(VERSION)" ]; then \
+	@if [ -z "$(VERSION)" ]; then \
 		echo "Error: VERSION parameter is required. Use 'v.x.x.x' format."; \
 		exit 1; \
 	fi; \

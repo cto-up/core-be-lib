@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"sync"
-	"time"
 
 	"ctoup.com/coreapp/api/handlers"
 	"ctoup.com/coreapp/api/helpers"
@@ -14,7 +13,7 @@ import (
 
 	// [DO NOT REMOVE COMMENT - Import]
 	"ctoup.com/coreapp/pkg/core/db"
-	access "ctoup.com/coreapp/pkg/shared/service"
+	"ctoup.com/coreapp/pkg/shared/service"
 
 	"ctoup.com/coreapp/pkg/shared/seedservice"
 
@@ -36,10 +35,10 @@ import (
 
 type ServerConfig struct {
 	Router                 *gin.Engine
-	TenantClientPool       *access.FirebaseTenantClientConnectionPool
-	FirebaseAuthMiddleware *access.FirebaseAuthMiddleware
-	TenantMiddleware       *access.TenantMiddleware
-	AuthMiddleware         *access.AuthMiddleware
+	TenantClientPool       *service.FirebaseTenantClientConnectionPool
+	FirebaseAuthMiddleware *service.FirebaseAuthMiddleware
+	TenantMiddleware       *service.TenantMiddleware
+	AuthMiddleware         *service.AuthMiddleware
 	APIOptions             core.GinServerOptions
 }
 
@@ -96,18 +95,18 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	checks := append([]checks.Check{sqlCheck}, additionalChecks...)
 	setupHealthCheck(router, checks...)
 
-	multiTenantService := access.NewMultitenantService(coreStore)
+	multiTenantService := service.NewMultitenantService(coreStore)
 
-	firebaseTenantClientPool, err := access.NewFirebaseTenantClientConnectionPool(context.Background(), multiTenantService)
+	firebaseTenantClientPool, err := service.NewFirebaseTenantClientConnectionPool(context.Background(), multiTenantService)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create NewFirebaseTenantClientConnectionPool!")
 	}
-	firebaseAuthMiddleWare := access.NewFirebaseMiddleware(nil, firebaseTenantClientPool, multiTenantService)
-	tenantMiddleWare := access.NewTenantMiddleware(nil, multiTenantService)
-	clientAppService := access.NewClientApplicationService(coreStore)
+	firebaseAuthMiddleWare := service.NewFirebaseMiddleware(nil, firebaseTenantClientPool, multiTenantService)
+	tenantMiddleWare := service.NewTenantMiddleware(nil, multiTenantService)
+	clientAppService := service.NewClientApplicationService(coreStore)
 
 	// Create the combined auth middleware
-	authMiddleware := access.NewAuthMiddleware(
+	authMiddleware := service.NewAuthMiddleware(
 		firebaseAuthMiddleWare,
 		clientAppService,
 	)
@@ -115,7 +114,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	apiOptions := core.GinServerOptions{
 		BaseURL: "",
 		Middlewares: []core.MiddlewareFunc{
-			core.MiddlewareFunc(requestLogger()),
+			core.MiddlewareFunc(service.RequestIDMiddleware()),
 			// Use the combined middleware, allowing API tokens
 			core.MiddlewareFunc(authMiddleware.MiddlewareFunc()),
 			core.MiddlewareFunc(tenantMiddleWare.MiddlewareFunc()),
@@ -137,26 +136,5 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 		TenantMiddleware:       tenantMiddleWare,
 		AuthMiddleware:         authMiddleware,
 		APIOptions:             apiOptions,
-	}
-}
-
-func requestLogger() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Record the start time
-		start := time.Now()
-
-		// Process the request
-		c.Next()
-
-		// Calculate the time taken
-		duration := time.Since(start)
-
-		// Log the details
-		log.Info().
-			Str("method", c.Request.Method).
-			Str("url", c.Request.URL.String()).
-			Int("status", c.Writer.Status()).
-			Dur("duration", duration).
-			Msg("Request handled")
 	}
 }
