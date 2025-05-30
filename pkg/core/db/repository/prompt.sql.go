@@ -153,18 +153,23 @@ const listPrompts = `-- name: ListPrompts :many
 SELECT id, name, content, tags, parameters, sample_parameters, format, format_instructions, user_id, tenant_id, created_at, updated_at FROM core_prompts
 WHERE tenant_id = $3::text
   AND (UPPER(name) LIKE UPPER($4) OR $4 IS NULL)
+  AND (
+    $5::varchar[] IS NULL 
+    OR 
+    ($5::varchar[] && tags)
+  )
 ORDER BY
-  CASE WHEN $5::TEXT = 'name' AND $6::TEXT = 'asc' THEN name END ASC,
-  CASE WHEN $5::TEXT = 'name' AND $6::TEXT != 'asc' THEN name END DESC
+  CASE WHEN $6::TEXT = 'name' AND $7::TEXT = 'asc' THEN name END ASC,
+  CASE WHEN $6::TEXT = 'name' AND $7::TEXT != 'asc' THEN name END DESC
   ,
-  CASE WHEN $5::TEXT = 'content' AND $6::TEXT = 'asc' THEN content END ASC,
-  CASE WHEN $5::TEXT = 'content' AND $6::TEXT != 'asc' THEN content END DESC
+  CASE WHEN $6::TEXT = 'content' AND $7::TEXT = 'asc' THEN content END ASC,
+  CASE WHEN $6::TEXT = 'content' AND $7::TEXT != 'asc' THEN content END DESC
   ,
-  CASE WHEN $5::TEXT = 'tags' AND $6::TEXT = 'asc' THEN tags END ASC,
-  CASE WHEN $5::TEXT = 'tags' AND $6::TEXT != 'asc' THEN tags END DESC
+  CASE WHEN $6::TEXT = 'tags' AND $7::TEXT = 'asc' THEN tags END ASC,
+  CASE WHEN $6::TEXT = 'tags' AND $7::TEXT != 'asc' THEN tags END DESC
   ,
-  CASE WHEN $5::TEXT = 'parameters' AND $6::TEXT = 'asc' THEN parameters END ASC,
-  CASE WHEN $5::TEXT = 'parameters' AND $6::TEXT != 'asc' THEN parameters END DESC
+  CASE WHEN $6::TEXT = 'parameters' AND $7::TEXT = 'asc' THEN parameters END ASC,
+  CASE WHEN $6::TEXT = 'parameters' AND $7::TEXT != 'asc' THEN parameters END DESC
   
 LIMIT $1
 OFFSET $2
@@ -175,6 +180,7 @@ type ListPromptsParams struct {
 	Offset   int32       `json:"offset"`
 	TenantID string      `json:"tenant_id"`
 	Like     interface{} `json:"like"`
+	Tags     []string    `json:"tags"`
 	SortBy   string      `json:"sortBy"`
 	Order    string      `json:"order"`
 }
@@ -185,6 +191,7 @@ func (q *Queries) ListPrompts(ctx context.Context, arg ListPromptsParams) ([]Cor
 		arg.Offset,
 		arg.TenantID,
 		arg.Like,
+		arg.Tags,
 		arg.SortBy,
 		arg.Order,
 	)

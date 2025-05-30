@@ -30,6 +30,14 @@ get:
       schema:
         type: string
         enum: [asc, desc]
+    - name: tags
+      in: query
+      description: tags to filter by
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
     - name: q
       in: query
       description: starts with

@@ -207,6 +207,9 @@ type ListPromptsParams struct {
 	// Order sort order
 	Order *ListPromptsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
 
+	// Tags tags to filter by
+	Tags *[]string `form:"tags,omitempty" json:"tags,omitempty"`
+
 	// Q starts with
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
 
@@ -1218,6 +1221,14 @@ func (siw *ServerInterfaceWrapper) ListPrompts(c *gin.Context) {
 	err = runtime.BindQueryParameter("form", true, false, "order", c.Request.URL.Query(), &params.Order)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter order: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "tags" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "tags", c.Request.URL.Query(), &params.Tags)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tags: %w", err), http.StatusBadRequest)
 		return
 	}
 

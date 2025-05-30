@@ -54,7 +54,6 @@ func RequestIDMiddleware() gin.HandlerFunc {
 
 		// Log the details
 		requestLogger.Info().
-			Str("request_id", requestID).
 			Str("method", c.Request.Method).
 			Str("url", c.Request.URL.String()).
 			Int("status", c.Writer.Status()).

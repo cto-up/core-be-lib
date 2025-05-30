@@ -12,6 +12,11 @@ LIMIT 1;
 SELECT * FROM core_prompts
 WHERE tenant_id = sqlc.arg('tenant_id')::text
   AND (UPPER(name) LIKE UPPER(sqlc.narg('like')) OR sqlc.narg('like') IS NULL)
+  AND (
+    sqlc.narg('tags')::varchar[] IS NULL 
+    OR 
+    (sqlc.narg('tags')::varchar[] && tags)
+  )
 ORDER BY
   CASE WHEN sqlc.arg('sortBy')::TEXT = 'name' AND sqlc.arg('order')::TEXT = 'asc' THEN name END ASC,
   CASE WHEN sqlc.arg('sortBy')::TEXT = 'name' AND sqlc.arg('order')::TEXT != 'asc' THEN name END DESC

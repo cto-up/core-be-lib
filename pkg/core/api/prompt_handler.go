@@ -185,10 +185,17 @@ func (exh *PromptHandler) ListPrompts(c *gin.Context, params api.ListPromptsPara
 		like.Valid = true
 	}
 
+	// Handle tags filtering
+	var tags []string
+	if params.Tags != nil && len(*params.Tags) > 0 {
+		tags = *params.Tags
+	}
+
 	query := repository.ListPromptsParams{
 		Limit:    pagingSql.PageSize,
 		Offset:   pagingSql.Offset,
 		Like:     like,
+		Tags:     tags,
 		SortBy:   pagingSql.SortBy,
 		Order:    pagingSql.Order,
 		TenantID: tenantID.(string),
