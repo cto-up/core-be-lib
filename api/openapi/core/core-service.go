@@ -1226,7 +1226,7 @@ func (siw *ServerInterfaceWrapper) ListPrompts(c *gin.Context) {
 
 	// ------------- Optional query parameter "tags" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "tags", c.Request.URL.Query(), &params.Tags)
+	err = runtime.BindQueryParameter("form", false, false, "tags", c.Request.URL.Query(), &params.Tags)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tags: %w", err), http.StatusBadRequest)
 		return

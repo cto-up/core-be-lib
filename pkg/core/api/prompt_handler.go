@@ -189,6 +189,18 @@ func (exh *PromptHandler) ListPrompts(c *gin.Context, params api.ListPromptsPara
 	var tags []string
 	if params.Tags != nil && len(*params.Tags) > 0 {
 		tags = *params.Tags
+		// remove all empty strings
+		for i := 0; i < len(tags); i++ {
+			if tags[i] == "" {
+				tags = append(tags[:i], tags[i+1:]...)
+				i--
+			}
+		}
+		if len(tags) == 0 {
+			tags = nil
+		}
+	} else {
+		tags = nil // Explicitly set to nil when not provided
 	}
 
 	query := repository.ListPromptsParams{

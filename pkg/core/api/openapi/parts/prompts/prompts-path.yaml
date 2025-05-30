@@ -38,6 +38,8 @@ get:
         type: array
         items:
           type: string
+      style: form
+      explode: false
     - name: q
       in: query
       description: starts with
