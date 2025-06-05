@@ -64,8 +64,6 @@ func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient,
 	params := (&auth.UserToCreate{}).
 		Email(req.Email).
 		EmailVerified(false).
-		//PhoneNumber("+15555550100").
-		Password(req.Password).
 		DisplayName(req.Name).
 		PhotoURL("/images/avatar-1.jpeg").
 		Disabled(false)

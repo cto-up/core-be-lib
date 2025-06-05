@@ -126,6 +126,7 @@ type DomainInfo struct {
 	Domain    string
 	TLD       string
 	FullHost  string
+	Port      string // The port number if present (e.g., "9999")
 }
 
 // isIPAddress checks if the hostname is an IP address
@@ -201,6 +202,7 @@ func GetDomainInfo(c *gin.Context) (*DomainInfo, error) {
 	}
 
 	hostname := strings.ToLower(strings.TrimSpace(host.Hostname()))
+	port := host.Port()
 
 	subdomain, domain, tld := extractDomainParts(hostname)
 
@@ -215,6 +217,7 @@ func GetDomainInfo(c *gin.Context) (*DomainInfo, error) {
 		Domain:    fullDomain,
 		TLD:       tld,
 		FullHost:  hostname,
+		Port:      port,
 	}, nil
 }
 
@@ -234,6 +237,20 @@ func GetDomain(c *gin.Context) (string, error) {
 		return "", err
 	}
 	return domainInfo.Domain, nil
+}
+
+func GetBaseDomainWithPort(c *gin.Context) (string, error) {
+	domainInfo, err := GetDomainInfo(c)
+	if err != nil {
+		return "", err
+	}
+
+	baseDomain := domainInfo.Domain // This already gives "domain.com" or "domain.co.uk"
+
+	if domainInfo.Port != "" {
+		return fmt.Sprintf("%s:%s", baseDomain, domainInfo.Port), nil
+	}
+	return baseDomain, nil
 }
 
 // GetRootDomain extracts just the domain part without subdomain or port

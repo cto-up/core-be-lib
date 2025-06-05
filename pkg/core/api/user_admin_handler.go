@@ -64,6 +64,16 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	url, err := getResetPasswordURL(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
 	c.JSON(http.StatusCreated, user)
 }
 
@@ -267,21 +277,23 @@ func (uh *UserAdminHandler) ResetPasswordRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	host, err := access.GetHost(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	url := fmt.Sprintf("%s://%s/signin?from=/", host.Scheme, host.Host)
-
 	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
 		return
 	}
-	resetPasswordRequest(c, baseAuthClient, url, req.Email)
+	url, err := getResetPasswordURL(c, "")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
 }
 
 func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID string) {
@@ -314,20 +326,23 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 		return
 	}
 
-	host, err := access.GetHost(c)
+	url, err := getResetPasswordURL(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-
-	url := fmt.Sprintf("%s://%s/signin?from=/", host.Scheme, host.Host)
 
 	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
 		return
 	}
-	resetPasswordRequest(c, baseAuthClient, url, req.Email)
+	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
 }
 
 // ImportUsersFromAdmin implements the CSV import functionality
@@ -477,13 +492,11 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 
 			lastname := record[0]
 			firstname := record[1]
-			password := record[2]
-			email := record[3]
-			roleNames := strings.Split(record[4], ",")
+			email := record[2]
+			roleNames := strings.Split(record[3], ",")
 
 			var req core.AddUserJSONRequestBody
 			req.Email = email
-			req.Password = password
 			req.Name = firstname + " " + lastname
 
 			user, err := uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req)
@@ -526,6 +539,26 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 				if err != nil {
 					roleAssignErrors = append(roleAssignErrors, fmt.Sprintf("error assigning role '%s': %v", roleName, err))
 				}
+			}
+			url, err := getResetPasswordURL(c)
+			if err != nil {
+				errors = append(errors, ImportError{
+					Line:  lineNum,
+					Email: email,
+					Error: fmt.Sprintf("error getting reset password url: %v", err),
+				})
+				failed++
+				continue
+			}
+			err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
+			if err != nil {
+				errors = append(errors, ImportError{
+					Line:  lineNum,
+					Email: email,
+					Error: fmt.Sprintf("error sending welcome email: %v", err),
+				})
+				failed++
+				continue
 			}
 
 			if len(roleAssignErrors) > 0 {

@@ -68,6 +68,7 @@ func (fam *FirebaseAuthMiddleware) verifyToken(c *gin.Context) (*auth.Token, boo
 	}
 
 	if token == "" {
+		log.Error().Msg("missing token")
 		return nil, true
 	}
 
@@ -75,10 +76,12 @@ func (fam *FirebaseAuthMiddleware) verifyToken(c *gin.Context) (*auth.Token, boo
 
 	authClient, err := fam.tenantClientConnectionPool.GetBaseAuthClient(c)
 	if err != nil {
+		log.Error().Err(err).Msg("failed to get auth client")
 		return nil, true
 	}
 	idToken, err = authClient.VerifyIDToken(context.Background(), token)
 	if err != nil {
+		log.Error().Err(err).Msg("failed to verify id token")
 		return nil, true
 	}
 

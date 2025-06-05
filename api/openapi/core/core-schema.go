@@ -328,9 +328,8 @@ type NewTranslation struct {
 
 // NewUser defines model for NewUser.
 type NewUser struct {
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Password string `json:"password"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
 }
 
 // Prompt defines model for Prompt.

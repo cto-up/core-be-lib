@@ -12,7 +12,7 @@ post:
             file:
               type: string
               format: binary
-              description: CSV file with user data (Lastname;Firstname;password;email format)
+              description: CSV file with user data (lastname;firstname;email format)
   responses:
     "200":
       description: Import results

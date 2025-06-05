@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome to CTO Up</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css"
+    />
+    <style>
+      .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .logo {
+        max-width: 150px;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="email-container">
+      <img
+        src="https://via.placeholder.com/150x50?text=Your+Logo"
+        alt="Company Logo"
+        class="logo"
+      />
+
+      <div class="box">
+        <h1 class="title is-3">Welcome to CTO Up</h1>
+        <p class="subtitle is-5">
+          You're one step away from accessing your password.
+        </p>
+
+        <div class="content">
+          <p>
+            You have been invited to join CTO Up. Please click the button below
+            to set your password:
+          </p>
+
+          <a href="{{.Link}}" class="button is-primary is-medium"
+            >Set Password</a
+          >
+
+          <p class="mt-4">
+            This link will expire in 24 hours for security reasons.
+          </p>
+
+          <p>
+            If you're having trouble clicking the button, copy and paste the URL
+            below into your web browser:
+          </p>
+          <p><a href="{{.Link}}">{{.Link}}</a></p>
+        </div>
+      </div>
+
+      <div class="has-text-centered mt-4">
+        <p class="is-size-7">© 2024 CTO Up. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>

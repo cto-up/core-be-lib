@@ -46,6 +46,16 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	url, err := getResetPasswordURL(c, tenant.Subdomain)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
 	c.JSON(http.StatusCreated, user)
 }
 
@@ -261,7 +271,12 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
 		return
 	}
-	resetPasswordRequest(c, baseAuthClient, url, req.Email)
+	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
 }
 
 func NewUserSuperAdminHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserSuperAdminHandler {

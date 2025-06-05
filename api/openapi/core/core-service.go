@@ -441,7 +441,7 @@ type ListUsersParamsOrder string
 
 // ImportUsersFromAdminMultipartBody defines parameters for ImportUsersFromAdmin.
 type ImportUsersFromAdminMultipartBody struct {
-	// File CSV file with user data (Lastname;Firstname;password;email format)
+	// File CSV file with user data (lastname;firstname;email format)
 	File *openapi_types.File `json:"file,omitempty"`
 }
 
