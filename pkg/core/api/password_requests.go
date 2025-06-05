@@ -96,7 +96,7 @@ func sendWelcomeEmail(c *gin.Context, baseAuthClient access.BaseAuthClient, url,
 		Link: link,
 	}
 
-	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Welcome to CTO Up", "")
+	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Welcome, Set Your Password", "")
 	if err := r.ParseTemplate("templates/email-welcome.html", templateData); err != nil {
 		log.Error().Err(err).Msg("Failed to parse template for reset link")
 		return err
