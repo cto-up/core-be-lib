@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"ctoup.com/coreapp/pkg/shared/emailservice"
@@ -38,7 +39,7 @@ func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 }
 
 func resetPasswordRequest(c *gin.Context, baseAuthClient access.BaseAuthClient, url, toEmail string) error {
-	fromEmail := c.GetString("SYSTEM_EMAIL")
+	fromEmail := os.Getenv("SYSTEM_EMAIL")
 	if fromEmail == "" {
 		fromEmail = "noreply@ctoup.com"
 	}
@@ -74,7 +75,7 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient access.BaseAuthClient, 
 }
 
 func sendWelcomeEmail(c *gin.Context, baseAuthClient access.BaseAuthClient, url, toEmail string) error {
-	fromEmail := c.GetString("SYSTEM_EMAIL")
+	fromEmail := os.Getenv("SYSTEM_EMAIL")
 	if fromEmail == "" {
 		fromEmail = "noreply@ctoup.com"
 	}
