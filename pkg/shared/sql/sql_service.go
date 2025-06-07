@@ -87,10 +87,24 @@ const (
 )
 
 func MigrateUp(dbConnection string, path string, prefix string) error {
-	return migrateMe(dbConnection, path, prefix, MigrationDirectionUp)
+	log.Info().Msg("Migrating up... " + path + " with prefix " + prefix)
+	err := migrateMe(dbConnection, path, prefix, MigrationDirectionUp)
+	if err != nil {
+		log.Err(err).Msg("Cannot migrate up!")
+		return err
+	}
+	log.Info().Msg("Migrated up!")
+	return nil
 }
 func MigrateDown(dbConnection string, path string, prefix string) error {
-	return migrateMe(dbConnection, path, prefix, MigrationDirectionDown)
+	log.Info().Msg("Migrating down... " + path + " with prefix " + prefix)
+	err := migrateMe(dbConnection, path, prefix, MigrationDirectionDown)
+	if err != nil {
+		log.Err(err).Msg("Cannot migrate down!")
+		return err
+	}
+	log.Info().Msg("Migrated down!")
+	return nil
 }
 
 func migrateMe(dbConnection string, path string, prefix string, direction MigrationDirection) error {
@@ -112,7 +126,7 @@ func migrateMe(dbConnection string, path string, prefix string, direction Migrat
 		if strings.Contains(err.Error(), "no change") {
 			log.Info().Msg("No migration change.")
 		} else {
-			log.Err(err).Msg("Error migrate down!")
+			log.Err(err).Msg("Error migrate!")
 			return err
 		}
 	}
