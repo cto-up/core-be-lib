@@ -14,7 +14,7 @@ import (
 )
 
 const getUserRoleByID = `-- name: GetUserRoleByID :one
-SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, JSON_AGG(core_roles.*) as core_roles
+SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, COALESCE(JSON_AGG(core_roles.*) FILTER (WHERE core_roles.id IS NOT NULL), '[]'::json)  as core_roles
 FROM core_users
 LEFT JOIN core_roles ON core_users.core_roles @> ARRAY[core_roles.id]
 WHERE core_users.id = $1 
@@ -34,7 +34,7 @@ type GetUserRoleByIDRow struct {
 	Email     pgtype.Text           `json:"email"`
 	CreatedAt time.Time             `json:"created_at"`
 	TenantID  pgtype.Text           `json:"tenant_id"`
-	CoreRoles []byte                `json:"core_roles"`
+	CoreRoles interface{}           `json:"core_roles"`
 }
 
 func (q *Queries) GetUserRoleByID(ctx context.Context, arg GetUserRoleByIDParams) (GetUserRoleByIDRow, error) {
@@ -52,7 +52,7 @@ func (q *Queries) GetUserRoleByID(ctx context.Context, arg GetUserRoleByIDParams
 }
 
 const listUsersRoles = `-- name: ListUsersRoles :many
-SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, JSON_AGG(core_roles.*) as core_roles
+SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, COALESCE(JSON_AGG(core_roles.*) FILTER (WHERE core_roles.id IS NOT NULL), '[]'::json)  as core_roles
 FROM core_users
 LEFT JOIN core_roles ON core_users.core_roles @> ARRAY[core_roles.id]
 WHERE core_users.tenant_id = $3::text
@@ -76,7 +76,7 @@ type ListUsersRolesRow struct {
 	Email     pgtype.Text           `json:"email"`
 	CreatedAt time.Time             `json:"created_at"`
 	TenantID  pgtype.Text           `json:"tenant_id"`
-	CoreRoles []byte                `json:"core_roles"`
+	CoreRoles interface{}           `json:"core_roles"`
 }
 
 func (q *Queries) ListUsersRoles(ctx context.Context, arg ListUsersRolesParams) ([]ListUsersRolesRow, error) {

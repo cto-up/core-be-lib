@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
@@ -214,23 +215,35 @@ func (uh *UserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqls
 	return users, nil
 }
 
-func unmarshalRolesFromDB(rolesBytes []byte) ([]core.Role, error) {
+func unmarshalRolesFromDB(rolesData interface{}) ([]core.Role, error) {
 	var dbRoles []repository.CoreRole
 	var roles []core.Role
-	if rolesBytes != nil {
+	switch v := rolesData.(type) {
+	case []byte:
+		// Raw JSON bytes
+		if err := json.Unmarshal(v, &dbRoles); err != nil {
+			return nil, err
+		}
+	case []interface{}:
+		// Already unmarshaled slice
+		rolesBytes, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(rolesBytes, &dbRoles); err != nil {
-			return []core.Role{}, err
+			return nil, err
 		}
-		roles = make([]core.Role, len(dbRoles))
-		for i, dbRole := range dbRoles {
-			roles[i] = core.Role{
-				Id:   dbRole.ID,
-				Name: dbRole.Name,
-			}
-		}
-		return roles, nil
+	default:
+		return nil, fmt.Errorf("unexpected type for roles data: %T", rolesData)
 	}
-	return []core.Role{}, nil
+	roles = make([]core.Role, len(dbRoles))
+	for i, dbRole := range dbRoles {
+		roles[i] = core.Role{
+			Id:   dbRole.ID,
+			Name: dbRole.Name,
+		}
+	}
+	return roles, nil
 }
 
 func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, roleID uuid.UUID) error {

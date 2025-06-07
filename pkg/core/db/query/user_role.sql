@@ -1,5 +1,5 @@
 -- name: GetUserRoleByID :one
-SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, JSON_AGG(core_roles.*) as core_roles
+SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, COALESCE(JSON_AGG(core_roles.*) FILTER (WHERE core_roles.id IS NOT NULL), '[]'::json)  as core_roles
 FROM core_users
 LEFT JOIN core_roles ON core_users.core_roles @> ARRAY[core_roles.id]
 WHERE core_users.id = $1 
@@ -8,7 +8,7 @@ GROUP BY core_users.id
 LIMIT 1;
 
 -- name: ListUsersRoles :many
-SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, JSON_AGG(core_roles.*) as core_roles
+SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, COALESCE(JSON_AGG(core_roles.*) FILTER (WHERE core_roles.id IS NOT NULL), '[]'::json)  as core_roles
 FROM core_users
 LEFT JOIN core_roles ON core_users.core_roles @> ARRAY[core_roles.id]
 WHERE core_users.tenant_id = sqlc.arg(tenant_id)::text
