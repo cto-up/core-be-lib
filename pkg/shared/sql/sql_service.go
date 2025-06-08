@@ -3,7 +3,6 @@ package sqlservice
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -114,7 +113,6 @@ func migrateMe(dbConnection string, path string, prefix string, direction Migrat
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create migrate instance!")
-		os.Exit(0)
 	}
 
 	if direction == MigrationDirectionUp {

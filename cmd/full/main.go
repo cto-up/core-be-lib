@@ -73,8 +73,6 @@ func main() {
 	connPool, err := connector.ConnectWithRetry(context.Background())
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create Pool:")
-
-		os.Exit(0)
 	}
 	log.Info().Msg("Connection Pool created...")
 
