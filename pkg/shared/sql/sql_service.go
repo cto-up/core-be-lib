@@ -87,23 +87,23 @@ const (
 )
 
 func MigrateUp(dbConnection string, path string, prefix string) error {
-	log.Info().Msg("Migrating up... " + path + " with prefix " + prefix)
+	log.Info().Msg("Start Migrating up... " + path + " with prefix " + prefix)
 	err := migrateMe(dbConnection, path, prefix, MigrationDirectionUp)
 	if err != nil {
 		log.Err(err).Msg("Cannot migrate up!")
 		return err
 	}
-	log.Info().Msg("Migrated up!")
+	log.Info().Msg("End Migrated up!")
 	return nil
 }
 func MigrateDown(dbConnection string, path string, prefix string) error {
-	log.Info().Msg("Migrating down... " + path + " with prefix " + prefix)
+	log.Info().Msg("Start Migrating down... " + path + " with prefix " + prefix)
 	err := migrateMe(dbConnection, path, prefix, MigrationDirectionDown)
 	if err != nil {
 		log.Err(err).Msg("Cannot migrate down!")
 		return err
 	}
-	log.Info().Msg("Migrated down!")
+	log.Info().Msg("End Migrating down!")
 	return nil
 }
 
@@ -113,7 +113,7 @@ func migrateMe(dbConnection string, path string, prefix string, direction Migrat
 		dbConnection+"&x-migrations-table="+prefix+"_migrations",
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Cannot create migration!")
+		log.Fatal().Err(err).Msg("Cannot create migrate instance!")
 		os.Exit(0)
 	}
 

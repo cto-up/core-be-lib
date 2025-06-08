@@ -8,7 +8,6 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog/log"
 )
 
 // getMigrationPath returns the absolute path to the migration directory
@@ -41,7 +40,6 @@ func migrate(dbConnection string) {
 	once.Do(func() {
 		path := getMigrationPath()
 		prefix := "core"
-		log.Info().Msg("Migrating... " + path + " with prefix " + prefix)
 		sqlservice.MigrateUp(dbConnection, path, prefix)
 	})
 }
