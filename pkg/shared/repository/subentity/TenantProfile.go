@@ -3,7 +3,6 @@ package subentity
 type TenantProfile struct {
 	StoreRAGDocument bool   `json:"storeRAGDocument"`
 	DisplayName      string `json:"displayName"`
-	CompanyName      string `json:"companyName"`
 	Values           string `json:"values"`
 	LightColors      Colors `json:"lightColors"`
 	DarkColors       Colors `json:"darkColors"`

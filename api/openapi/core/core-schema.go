@@ -368,8 +368,7 @@ type PublicTenantSchema struct {
 	Id       openapi_types.UUID `json:"id"`
 	Name     string             `json:"name"`
 	Profile  struct {
-		CompanyName string `json:"companyName"`
-		DarkColors  struct {
+		DarkColors struct {
 			Accent     *string `json:"accent,omitempty"`
 			Background *string `json:"background,omitempty"`
 			Info       *string `json:"info,omitempty"`
@@ -422,8 +421,7 @@ type TenantFeatures map[string]bool
 
 // TenantProfile defines model for TenantProfile.
 type TenantProfile struct {
-	CompanyName string `json:"companyName"`
-	DarkColors  struct {
+	DarkColors struct {
 		Accent     *string `json:"accent,omitempty"`
 		Background *string `json:"background,omitempty"`
 		Info       *string `json:"info,omitempty"`
