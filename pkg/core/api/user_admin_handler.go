@@ -387,7 +387,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	}
 
 	// Validate header
-	requiredColumns := []string{"lastname", "firstname", "email", "roles"}
+	requiredColumns := []string{"lastname", "firstname", "email", "is_admin"}
 	missingColumns := []string{}
 
 	// Create a map of header columns for easy lookup
@@ -408,21 +408,13 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 		return
 	}
 
-	// Fetch all available roles for validation
-	roles, err := uh.store.Queries.ListRoles(c, repository.ListRolesParams{
-		Limit:  100, // Assuming we won't have more than 100 roles
-		Offset: 0,
-	})
+	// Fetch the ADMIN role for assignment
+	adminRole, err := uh.store.Queries.GetRoleByName(c, "ADMIN")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("error fetching roles: %v", err)))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("error fetching ADMIN role: %v", err)))
 		return
 	}
 
-	// Create a map of role names to IDs for quick lookup
-	roleMap := make(map[string]uuid.UUID)
-	for _, role := range roles {
-		roleMap[role.Name] = role.ID
-	}
 	// Process records
 	type ImportError struct {
 		Line  int    `json:"line"`
@@ -484,16 +476,22 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			if len(record) < 4 {
 				errors = append(errors, ImportError{
 					Line:  lineNum,
-					Error: fmt.Sprintf("invalid record format, expected 4 fields, got %d", len(record)),
+					Error: fmt.Sprintf("invalid record format, expected at least 4 fields, got %d", len(record)),
 				})
 				failed++
 				continue
 			}
 
-			lastname := record[0]
-			firstname := record[1]
-			email := record[2]
-			roleNames := strings.Split(record[3], ",")
+			lastname := record[headerMap["lastname"]]
+			firstname := record[headerMap["firstname"]]
+			email := record[headerMap["email"]]
+			isAdminStr := strings.ToLower(record[headerMap["is_admin"]])
+
+			// Parse is_admin value
+			isAdmin := false
+			if isAdminStr == "y" || isAdminStr == "yes" || isAdminStr == "Y" || isAdminStr == "YES" || isAdminStr == "Yes" {
+				isAdmin = true
+			}
 
 			var req core.AddUserJSONRequestBody
 			req.Email = email
@@ -521,25 +519,18 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 				}
 			}
 
-			// Assign roles
-			roleAssignErrors := []string{}
-			for _, roleName := range roleNames {
-				roleName = strings.TrimSpace(roleName)
-				if roleName == "" {
-					continue
-				}
-
-				roleID, exists := roleMap[roleName]
-				if !exists {
-					roleAssignErrors = append(roleAssignErrors, fmt.Sprintf("role '%s' not found", roleName))
-					continue
-				}
-
-				err = uh.userService.AssignRole(c, baseAuthClient, tenantID.(string), user.ID, roleID)
+			// Assign ADMIN role if is_admin is true
+			if isAdmin {
+				err = uh.userService.AssignRole(c, baseAuthClient, tenantID.(string), user.ID, adminRole.ID)
 				if err != nil {
-					roleAssignErrors = append(roleAssignErrors, fmt.Sprintf("error assigning role '%s': %v", roleName, err))
+					errors = append(errors, ImportError{
+						Line:  lineNum,
+						Email: email,
+						Error: fmt.Sprintf("user created but role assignment failed: %v", err),
+					})
 				}
 			}
+
 			url, err := getResetPasswordURL(c)
 			if err != nil {
 				errors = append(errors, ImportError{
@@ -561,18 +552,11 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 				continue
 			}
 
-			if len(roleAssignErrors) > 0 {
-				errors = append(errors, ImportError{
-					Line:  lineNum,
-					Email: email,
-					Error: fmt.Sprintf("user created but role assignment failed: %s", strings.Join(roleAssignErrors, "; ")),
-				})
-			}
 			success++
 		}
 
 		// Return results
-		result := fmt.Sprintf(`Finished processing CSV file. Results:
+		result := fmt.Sprintf(`Finished processing Users. Results:
 			total: %d,
 			success: %d,
 			already exists: %d,

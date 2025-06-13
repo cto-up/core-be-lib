@@ -103,7 +103,7 @@ func (ss *SeedService) testSeedRoles(c context.Context, queries *repository.Quer
 }
 
 func (ss *SeedService) seedRoles(c context.Context, queries *repository.Queries, userID string) ([]repository.CoreRole, error) {
-	rolesString := []string{"USER", "ADMIN", "SUPER_ADMIN"}
+	rolesString := []string{"ADMIN", "SUPER_ADMIN"}
 
 	roles := make([]repository.CoreRole, len(rolesString))
 

@@ -74,6 +74,24 @@ func (q *Queries) GetRoleByID(ctx context.Context, id uuid.UUID) (CoreRole, erro
 	return i, err
 }
 
+const getRoleByName = `-- name: GetRoleByName :one
+SELECT id, user_id, created_at, updated_at, name FROM core_roles
+WHERE name = $1 LIMIT 1
+`
+
+func (q *Queries) GetRoleByName(ctx context.Context, name string) (CoreRole, error) {
+	row := q.db.QueryRow(ctx, getRoleByName, name)
+	var i CoreRole
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+	)
+	return i, err
+}
+
 const listRoles = `-- name: ListRoles :many
 SELECT id, user_id, created_at, updated_at, name FROM core_roles
 WHERE (UPPER(name) LIKE UPPER($3) OR $3 IS NULL)

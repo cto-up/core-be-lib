@@ -2,6 +2,10 @@
 SELECT * FROM core_roles
 WHERE id = $1 LIMIT 1;
 
+-- name: GetRoleByName :one
+SELECT * FROM core_roles
+WHERE name = $1 LIMIT 1;
+
 -- name: ListRoles :many
 SELECT * FROM core_roles
 WHERE (UPPER(name) LIKE UPPER(sqlc.narg('like')) OR sqlc.narg('like') IS NULL)
