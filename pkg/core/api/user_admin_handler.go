@@ -387,7 +387,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	}
 
 	// Validate header
-	requiredColumns := []string{"lastname", "firstname", "password", "email", "roles"}
+	requiredColumns := []string{"lastname", "firstname", "email", "roles"}
 	missingColumns := []string{}
 
 	// Create a map of header columns for easy lookup
