@@ -1,4 +1,4 @@
-post:
+patch:
   description: Add authorized domains for Firebase Authentication
   operationId: addAuthorizedDomains
   requestBody:
@@ -21,6 +21,38 @@ post:
   responses:
     "200":
       description: Domains successfully authorized
+    "400":
+      description: Invalid request
+    "401":
+      description: Unauthorized
+    "403":
+      description: Forbidden - requires SUPER_ADMIN role
+    "500":
+      description: Internal server error
+
+delete:
+  description: Remove authorized domains for Firebase Authentication
+  operationId: removeAuthorizedDomains
+  requestBody:
+    description: Domains to remove
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - domains
+          properties:
+            domains:
+              type: array
+              items:
+                type: string
+                format: hostname
+              description: List of domains to remove
+              example: ["bo.app.example.com", "app.example.com"]
+  responses:
+    "200":
+      description: Domains successfully removed
     "400":
       description: Invalid request
     "401":

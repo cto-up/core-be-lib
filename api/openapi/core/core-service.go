@@ -523,6 +523,12 @@ type GetAPITokenAuditLogsParams struct {
 	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// RemoveAuthorizedDomainsJSONBody defines parameters for RemoveAuthorizedDomains.
+type RemoveAuthorizedDomainsJSONBody struct {
+	// Domains List of domains to remove
+	Domains []string `json:"domains"`
+}
+
 // AddAuthorizedDomainsJSONBody defines parameters for AddAuthorizedDomains.
 type AddAuthorizedDomainsJSONBody struct {
 	// Domains List of domains to authorize
@@ -700,6 +706,9 @@ type CreateAPITokenJSONRequestBody = NewAPIToken
 
 // RevokeAPITokenJSONRequestBody defines body for RevokeAPIToken for application/json ContentType.
 type RevokeAPITokenJSONRequestBody = APITokenRevoke
+
+// RemoveAuthorizedDomainsJSONRequestBody defines body for RemoveAuthorizedDomains for application/json ContentType.
+type RemoveAuthorizedDomainsJSONRequestBody RemoveAuthorizedDomainsJSONBody
 
 // AddAuthorizedDomainsJSONRequestBody defines body for AddAuthorizedDomains for application/json ContentType.
 type AddAuthorizedDomainsJSONRequestBody AddAuthorizedDomainsJSONBody
@@ -917,7 +926,10 @@ type ServerInterface interface {
 	// (PATCH /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke)
 	RevokeAPIToken(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
 
-	// (POST /superadmin-api/v1/config/authorized-domains)
+	// (DELETE /superadmin-api/v1/config/authorized-domains)
+	RemoveAuthorizedDomains(c *gin.Context)
+
+	// (PATCH /superadmin-api/v1/config/authorized-domains)
 	AddAuthorizedDomains(c *gin.Context)
 
 	// (GET /superadmin-api/v1/configs/global-configs)
@@ -2732,6 +2744,19 @@ func (siw *ServerInterfaceWrapper) RevokeAPIToken(c *gin.Context) {
 	siw.Handler.RevokeAPIToken(c, id, tokenId)
 }
 
+// RemoveAuthorizedDomains operation middleware
+func (siw *ServerInterfaceWrapper) RemoveAuthorizedDomains(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.RemoveAuthorizedDomains(c)
+}
+
 // AddAuthorizedDomains operation middleware
 func (siw *ServerInterfaceWrapper) AddAuthorizedDomains(c *gin.Context) {
 
@@ -3515,7 +3540,8 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId", wrapper.GetAPITokenById)
 	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId/audit", wrapper.GetAPITokenAuditLogs)
 	router.PATCH(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId/revoke", wrapper.RevokeAPIToken)
-	router.POST(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.AddAuthorizedDomains)
+	router.DELETE(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.RemoveAuthorizedDomains)
+	router.PATCH(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.AddAuthorizedDomains)
 	router.GET(options.BaseURL+"/superadmin-api/v1/configs/global-configs", wrapper.ListGlobalConfigs)
 	router.POST(options.BaseURL+"/superadmin-api/v1/configs/global-configs", wrapper.AddGlobalConfig)
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/configs/global-configs/:id", wrapper.DeleteGlobalConfig)
