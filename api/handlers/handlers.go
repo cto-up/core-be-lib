@@ -9,6 +9,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type Handlers struct {
+	*config.GlobalConfigHandler
+	*core.PromptHandler
+	*config.TenantConfigHandler
+	*health.HealthHandler
+	*core.TenantHandler
+	*core.UserHandler
+	*core.UserAdminHandler
+	*core.UserSuperAdminHandler
+	*core.SuperAdminHandler
+	*core.RoleHandler
+	*core.ClientApplicationHandler
+	*core.TranslationHandler
+}
+
 func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool *access.FirebaseTenantClientConnectionPool, multiTenantService *access.MultitenantService, clientAppService *access.ClientApplicationService) Handlers {
 	store := db.NewStore(connPool)
 	handlers := Handlers{
@@ -20,23 +35,10 @@ func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool *access.FirebaseT
 		UserHandler:              core.NewUserHandler(store, authClientPool),
 		UserAdminHandler:         core.NewUserAdminHandler(store, authClientPool),
 		UserSuperAdminHandler:    core.NewUserSuperAdminHandler(store, authClientPool),
+		SuperAdminHandler:        core.NewSuperAdminHandler(authClientPool),
 		RoleHandler:              core.NewRoleHandler(store),
 		ClientApplicationHandler: core.NewClientApplicationHandler(store, clientAppService),
 		TranslationHandler:       core.NewTranslationHandler(store),
 	}
 	return handlers
-}
-
-type Handlers struct {
-	*config.GlobalConfigHandler
-	*core.PromptHandler
-	*config.TenantConfigHandler
-	*health.HealthHandler
-	*core.TenantHandler
-	*core.UserHandler
-	*core.UserAdminHandler
-	*core.UserSuperAdminHandler
-	*core.RoleHandler
-	*core.ClientApplicationHandler
-	*core.TranslationHandler
 }

@@ -523,6 +523,12 @@ type GetAPITokenAuditLogsParams struct {
 	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// AddAuthorizedDomainsJSONBody defines parameters for AddAuthorizedDomains.
+type AddAuthorizedDomainsJSONBody struct {
+	// Domains List of domains to authorize
+	Domains []string `json:"domains"`
+}
+
 // ListGlobalConfigsParams defines parameters for ListGlobalConfigs.
 type ListGlobalConfigsParams struct {
 	// Page page number
@@ -694,6 +700,9 @@ type CreateAPITokenJSONRequestBody = NewAPIToken
 
 // RevokeAPITokenJSONRequestBody defines body for RevokeAPIToken for application/json ContentType.
 type RevokeAPITokenJSONRequestBody = APITokenRevoke
+
+// AddAuthorizedDomainsJSONRequestBody defines body for AddAuthorizedDomains for application/json ContentType.
+type AddAuthorizedDomainsJSONRequestBody AddAuthorizedDomainsJSONBody
 
 // AddGlobalConfigJSONRequestBody defines body for AddGlobalConfig for application/json ContentType.
 type AddGlobalConfigJSONRequestBody AddGlobalConfigJSONBody
@@ -907,6 +916,9 @@ type ServerInterface interface {
 
 	// (PATCH /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke)
 	RevokeAPIToken(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
+
+	// (POST /superadmin-api/v1/config/authorized-domains)
+	AddAuthorizedDomains(c *gin.Context)
 
 	// (GET /superadmin-api/v1/configs/global-configs)
 	ListGlobalConfigs(c *gin.Context, params ListGlobalConfigsParams)
@@ -2720,6 +2732,19 @@ func (siw *ServerInterfaceWrapper) RevokeAPIToken(c *gin.Context) {
 	siw.Handler.RevokeAPIToken(c, id, tokenId)
 }
 
+// AddAuthorizedDomains operation middleware
+func (siw *ServerInterfaceWrapper) AddAuthorizedDomains(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AddAuthorizedDomains(c)
+}
+
 // ListGlobalConfigs operation middleware
 func (siw *ServerInterfaceWrapper) ListGlobalConfigs(c *gin.Context) {
 
@@ -3490,6 +3515,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId", wrapper.GetAPITokenById)
 	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId/audit", wrapper.GetAPITokenAuditLogs)
 	router.PATCH(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId/revoke", wrapper.RevokeAPIToken)
+	router.POST(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.AddAuthorizedDomains)
 	router.GET(options.BaseURL+"/superadmin-api/v1/configs/global-configs", wrapper.ListGlobalConfigs)
 	router.POST(options.BaseURL+"/superadmin-api/v1/configs/global-configs", wrapper.AddGlobalConfig)
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/configs/global-configs/:id", wrapper.DeleteGlobalConfig)

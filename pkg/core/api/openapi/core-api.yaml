@@ -87,7 +87,7 @@ paths:
   /public-api/v1/tenant/pictures/background-mobile:
     $ref: "./parts/admin/public-tenant-pictures-background-mobile-path.yaml"
   /api/v1/tenant/pictures/logo:
-    $ref: "./parts/admin/tenant-pictures-logo-path.yaml" 
+    $ref: "./parts/admin/tenant-pictures-logo-path.yaml"
   /api/v1/tenant/pictures/background:
     $ref: "./parts/admin/tenant-pictures-background-path.yaml"
   /api/v1/tenant/pictures/background-mobile:
@@ -102,6 +102,8 @@ paths:
     $ref: "./parts/admin/tenants-id-path.yaml"
   /superadmin-api/v1/tenant/{tenantid}/features:
     $ref: "./parts/admin/super-admin-tenant-features-path.yaml"
+  /superadmin-api/v1/config/authorized-domains:
+    $ref: "./parts/admin/authorized-domains-path.yaml"
 
   # Client Applications and API Tokens (SUPER_ADMIN only)
   /superadmin-api/v1/client-applications:

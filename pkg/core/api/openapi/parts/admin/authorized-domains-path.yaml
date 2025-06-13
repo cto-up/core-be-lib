@@ -1,0 +1,31 @@
+post:
+  description: Add authorized domains for Firebase Authentication
+  operationId: addAuthorizedDomains
+  requestBody:
+    description: Domains to authorize
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - domains
+          properties:
+            domains:
+              type: array
+              items:
+                type: string
+                format: hostname
+              description: List of domains to authorize
+              example: ["bo.app.example.com", "app.example.com"]
+  responses:
+    "200":
+      description: Domains successfully authorized
+    "400":
+      description: Invalid request
+    "401":
+      description: Unauthorized
+    "403":
+      description: Forbidden - requires SUPER_ADMIN role
+    "500":
+      description: Internal server error
