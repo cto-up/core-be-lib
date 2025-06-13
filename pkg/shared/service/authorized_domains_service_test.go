@@ -8,24 +8,8 @@ import (
 	"firebase.google.com/go/auth"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-// MockHTTPClient is a mock HTTP client for testing
-type MockHTTPClient struct {
-	mock.Mock
-}
-
-func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	args := m.Called(req)
-	return args.Get(0).(*http.Response), args.Error(1)
-}
-
-// MockAuthClient is a mock Firebase Auth client for testing
-type MockAuthClient struct {
-	mock.Mock
-}
 
 func TestAddAuthorizeDomains(t *testing.T) {
 	// Set up test environment variables
