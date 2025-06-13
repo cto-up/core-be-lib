@@ -6,12 +6,12 @@ import (
 	"ctoup.com/coreapp/api/helpers"
 	api "ctoup.com/coreapp/api/openapi/core"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	"ctoup.com/coreapp/pkg/shared/service"
-	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -19,15 +19,15 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type TenantHandler struct {
-	authClientPool     *access.FirebaseTenantClientConnectionPool
-	multiTenantService *access.MultitenantService
+	authClientPool     *service.FirebaseTenantClientConnectionPool
+	multiTenantService *service.MultitenantService
 	store              *db.Store
 }
 
 // (GET /public-api/v1/tenant)
 func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 
-	subdomain, err := access.GetSubdomain(c)
+	subdomain, err := service.GetSubdomain(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -79,7 +79,7 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	userID, exist := c.Get(access.AUTH_USER_ID)
+	userID, exist := c.Get(service.AUTH_USER_ID)
 	if !exist {
 		// should not happen as the middleware ensures that the user is authenticated
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
@@ -98,6 +98,20 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 		service.DeleteTenant(c, exh.authClientPool.GetClient(), firebaseTenant.ID)
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
+	}
+	profile := subentity.TenantProfile{
+		DisplayName: req.Name,
+		LightColors: subentity.Colors{},
+		DarkColors:  subentity.Colors{},
+	}
+
+	_, err = exh.store.UpdateTenantProfile(c, repository.UpdateTenantProfileParams{
+		TenantID: firebaseTenant.ID,
+		Profile:  profile,
+	})
+
+	if err != nil {
+		log.Error().Err(err).Str("tenantID", firebaseTenant.ID).Msg("Failed to set tenant profile on create")
 	}
 	c.JSON(http.StatusCreated, tenant)
 }
@@ -202,7 +216,7 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 	c.JSON(http.StatusOK, tenants)
 }
 
-func NewTenantHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool, multiTenantService *access.MultitenantService) *TenantHandler {
+func NewTenantHandler(store *db.Store, authClientPool *service.FirebaseTenantClientConnectionPool, multiTenantService *service.MultitenantService) *TenantHandler {
 	return &TenantHandler{
 		store:              store,
 		authClientPool:     authClientPool,
