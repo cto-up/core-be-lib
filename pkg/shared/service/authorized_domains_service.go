@@ -55,8 +55,7 @@ func SDKAddAuthorizedDomains(ctx context.Context, authClient *auth.Client, domai
 	}
 
 	// Get current configuration
-	configName := fmt.Sprintf("projects/%s/config", projectID)
-	currentConfig, err := service.Projects.GetConfig(configName).Context(ctx).Do()
+	configName, currentConfig, err := GetFirebaseConfig(ctx, projectID, service)
 	if err != nil {
 		return fmt.Errorf("failed to get current configuration: %w", err)
 	}
@@ -99,6 +98,12 @@ func SDKAddAuthorizedDomains(ctx context.Context, authClient *auth.Client, domai
 	return nil
 }
 
+func GetFirebaseConfig(ctx context.Context, projectID string, service *identitytoolkit.Service) (string, *identitytoolkit.GoogleCloudIdentitytoolkitAdminV2Config, error) {
+	configName := fmt.Sprintf("projects/%s/config", projectID)
+	currentConfig, err := service.Projects.GetConfig(configName).Context(ctx).Do()
+	return configName, currentConfig, err
+}
+
 // SDKRemoveAuthorizedDomains removes domains using the SDK with proper field masking
 func SDKRemoveAuthorizedDomains(ctx context.Context, authClient *auth.Client, domainsToRemove []string) error {
 	service, projectID, err := createIdentityToolkitService(ctx)
@@ -107,8 +112,8 @@ func SDKRemoveAuthorizedDomains(ctx context.Context, authClient *auth.Client, do
 	}
 
 	// Get current configuration
-	configName := fmt.Sprintf("projects/%s/config", projectID)
-	currentConfig, err := service.Projects.GetConfig(configName).Context(ctx).Do()
+	// Get current configuration
+	configName, currentConfig, err := GetFirebaseConfig(ctx, projectID, service)
 	if err != nil {
 		return fmt.Errorf("failed to get current configuration: %w", err)
 	}

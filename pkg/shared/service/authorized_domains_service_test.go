@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"testing"
 
 	"firebase.google.com/go/auth"
@@ -10,6 +13,36 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGetFirebaseConfig(t *testing.T) {
+	// Set up test environment variables
+	godotenv.Load("../../../.env")
+	godotenv.Overload("../../../.env", "../../../.env.local")
+
+	// Create a context
+	ctx := context.Background()
+
+	// Initialize Firebase Auth client
+
+	service, projectID, err := createIdentityToolkitService(ctx)
+	require.NoError(t, err)
+
+	// Get the config
+	configName, currentConfig, err := GetFirebaseConfig(ctx, projectID, service)
+	// write out the config into a file called config.json
+	file, err := os.Create("config.json")
+	require.NoError(t, err)
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	err = encoder.Encode(currentConfig)
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	require.NotNil(t, currentConfig)
+	assert.Equal(t, configName, fmt.Sprintf("projects/%s/config", projectID))
+}
 
 func TestAddAuthorizeDomains(t *testing.T) {
 	// Set up test environment variables
