@@ -165,7 +165,7 @@ func (uh *UserSuperAdminHandler) ListUsersFromSuperAdmin(c *gin.Context, tenantI
 }
 
 // AssignRole implements openapi.ServerInterface.
-func (uh *UserSuperAdminHandler) AssignRoleFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userID string, roleID uuid.UUID) {
+func (uh *UserSuperAdminHandler) AssignRoleFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userID string, role core.Role) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -176,7 +176,7 @@ func (uh *UserSuperAdminHandler) AssignRoleFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	err = uh.userService.AssignRole(c, baseAuthClient, tenant.TenantID, userID, roleID)
+	err = uh.userService.AssignRole(c, baseAuthClient, tenant.TenantID, userID, role)
 	if err != nil {
 		log.Printf("error %v\n", err)
 		c.Status(http.StatusInternalServerError)
@@ -186,7 +186,7 @@ func (uh *UserSuperAdminHandler) AssignRoleFromSuperAdmin(c *gin.Context, tenant
 }
 
 // UnassignRole implements openapi.ServerInterface.
-func (uh *UserSuperAdminHandler) UnassignRoleFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userID string, roleID uuid.UUID) {
+func (uh *UserSuperAdminHandler) UnassignRoleFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userID string, role core.Role) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -198,7 +198,7 @@ func (uh *UserSuperAdminHandler) UnassignRoleFromSuperAdmin(c *gin.Context, tena
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	err = uh.userService.UnassignRole(c, baseAuthClient, tenant.TenantID, userID, roleID)
+	err = uh.userService.UnassignRole(c, baseAuthClient, tenant.TenantID, userID, role)
 	if err != nil {
 		log.Printf("error %v\n", err)
 		c.Status(http.StatusInternalServerError)

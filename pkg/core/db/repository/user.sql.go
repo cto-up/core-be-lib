@@ -9,7 +9,6 @@ import (
 	"context"
 
 	subentity "ctoup.com/coreapp/pkg/shared/repository/subentity"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -19,7 +18,7 @@ INSERT INTO core_users (
 ) VALUES (
   $1, $3::text, $2, $4::text
 )
-RETURNING id, profile, email, core_roles, created_at, tenant_id
+RETURNING id, profile, email, created_at, tenant_id, roles
 `
 
 type CreateUserParams struct {
@@ -41,9 +40,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CoreUse
 		&i.ID,
 		&i.Profile,
 		&i.Email,
-		&i.CoreRoles,
 		&i.CreatedAt,
 		&i.TenantID,
+		&i.Roles,
 	)
 	return i, err
 }
@@ -68,7 +67,7 @@ func (q *Queries) DeleteUser(ctx context.Context, arg DeleteUserParams) (string,
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, profile, email, core_roles, created_at, tenant_id FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
 WHERE email = $1::text
 AND tenant_id = $2::text
 LIMIT 1
@@ -86,15 +85,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) 
 		&i.ID,
 		&i.Profile,
 		&i.Email,
-		&i.CoreRoles,
 		&i.CreatedAt,
 		&i.TenantID,
+		&i.Roles,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, profile, email, core_roles, created_at, tenant_id FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
 WHERE id = $1
 AND tenant_id = $2::text
 LIMIT 1
@@ -112,15 +111,15 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (CoreU
 		&i.ID,
 		&i.Profile,
 		&i.Email,
-		&i.CoreRoles,
 		&i.CreatedAt,
 		&i.TenantID,
+		&i.Roles,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, profile, email, core_roles, created_at, tenant_id FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
 WHERE (UPPER(email) LIKE UPPER($3) OR $3 IS NULL)
 AND tenant_id = $4::text
 ORDER BY created_at
@@ -153,9 +152,9 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]CoreUse
 			&i.ID,
 			&i.Profile,
 			&i.Email,
-			&i.CoreRoles,
 			&i.CreatedAt,
 			&i.TenantID,
+			&i.Roles,
 		); err != nil {
 			return nil, err
 		}
@@ -205,48 +204,6 @@ type UpdateUserParams struct {
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (string, error) {
 	row := q.db.QueryRow(ctx, updateUser, arg.ID, arg.Email, arg.TenantID)
-	var id string
-	err := row.Scan(&id)
-	return id, err
-}
-
-const updateUserAddRole = `-- name: UpdateUserAddRole :one
-UPDATE core_users
-SET core_roles = ARRAY(SELECT DISTINCT unnest(core_roles || $2::uuid))
-WHERE id = $1
-AND tenant_id = $3::text
-RETURNING id
-`
-
-type UpdateUserAddRoleParams struct {
-	ID       string    `json:"id"`
-	Role     uuid.UUID `json:"role"`
-	TenantID string    `json:"tenant_id"`
-}
-
-func (q *Queries) UpdateUserAddRole(ctx context.Context, arg UpdateUserAddRoleParams) (string, error) {
-	row := q.db.QueryRow(ctx, updateUserAddRole, arg.ID, arg.Role, arg.TenantID)
-	var id string
-	err := row.Scan(&id)
-	return id, err
-}
-
-const updateUserRemoveRole = `-- name: UpdateUserRemoveRole :one
-UPDATE core_users
-SET core_roles = ARRAY_REMOVE(core_roles, $2::uuid)
-WHERE id = $1 
-AND tenant_id = $3::text
-RETURNING id
-`
-
-type UpdateUserRemoveRoleParams struct {
-	ID       string    `json:"id"`
-	Role     uuid.UUID `json:"role"`
-	TenantID string    `json:"tenant_id"`
-}
-
-func (q *Queries) UpdateUserRemoveRole(ctx context.Context, arg UpdateUserRemoveRoleParams) (string, error) {
-	row := q.db.QueryRow(ctx, updateUserRemoveRole, arg.ID, arg.Role, arg.TenantID)
 	var id string
 	err := row.Scan(&id)
 	return id, err

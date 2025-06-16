@@ -126,7 +126,7 @@ type CoreUser struct {
 	ID        string                `json:"id"`
 	Profile   subentity.UserProfile `json:"profile"`
 	Email     pgtype.Text           `json:"email"`
-	CoreRoles []uuid.UUID           `json:"core_roles"`
 	CreatedAt time.Time             `json:"created_at"`
 	TenantID  pgtype.Text           `json:"tenant_id"`
+	Roles     []string              `json:"roles"`
 }

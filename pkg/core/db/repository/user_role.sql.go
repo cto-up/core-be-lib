@@ -13,93 +13,176 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getUserRoleByID = `-- name: GetUserRoleByID :one
-SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, COALESCE(JSON_AGG(core_roles.*) FILTER (WHERE core_roles.id IS NOT NULL), '[]'::json)  as core_roles
-FROM core_users
-LEFT JOIN core_roles ON core_users.core_roles @> ARRAY[core_roles.id]
-WHERE core_users.id = $1 
-AND core_users.tenant_id = $2::text
-GROUP BY core_users.id
-LIMIT 1
+const assignMultipleRoles = `-- name: AssignMultipleRoles :one
+UPDATE core_users 
+SET roles = (
+    SELECT ARRAY_AGG(DISTINCT role_name ORDER BY role_name)
+    FROM (
+        SELECT unnest(COALESCE(roles, ARRAY[]::VARCHAR[])) as role_name
+        UNION
+        SELECT unnest($1::VARCHAR[]) as role_name
+    ) combined_roles
+)
+WHERE id = $2::VARCHAR
+AND tenant_id = $3::VARCHAR
+RETURNING id, roles
 `
 
-type GetUserRoleByIDParams struct {
-	ID       string `json:"id"`
-	TenantID string `json:"tenant_id"`
+type AssignMultipleRolesParams struct {
+	RoleNames []string `json:"role_names"`
+	UserID    string   `json:"user_id"`
+	TenantID  string   `json:"tenant_id"`
 }
 
-type GetUserRoleByIDRow struct {
-	ID        string                `json:"id"`
-	Profile   subentity.UserProfile `json:"profile"`
-	Email     pgtype.Text           `json:"email"`
-	CreatedAt time.Time             `json:"created_at"`
-	TenantID  pgtype.Text           `json:"tenant_id"`
-	CoreRoles interface{}           `json:"core_roles"`
+type AssignMultipleRolesRow struct {
+	ID    string   `json:"id"`
+	Roles []string `json:"roles"`
 }
 
-func (q *Queries) GetUserRoleByID(ctx context.Context, arg GetUserRoleByIDParams) (GetUserRoleByIDRow, error) {
-	row := q.db.QueryRow(ctx, getUserRoleByID, arg.ID, arg.TenantID)
-	var i GetUserRoleByIDRow
-	err := row.Scan(
-		&i.ID,
-		&i.Profile,
-		&i.Email,
-		&i.CreatedAt,
-		&i.TenantID,
-		&i.CoreRoles,
-	)
+// Assign multiple roles to a user at once
+// Handles duplicates automatically
+func (q *Queries) AssignMultipleRoles(ctx context.Context, arg AssignMultipleRolesParams) (AssignMultipleRolesRow, error) {
+	row := q.db.QueryRow(ctx, assignMultipleRoles, arg.RoleNames, arg.UserID, arg.TenantID)
+	var i AssignMultipleRolesRow
+	err := row.Scan(&i.ID, &i.Roles)
 	return i, err
 }
 
-const listUsersRoles = `-- name: ListUsersRoles :many
-SELECT core_users.id, core_users.profile, core_users.email, core_users.created_at, core_users.tenant_id, COALESCE(JSON_AGG(core_roles.*) FILTER (WHERE core_roles.id IS NOT NULL), '[]'::json)  as core_roles
-FROM core_users
-LEFT JOIN core_roles ON core_users.core_roles @> ARRAY[core_roles.id]
-WHERE core_users.tenant_id = $3::text
-AND (UPPER(core_users.profile->>'name') LIKE UPPER($4) OR $4 IS NULL)
-GROUP BY core_users.id
-ORDER BY core_users.created_at
-LIMIT $1
-OFFSET $2
+const assignRoleWithRowsAffected = `-- name: AssignRoleWithRowsAffected :execrows
+UPDATE core_users 
+SET roles = CASE 
+    WHEN roles IS NULL THEN ARRAY[$1::VARCHAR(20)]
+    WHEN $1::VARCHAR(20) = ANY(roles) THEN roles
+    ELSE array_append(roles, $1::VARCHAR(20))
+END
+WHERE id = $2::VARCHAR
+AND tenant_id = $3::VARCHAR
 `
 
-type ListUsersRolesParams struct {
-	Limit    int32       `json:"limit"`
-	Offset   int32       `json:"offset"`
-	TenantID string      `json:"tenant_id"`
-	Like     interface{} `json:"like"`
+type AssignRoleWithRowsAffectedParams struct {
+	RoleName string `json:"role_name"`
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
 }
 
-type ListUsersRolesRow struct {
+// Alternative version that returns the number of rows affected
+// Useful if you just need to know if the operation succeeded
+func (q *Queries) AssignRoleWithRowsAffected(ctx context.Context, arg AssignRoleWithRowsAffectedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, assignRoleWithRowsAffected, arg.RoleName, arg.UserID, arg.TenantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const checkUserHasRole = `-- name: CheckUserHasRole :one
+SELECT 
+    id,
+    CASE 
+        WHEN roles IS NULL THEN false
+        WHEN $1::VARCHAR(20) = ANY(roles) THEN true
+        ELSE false
+    END as has_role,
+    roles
+FROM core_users
+WHERE id = $2::VARCHAR
+AND tenant_id = $3::VARCHAR
+LIMIT 1
+`
+
+type CheckUserHasRoleParams struct {
+	RoleName string `json:"role_name"`
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+type CheckUserHasRoleRow struct {
+	ID      string   `json:"id"`
+	HasRole bool     `json:"has_role"`
+	Roles   []string `json:"roles"`
+}
+
+// Check if a user has a specific role
+func (q *Queries) CheckUserHasRole(ctx context.Context, arg CheckUserHasRoleParams) (CheckUserHasRoleRow, error) {
+	row := q.db.QueryRow(ctx, checkUserHasRole, arg.RoleName, arg.UserID, arg.TenantID)
+	var i CheckUserHasRoleRow
+	err := row.Scan(&i.ID, &i.HasRole, &i.Roles)
+	return i, err
+}
+
+const getUserRoles = `-- name: GetUserRoles :one
+SELECT 
+    id,
+    COALESCE(roles, ARRAY[]::VARCHAR[]) as roles
+FROM core_users
+WHERE id = $1::VARCHAR
+AND tenant_id = $2::VARCHAR
+LIMIT 1
+`
+
+type GetUserRolesParams struct {
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+type GetUserRolesRow struct {
+	ID    string   `json:"id"`
+	Roles []string `json:"roles"`
+}
+
+// Get all roles for a specific user
+func (q *Queries) GetUserRoles(ctx context.Context, arg GetUserRolesParams) (GetUserRolesRow, error) {
+	row := q.db.QueryRow(ctx, getUserRoles, arg.UserID, arg.TenantID)
+	var i GetUserRolesRow
+	err := row.Scan(&i.ID, &i.Roles)
+	return i, err
+}
+
+const getUsersWithAnyRole = `-- name: GetUsersWithAnyRole :many
+SELECT 
+    id,
+    email,
+    profile,
+    roles,
+    created_at,
+    tenant_id
+FROM core_users
+WHERE roles && $1::VARCHAR[] -- Array overlap operator
+AND tenant_id = $2::VARCHAR
+ORDER BY id
+`
+
+type GetUsersWithAnyRoleParams struct {
+	RoleNames []string `json:"role_names"`
+	TenantID  string   `json:"tenant_id"`
+}
+
+type GetUsersWithAnyRoleRow struct {
 	ID        string                `json:"id"`
-	Profile   subentity.UserProfile `json:"profile"`
 	Email     pgtype.Text           `json:"email"`
+	Profile   subentity.UserProfile `json:"profile"`
+	Roles     []string              `json:"roles"`
 	CreatedAt time.Time             `json:"created_at"`
 	TenantID  pgtype.Text           `json:"tenant_id"`
-	CoreRoles interface{}           `json:"core_roles"`
 }
 
-func (q *Queries) ListUsersRoles(ctx context.Context, arg ListUsersRolesParams) ([]ListUsersRolesRow, error) {
-	rows, err := q.db.Query(ctx, listUsersRoles,
-		arg.Limit,
-		arg.Offset,
-		arg.TenantID,
-		arg.Like,
-	)
+// Get all users that have any of the specified roles
+func (q *Queries) GetUsersWithAnyRole(ctx context.Context, arg GetUsersWithAnyRoleParams) ([]GetUsersWithAnyRoleRow, error) {
+	rows, err := q.db.Query(ctx, getUsersWithAnyRole, arg.RoleNames, arg.TenantID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListUsersRolesRow{}
+	items := []GetUsersWithAnyRoleRow{}
 	for rows.Next() {
-		var i ListUsersRolesRow
+		var i GetUsersWithAnyRoleRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.Profile,
 			&i.Email,
+			&i.Profile,
+			&i.Roles,
 			&i.CreatedAt,
 			&i.TenantID,
-			&i.CoreRoles,
 		); err != nil {
 			return nil, err
 		}
@@ -109,4 +192,191 @@ func (q *Queries) ListUsersRoles(ctx context.Context, arg ListUsersRolesParams) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const getUsersWithRole = `-- name: GetUsersWithRole :many
+SELECT 
+    id,
+    email,
+    profile,
+    roles,
+    created_at,
+    tenant_id
+FROM core_users
+WHERE $1::VARCHAR(20) = ANY(roles)
+AND tenant_id = $2::VARCHAR
+ORDER BY id
+`
+
+type GetUsersWithRoleParams struct {
+	RoleName string `json:"role_name"`
+	TenantID string `json:"tenant_id"`
+}
+
+type GetUsersWithRoleRow struct {
+	ID        string                `json:"id"`
+	Email     pgtype.Text           `json:"email"`
+	Profile   subentity.UserProfile `json:"profile"`
+	Roles     []string              `json:"roles"`
+	CreatedAt time.Time             `json:"created_at"`
+	TenantID  pgtype.Text           `json:"tenant_id"`
+}
+
+// Get all users that have a specific role
+func (q *Queries) GetUsersWithRole(ctx context.Context, arg GetUsersWithRoleParams) ([]GetUsersWithRoleRow, error) {
+	rows, err := q.db.Query(ctx, getUsersWithRole, arg.RoleName, arg.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUsersWithRoleRow{}
+	for rows.Next() {
+		var i GetUsersWithRoleRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Profile,
+			&i.Roles,
+			&i.CreatedAt,
+			&i.TenantID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setUserRoles = `-- name: SetUserRoles :one
+UPDATE core_users 
+SET roles = CASE 
+    WHEN $1::VARCHAR[] IS NULL OR array_length($1::VARCHAR[], 1) = 0 THEN NULL
+    ELSE $1::VARCHAR[]
+END
+WHERE id = $2::VARCHAR
+AND tenant_id = $3::VARCHAR
+RETURNING id, roles
+`
+
+type SetUserRolesParams struct {
+	RoleNames []string `json:"role_names"`
+	UserID    string   `json:"user_id"`
+	TenantID  string   `json:"tenant_id"`
+}
+
+type SetUserRolesRow struct {
+	ID    string   `json:"id"`
+	Roles []string `json:"roles"`
+}
+
+// Replace all user roles with a new set of roles
+// Use this when you want to completely override existing roles
+func (q *Queries) SetUserRoles(ctx context.Context, arg SetUserRolesParams) (SetUserRolesRow, error) {
+	row := q.db.QueryRow(ctx, setUserRoles, arg.RoleNames, arg.UserID, arg.TenantID)
+	var i SetUserRolesRow
+	err := row.Scan(&i.ID, &i.Roles)
+	return i, err
+}
+
+const unassignMultipleRoles = `-- name: UnassignMultipleRoles :one
+UPDATE core_users 
+SET roles = (
+    SELECT CASE 
+        WHEN array_length(remaining_roles, 1) > 0 THEN remaining_roles
+        ELSE NULL
+    END
+    FROM (
+        SELECT ARRAY_AGG(role_name) as remaining_roles
+        FROM unnest(COALESCE(roles, ARRAY[]::VARCHAR[])) as role_name
+        WHERE NOT (role_name = ANY($1::VARCHAR[]))
+    ) filtered
+)
+WHERE id = $2::VARCHAR
+AND tenant_id = $3::VARCHAR
+RETURNING id, roles
+`
+
+type UnassignMultipleRolesParams struct {
+	RoleNames []string `json:"role_names"`
+	UserID    string   `json:"user_id"`
+	TenantID  string   `json:"tenant_id"`
+}
+
+type UnassignMultipleRolesRow struct {
+	ID    string   `json:"id"`
+	Roles []string `json:"roles"`
+}
+
+// Remove multiple roles from a user at once
+func (q *Queries) UnassignMultipleRoles(ctx context.Context, arg UnassignMultipleRolesParams) (UnassignMultipleRolesRow, error) {
+	row := q.db.QueryRow(ctx, unassignMultipleRoles, arg.RoleNames, arg.UserID, arg.TenantID)
+	var i UnassignMultipleRolesRow
+	err := row.Scan(&i.ID, &i.Roles)
+	return i, err
+}
+
+const unassignRole = `-- name: UnassignRole :one
+UPDATE core_users 
+SET roles = CASE 
+    WHEN roles IS NULL THEN NULL
+    WHEN NOT ($1::VARCHAR(20) = ANY(roles)) THEN roles -- Role doesn't exist, no change
+    ELSE array_remove(roles, $1::VARCHAR(20))
+END
+WHERE id = $2::VARCHAR
+AND tenant_id = $3::VARCHAR
+RETURNING id, roles,
+    CASE 
+        WHEN roles IS NULL OR NOT ($1::VARCHAR(20) = ANY(roles)) THEN true
+        ELSE false 
+    END as role_unassigned
+`
+
+type UnassignRoleParams struct {
+	RoleName string `json:"role_name"`
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+type UnassignRoleRow struct {
+	ID             string   `json:"id"`
+	Roles          []string `json:"roles"`
+	RoleUnassigned bool     `json:"role_unassigned"`
+}
+
+// Removes a role from a user if it exists
+// Returns the updated roles array
+func (q *Queries) UnassignRole(ctx context.Context, arg UnassignRoleParams) (UnassignRoleRow, error) {
+	row := q.db.QueryRow(ctx, unassignRole, arg.RoleName, arg.UserID, arg.TenantID)
+	var i UnassignRoleRow
+	err := row.Scan(&i.ID, &i.Roles, &i.RoleUnassigned)
+	return i, err
+}
+
+const unassignRoleWithRowsAffected = `-- name: UnassignRoleWithRowsAffected :execrows
+UPDATE core_users 
+SET roles = CASE 
+    WHEN roles IS NULL THEN NULL
+    WHEN NOT ($1::VARCHAR(20) = ANY(roles)) THEN roles
+    ELSE array_remove(roles, $1::VARCHAR(20))
+END
+WHERE id = $2::VARCHAR
+AND tenant_id = $3::VARCHAR
+`
+
+type UnassignRoleWithRowsAffectedParams struct {
+	RoleName string `json:"role_name"`
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+// Alternative version that returns the number of rows affected
+func (q *Queries) UnassignRoleWithRowsAffected(ctx context.Context, arg UnassignRoleWithRowsAffectedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unassignRoleWithRowsAffected, arg.RoleName, arg.UserID, arg.TenantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

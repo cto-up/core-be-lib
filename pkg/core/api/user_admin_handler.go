@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/csv"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,7 +22,6 @@ import (
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -39,17 +39,34 @@ func NewUserAdminHandler(store *db.Store, authClientPool *access.FirebaseTenantC
 		userService:    userService}
 	return handler
 }
+func checkAuthorizedRoles(c *gin.Context, roles []core.Role) error {
+	// Check if new user has ADMIN role
+	if slices.Contains(roles, "SUPER_ADMIN") && !access.IsSuperAdmin(c) {
+		return errors.New("must be an SUPER_ADMIN to assign SUPER_ADMIN role to a user.")
+	}
+	return nil
+}
 
 // AddUser implements openapi.ServerInterface.
 func (uh *UserAdminHandler) AddUser(c *gin.Context) {
+
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
+	if !access.IsAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only admin can add user"})
+		return
+	}
 	var req core.AddUserJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	if err := checkAuthorizedRoles(c, req.Roles); err != nil {
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
 
@@ -89,7 +106,10 @@ func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-
+	if err := checkAuthorizedRoles(c, req.Roles); err != nil {
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
+		return
+	}
 	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
@@ -196,7 +216,7 @@ func (u *UserAdminHandler) ListUsers(c *gin.Context, params core.ListUsersParams
 }
 
 // AssignRole implements openopenapi.ServerInterface.
-func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, roleID uuid.UUID) {
+func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, role core.Role) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -209,7 +229,7 @@ func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, roleID uui
 		return
 	}
 
-	err = uh.userService.AssignRole(c, baseAuthClient, tenantID.(string), userID, roleID)
+	err = uh.userService.AssignRole(c, baseAuthClient, tenantID.(string), userID, role)
 	if err != nil {
 		log.Printf("error %v\n", err)
 		c.Status(http.StatusInternalServerError)
@@ -219,7 +239,7 @@ func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, roleID uui
 }
 
 // UnassignRole implements openopenapi.ServerInterface.
-func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, roleID uuid.UUID) {
+func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, role core.Role) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -231,7 +251,7 @@ func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, roleID u
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-	err = uh.userService.UnassignRole(c, baseAuthClient, tenantID.(string), userID, roleID)
+	err = uh.userService.UnassignRole(c, baseAuthClient, tenantID.(string), userID, role)
 	if err != nil {
 		log.Printf("error %v\n", err)
 		c.Status(http.StatusInternalServerError)
@@ -408,13 +428,6 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 		return
 	}
 
-	// Fetch the ADMIN role for assignment
-	adminRole, err := uh.store.Queries.GetRoleByName(c, "ADMIN")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("error fetching ADMIN role: %v", err)))
-		return
-	}
-
 	// Process records
 	type ImportError struct {
 		Line  int    `json:"line"`
@@ -497,7 +510,20 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			req.Email = email
 			req.Name = firstname + " " + lastname
 
-			user, err := uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req)
+			// check if user has rights to assign roles
+			if isAdmin && !access.IsSuperAdmin(c) {
+				errors = append(errors, ImportError{
+					Line:  lineNum,
+					Email: email,
+					Error: "must be an SUPER_ADMIN to assign SUPER_ADMIN role to a user.",
+				})
+				failed++
+				continue
+			}
+			if isAdmin {
+				req.Roles = []core.Role{"ADMIN"}
+			}
+			_, err = uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req)
 			if err != nil {
 				// check if error is a firebase error and if so, check if it is a duplicate email error
 				if auth.IsEmailAlreadyExists(err) {
@@ -516,18 +542,6 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 					})
 					failed++
 					continue
-				}
-			}
-
-			// Assign ADMIN role if is_admin is true
-			if isAdmin {
-				err = uh.userService.AssignRole(c, baseAuthClient, tenantID.(string), user.ID, adminRole.ID)
-				if err != nil {
-					errors = append(errors, ImportError{
-						Line:  lineNum,
-						Email: email,
-						Error: fmt.Sprintf("user created but role assignment failed: %v", err),
-					})
 				}
 			}
 

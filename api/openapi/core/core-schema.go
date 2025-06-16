@@ -59,6 +59,12 @@ const (
 	PromptFormatText     PromptFormat = "text"
 )
 
+// Defines values for Role.
+const (
+	ADMIN      Role = "ADMIN"
+	SUPERADMIN Role = "SUPER_ADMIN"
+)
+
 // Defines values for UserActionSchemaName.
 const (
 	DISABLED      UserActionSchemaName = "DISABLED"
@@ -304,11 +310,6 @@ type NewPrompt struct {
 // NewPromptFormat Output format of the prompt execution
 type NewPromptFormat string
 
-// NewRole defines model for NewRole.
-type NewRole struct {
-	Name string `json:"name"`
-}
-
 // NewTenant defines model for NewTenant.
 type NewTenant struct {
 	AllowPasswordSignUp   bool   `json:"allow_password_sign_up"`
@@ -330,6 +331,7 @@ type NewTranslation struct {
 type NewUser struct {
 	Email string `json:"email"`
 	Name  string `json:"name"`
+	Roles []Role `json:"roles"`
 }
 
 // Prompt defines model for Prompt.
@@ -393,18 +395,14 @@ type PublicTenantSchema struct {
 			Text       *string `json:"text,omitempty"`
 			Warning    *string `json:"warning,omitempty"`
 		} `json:"lightColors"`
-		StoreRAGDocument *bool   `json:"storeRAGDocument,omitempty"`
-		Values           *string `json:"values,omitempty"`
+		Values *string `json:"values,omitempty"`
 	} `json:"profile"`
 	Subdomain string `json:"subdomain"`
 	TenantId  string `json:"tenant_id"`
 }
 
 // Role defines model for Role.
-type Role struct {
-	Id   openapi_types.UUID `json:"id"`
-	Name string             `json:"name"`
-}
+type Role string
 
 // Tenant defines model for Tenant.
 type Tenant struct {
@@ -446,8 +444,7 @@ type TenantProfile struct {
 		Text       *string `json:"text,omitempty"`
 		Warning    *string `json:"warning,omitempty"`
 	} `json:"lightColors"`
-	StoreRAGDocument *bool   `json:"storeRAGDocument,omitempty"`
-	Values           *string `json:"values,omitempty"`
+	Values *string `json:"values,omitempty"`
 }
 
 // Translation defines model for Translation.
@@ -472,7 +469,7 @@ type User struct {
 	Id            string             `json:"id"`
 	Name          string             `json:"name"`
 	Profile       *UserProfileSchema `json:"profile,omitempty"`
-	Roles         *[]Role            `json:"roles,omitempty"`
+	Roles         []Role             `json:"roles"`
 }
 
 // UserActionSchema defines model for UserActionSchema.

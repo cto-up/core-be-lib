@@ -8,13 +8,12 @@ post:
       required: true
       schema:
         type: string
-    - name: roleid
+    - name: role
       in: path
-      description: ID of role to assign
+      description: role to assign
       required: true
       schema:
-        type: string
-        format: uuid
+        $ref: "../../core-schema.yaml#/components/schemas/Role"
   responses:
     "204":
       description: role assigned to user

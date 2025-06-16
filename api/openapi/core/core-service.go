@@ -61,12 +61,6 @@ const (
 	UpdatePromptJSONBodyFormatText     UpdatePromptJSONBodyFormat = "text"
 )
 
-// Defines values for ListRolesParamsOrder.
-const (
-	ListRolesParamsOrderAsc  ListRolesParamsOrder = "asc"
-	ListRolesParamsOrderDesc ListRolesParamsOrder = "desc"
-)
-
 // Defines values for ListTranslationsParamsOrder.
 const (
 	ListTranslationsParamsOrderAsc  ListTranslationsParamsOrder = "asc"
@@ -129,8 +123,8 @@ const (
 
 // Defines values for ListUsersFromSuperAdminParamsOrder.
 const (
-	ListUsersFromSuperAdminParamsOrderAsc  ListUsersFromSuperAdminParamsOrder = "asc"
-	ListUsersFromSuperAdminParamsOrderDesc ListUsersFromSuperAdminParamsOrder = "desc"
+	Asc  ListUsersFromSuperAdminParamsOrder = "asc"
+	Desc ListUsersFromSuperAdminParamsOrder = "desc"
 )
 
 // Defines values for UpdateUserStatusFromSuperAdminJSONBodyName.
@@ -323,27 +317,6 @@ type UpdatePromptJSONBody struct {
 
 // UpdatePromptJSONBodyFormat defines parameters for UpdatePrompt.
 type UpdatePromptJSONBodyFormat string
-
-// ListRolesParams defines parameters for ListRoles.
-type ListRolesParams struct {
-	// Page page number
-	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
-
-	// PageSize maximum number of results to return
-	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
-
-	// SortBy field to sort by
-	SortBy *string `form:"sortBy,omitempty" json:"sortBy,omitempty"`
-
-	// Order sort order
-	Order *ListRolesParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-
-	// Q starts with
-	Q *string `form:"q,omitempty" json:"q,omitempty"`
-}
-
-// ListRolesParamsOrder defines parameters for ListRoles.
-type ListRolesParamsOrder string
 
 // UploadTenantBackgroundMultipartBody defines parameters for UploadTenantBackground.
 type UploadTenantBackgroundMultipartBody struct {
@@ -653,12 +626,6 @@ type FormatPromptJSONRequestBody FormatPromptJSONBody
 // UpdatePromptJSONRequestBody defines body for UpdatePrompt for application/json ContentType.
 type UpdatePromptJSONRequestBody UpdatePromptJSONBody
 
-// AddRoleJSONRequestBody defines body for AddRole for application/json ContentType.
-type AddRoleJSONRequestBody = NewRole
-
-// UpdateRoleJSONRequestBody defines body for UpdateRole for application/json ContentType.
-type UpdateRoleJSONRequestBody = Role
-
 // UploadTenantBackgroundMultipartRequestBody defines body for UploadTenantBackground for multipart/form-data ContentType.
 type UploadTenantBackgroundMultipartRequestBody UploadTenantBackgroundMultipartBody
 
@@ -791,21 +758,6 @@ type ServerInterface interface {
 	// (PUT /api/v1/prompts/{id})
 	UpdatePrompt(c *gin.Context, id openapi_types.UUID)
 
-	// (GET /api/v1/roles)
-	ListRoles(c *gin.Context, params ListRolesParams)
-
-	// (POST /api/v1/roles)
-	AddRole(c *gin.Context)
-
-	// (DELETE /api/v1/roles/{id})
-	DeleteRole(c *gin.Context, id openapi_types.UUID)
-
-	// (GET /api/v1/roles/{id})
-	GetRoleByID(c *gin.Context, id openapi_types.UUID)
-
-	// (PUT /api/v1/roles/{id})
-	UpdateRole(c *gin.Context, id openapi_types.UUID)
-
 	// (POST /api/v1/tenant/pictures/background)
 	UploadTenantBackground(c *gin.Context)
 
@@ -860,11 +812,11 @@ type ServerInterface interface {
 	// (POST /api/v1/users/{userid}/password-reset-request)
 	ResetPasswordRequestByAdmin(c *gin.Context, userid string)
 
-	// (POST /api/v1/users/{userid}/roles/{roleid}/assign)
-	AssignRole(c *gin.Context, userid string, roleid openapi_types.UUID)
+	// (POST /api/v1/users/{userid}/roles/{role}/assign)
+	AssignRole(c *gin.Context, userid string, role Role)
 
-	// (POST /api/v1/users/{userid}/roles/{roleid}/unassign)
-	UnassignRole(c *gin.Context, userid string, roleid openapi_types.UUID)
+	// (POST /api/v1/users/{userid}/roles/{role}/unassign)
+	UnassignRole(c *gin.Context, userid string, role Role)
 
 	// (POST /api/v1/users/{userid}/status)
 	UpdateUserStatus(c *gin.Context, userid string)
@@ -986,11 +938,11 @@ type ServerInterface interface {
 	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/password-reset-request)
 	ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
 
-	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{roleid}/assign)
-	AssignRoleFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string, roleid openapi_types.UUID)
+	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{role}/assign)
+	AssignRoleFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string, role Role)
 
-	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{roleid}/unassign)
-	UnassignRoleFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string, roleid openapi_types.UUID)
+	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{role}/unassign)
+	UnassignRoleFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string, role Role)
 
 	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/status)
 	UpdateUserStatusFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
@@ -1473,149 +1425,6 @@ func (siw *ServerInterfaceWrapper) UpdatePrompt(c *gin.Context) {
 	}
 
 	siw.Handler.UpdatePrompt(c, id)
-}
-
-// ListRoles operation middleware
-func (siw *ServerInterfaceWrapper) ListRoles(c *gin.Context) {
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListRolesParams
-
-	// ------------- Optional query parameter "page" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "pageSize" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "sortBy" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "sortBy", c.Request.URL.Query(), &params.SortBy)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sortBy: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "order", c.Request.URL.Query(), &params.Order)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter order: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "q" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "q", c.Request.URL.Query(), &params.Q)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter q: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.ListRoles(c, params)
-}
-
-// AddRole operation middleware
-func (siw *ServerInterfaceWrapper) AddRole(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.AddRole(c)
-}
-
-// DeleteRole operation middleware
-func (siw *ServerInterfaceWrapper) DeleteRole(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.DeleteRole(c, id)
-}
-
-// GetRoleByID operation middleware
-func (siw *ServerInterfaceWrapper) GetRoleByID(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetRoleByID(c, id)
-}
-
-// UpdateRole operation middleware
-func (siw *ServerInterfaceWrapper) UpdateRole(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.UpdateRole(c, id)
 }
 
 // UploadTenantBackground operation middleware
@@ -2141,12 +1950,12 @@ func (siw *ServerInterfaceWrapper) AssignRole(c *gin.Context) {
 		return
 	}
 
-	// ------------- Path parameter "roleid" -------------
-	var roleid openapi_types.UUID
+	// ------------- Path parameter "role" -------------
+	var role Role
 
-	err = runtime.BindStyledParameterWithOptions("simple", "roleid", c.Param("roleid"), &roleid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "role", c.Param("role"), &role, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter roleid: %w", err), http.StatusBadRequest)
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter role: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -2157,7 +1966,7 @@ func (siw *ServerInterfaceWrapper) AssignRole(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.AssignRole(c, userid, roleid)
+	siw.Handler.AssignRole(c, userid, role)
 }
 
 // UnassignRole operation middleware
@@ -2174,12 +1983,12 @@ func (siw *ServerInterfaceWrapper) UnassignRole(c *gin.Context) {
 		return
 	}
 
-	// ------------- Path parameter "roleid" -------------
-	var roleid openapi_types.UUID
+	// ------------- Path parameter "role" -------------
+	var role Role
 
-	err = runtime.BindStyledParameterWithOptions("simple", "roleid", c.Param("roleid"), &roleid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "role", c.Param("role"), &role, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter roleid: %w", err), http.StatusBadRequest)
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter role: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -2190,7 +1999,7 @@ func (siw *ServerInterfaceWrapper) UnassignRole(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.UnassignRole(c, userid, roleid)
+	siw.Handler.UnassignRole(c, userid, role)
 }
 
 // UpdateUserStatus operation middleware
@@ -3358,12 +3167,12 @@ func (siw *ServerInterfaceWrapper) AssignRoleFromSuperAdmin(c *gin.Context) {
 		return
 	}
 
-	// ------------- Path parameter "roleid" -------------
-	var roleid openapi_types.UUID
+	// ------------- Path parameter "role" -------------
+	var role Role
 
-	err = runtime.BindStyledParameterWithOptions("simple", "roleid", c.Param("roleid"), &roleid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "role", c.Param("role"), &role, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter roleid: %w", err), http.StatusBadRequest)
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter role: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -3374,7 +3183,7 @@ func (siw *ServerInterfaceWrapper) AssignRoleFromSuperAdmin(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.AssignRoleFromSuperAdmin(c, tenantid, userid, roleid)
+	siw.Handler.AssignRoleFromSuperAdmin(c, tenantid, userid, role)
 }
 
 // UnassignRoleFromSuperAdmin operation middleware
@@ -3400,12 +3209,12 @@ func (siw *ServerInterfaceWrapper) UnassignRoleFromSuperAdmin(c *gin.Context) {
 		return
 	}
 
-	// ------------- Path parameter "roleid" -------------
-	var roleid openapi_types.UUID
+	// ------------- Path parameter "role" -------------
+	var role Role
 
-	err = runtime.BindStyledParameterWithOptions("simple", "roleid", c.Param("roleid"), &roleid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "role", c.Param("role"), &role, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter roleid: %w", err), http.StatusBadRequest)
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter role: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -3416,7 +3225,7 @@ func (siw *ServerInterfaceWrapper) UnassignRoleFromSuperAdmin(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.UnassignRoleFromSuperAdmin(c, tenantid, userid, roleid)
+	siw.Handler.UnassignRoleFromSuperAdmin(c, tenantid, userid, role)
 }
 
 // UpdateUserStatusFromSuperAdmin operation middleware
@@ -3495,11 +3304,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/api/v1/prompts/:id", wrapper.DeletePrompt)
 	router.GET(options.BaseURL+"/api/v1/prompts/:id", wrapper.GetPromptByID)
 	router.PUT(options.BaseURL+"/api/v1/prompts/:id", wrapper.UpdatePrompt)
-	router.GET(options.BaseURL+"/api/v1/roles", wrapper.ListRoles)
-	router.POST(options.BaseURL+"/api/v1/roles", wrapper.AddRole)
-	router.DELETE(options.BaseURL+"/api/v1/roles/:id", wrapper.DeleteRole)
-	router.GET(options.BaseURL+"/api/v1/roles/:id", wrapper.GetRoleByID)
-	router.PUT(options.BaseURL+"/api/v1/roles/:id", wrapper.UpdateRole)
 	router.POST(options.BaseURL+"/api/v1/tenant/pictures/background", wrapper.UploadTenantBackground)
 	router.POST(options.BaseURL+"/api/v1/tenant/pictures/background-mobile", wrapper.UploadTenantBackgroundMobile)
 	router.POST(options.BaseURL+"/api/v1/tenant/pictures/logo", wrapper.UploadTenantLogo)
@@ -3518,8 +3322,8 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/api/v1/users/:userid", wrapper.GetUserByID)
 	router.PUT(options.BaseURL+"/api/v1/users/:userid", wrapper.UpdateUser)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/password-reset-request", wrapper.ResetPasswordRequestByAdmin)
-	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:roleid/assign", wrapper.AssignRole)
-	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:roleid/unassign", wrapper.UnassignRole)
+	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:role/assign", wrapper.AssignRole)
+	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:role/unassign", wrapper.UnassignRole)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/status", wrapper.UpdateUserStatus)
 	router.GET(options.BaseURL+"/public-api/v1/health", wrapper.GetHealthCheck)
 	router.POST(options.BaseURL+"/public-api/v1/password-reset-request", wrapper.ResetPasswordRequest)
@@ -3560,7 +3364,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.GetUserByIDFromSuperAdmin)
 	router.PUT(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.UpdateUserFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/password-reset-request", wrapper.ResetPasswordRequestBySuperAdmin)
-	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/roles/:roleid/assign", wrapper.AssignRoleFromSuperAdmin)
-	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/roles/:roleid/unassign", wrapper.UnassignRoleFromSuperAdmin)
+	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/roles/:role/assign", wrapper.AssignRoleFromSuperAdmin)
+	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/roles/:role/unassign", wrapper.UnassignRoleFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/status", wrapper.UpdateUserStatusFromSuperAdmin)
 }

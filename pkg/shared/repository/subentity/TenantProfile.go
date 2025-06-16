@@ -1,11 +1,10 @@
 package subentity
 
 type TenantProfile struct {
-	StoreRAGDocument bool   `json:"storeRAGDocument"`
-	DisplayName      string `json:"displayName"`
-	Values           string `json:"values"`
-	LightColors      Colors `json:"lightColors"`
-	DarkColors       Colors `json:"darkColors"`
+	DisplayName string `json:"displayName"`
+	Values      string `json:"values"`
+	LightColors Colors `json:"lightColors"`
+	DarkColors  Colors `json:"darkColors"`
 }
 
 type Colors struct {

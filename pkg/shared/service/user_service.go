@@ -2,9 +2,7 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
@@ -15,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
-	"github.com/google/uuid"
 )
 
 type FullUser struct {
@@ -54,6 +51,7 @@ func NewUserService(store *db.Store, authClientPool *FirebaseTenantClientConnect
 }
 
 func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient, tenantId string, req core.AddUserJSONRequestBody) (repository.CoreUser, error) {
+
 	user := repository.CoreUser{}
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
@@ -149,9 +147,17 @@ func (uh *UserService) DeleteUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	return err
 }
 
+func convertRoles(dbRoles []string) []core.Role {
+	roles := make([]core.Role, len(dbRoles))
+	for i, role := range dbRoles {
+		roles[i] = core.Role(role)
+	}
+	return roles
+}
+
 func (uh *UserService) GetUserByID(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, id string) (FullUser, error) {
 	fullUser := FullUser{}
-	dbUser, err := uh.store.GetUserRoleByID(c, repository.GetUserRoleByIDParams{
+	dbUser, err := uh.store.GetUserByID(c, repository.GetUserByIDParams{
 		ID:       id,
 		TenantID: tenantId,
 	})
@@ -159,15 +165,11 @@ func (uh *UserService) GetUserByID(c *gin.Context, baseAuthClient BaseAuthClient
 		return fullUser, err
 	}
 
-	roles, err := unmarshalRolesFromDB(dbUser.CoreRoles)
-	if err != nil {
-		return fullUser, err
-	}
 	user := core.User{
 		Id:        dbUser.ID,
 		Name:      dbUser.Profile.Name,
 		Email:     dbUser.Email.String,
-		Roles:     &roles,
+		Roles:     convertRoles(dbUser.Roles),
 		CreatedAt: &dbUser.CreatedAt,
 	}
 
@@ -184,7 +186,7 @@ func (uh *UserService) GetUserByID(c *gin.Context, baseAuthClient BaseAuthClient
 }
 
 func (uh *UserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
-	dbUsers, err := uh.store.ListUsersRoles(c, repository.ListUsersRolesParams{
+	dbUsers, err := uh.store.ListUsers(c, repository.ListUsersParams{
 		Limit:    pagingSql.PageSize,
 		Offset:   pagingSql.Offset,
 		Like:     like,
@@ -198,15 +200,12 @@ func (uh *UserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqls
 	// create a slice of users
 	users := make([]core.User, len(dbUsers))
 	for j, dbUser := range dbUsers {
-		roles, err := unmarshalRolesFromDB(dbUser.CoreRoles)
-		if err != nil {
-			return users, err
-		}
+
 		user := core.User{
 			Id:        dbUser.ID,
 			Name:      dbUser.Profile.Name,
 			Email:     dbUser.Email.String,
-			Roles:     &roles,
+			Roles:     convertRoles(dbUser.Roles),
 			CreatedAt: &dbUser.CreatedAt,
 		}
 		users[j] = user
@@ -215,46 +214,11 @@ func (uh *UserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqls
 	return users, nil
 }
 
-func unmarshalRolesFromDB(rolesData interface{}) ([]core.Role, error) {
-	var dbRoles []repository.CoreRole
-	var roles []core.Role
-	switch v := rolesData.(type) {
-	case []byte:
-		// Raw JSON bytes
-		if err := json.Unmarshal(v, &dbRoles); err != nil {
-			return nil, err
-		}
-	case []interface{}:
-		// Already unmarshaled slice
-		rolesBytes, err := json.Marshal(v)
-		if err != nil {
-			return nil, err
-		}
-		if err := json.Unmarshal(rolesBytes, &dbRoles); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("unexpected type for roles data: %T", rolesData)
-	}
-	roles = make([]core.Role, len(dbRoles))
-	for i, dbRole := range dbRoles {
-		roles[i] = core.Role{
-			Id:   dbRole.ID,
-			Name: dbRole.Name,
-		}
-	}
-	return roles, nil
-}
-
-func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, roleID uuid.UUID) error {
+func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, role core.Role) error {
 	if !IsAdmin(c) && !IsSuperAdmin(c) {
 		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
 	}
-	role, err := uh.store.GetRoleByID(c, roleID)
-	if err != nil {
-		return err
-	}
-	if role.Name == "SUPER_ADMIN" && !IsSuperAdmin(c) {
+	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
 		return errors.New("must be an SUPER_ADMIN to perform such operation")
 	}
 
@@ -265,9 +229,9 @@ func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient,
 	defer tx.Rollback(c)
 	qtx := uh.store.Queries.WithTx(tx)
 
-	_, err = qtx.UpdateUserAddRole(c, repository.UpdateUserAddRoleParams{
-		ID:       userID,
-		Role:     role.ID,
+	_, err = qtx.AssignRoleWithRowsAffected(c, repository.AssignRoleWithRowsAffectedParams{
+		UserID:   userID,
+		RoleName: string(role),
 		TenantID: tenantId,
 	})
 	if err != nil {
@@ -287,7 +251,7 @@ func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient,
 		claims = user.CustomClaims
 	}
 
-	claims[role.Name] = true
+	claims[string(role)] = true
 	err = baseAuthClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
 	if err != nil {
 		return err
@@ -300,15 +264,11 @@ func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient,
 	return nil
 }
 
-func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, roleID uuid.UUID) error {
+func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, role core.Role) error {
 	if !IsAdmin(c) && !IsSuperAdmin(c) {
 		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
 	}
-	role, err := uh.store.GetRoleByID(c, roleID)
-	if err != nil {
-		return err
-	}
-	if role.Name == "SUPER_ADMIN" && !IsSuperAdmin(c) {
+	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
 		return errors.New("must be an SUPER_ADMIN to perform such operation")
 	}
 	tenant_id, exists := c.Get(AUTH_TENANT_ID_KEY)
@@ -323,9 +283,9 @@ func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClien
 	defer tx.Rollback(c)
 	qtx := uh.store.Queries.WithTx(tx)
 
-	_, err = qtx.UpdateUserRemoveRole(c, repository.UpdateUserRemoveRoleParams{
-		ID:       userID,
-		Role:     role.ID,
+	_, err = qtx.UnassignRoleWithRowsAffected(c, repository.UnassignRoleWithRowsAffectedParams{
+		UserID:   userID,
+		RoleName: string(role),
 		TenantID: tenant_id.(string),
 	})
 	if err != nil {
@@ -339,7 +299,7 @@ func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClien
 	}
 
 	claims := user.CustomClaims
-	claims[role.Name] = false
+	claims[string(role)] = false
 	err = baseAuthClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
 	if err != nil {
 		return err

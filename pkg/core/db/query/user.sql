@@ -49,19 +49,3 @@ WHERE id = $1
 AND tenant_id = sqlc.arg(tenant_id)::text
 RETURNING id
 ;
-
--- name: UpdateUserAddRole :one
-UPDATE core_users
-SET core_roles = ARRAY(SELECT DISTINCT unnest(core_roles || sqlc.arg(role)::uuid))
-WHERE id = $1
-AND tenant_id = sqlc.arg(tenant_id)::text
-RETURNING id
-;
-
--- name: UpdateUserRemoveRole :one
-UPDATE core_users
-SET core_roles = ARRAY_REMOVE(core_roles, sqlc.arg(role)::uuid)
-WHERE id = $1 
-AND tenant_id = sqlc.arg(tenant_id)::text
-RETURNING id
-;

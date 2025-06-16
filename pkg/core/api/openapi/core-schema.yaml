@@ -17,17 +17,26 @@ components:
       required:
         - name
         - email
+        - roles
       properties:
         name:
           type: string
         email:
           type: string
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+    Role:
+      type: string
+      enum: [ADMIN, SUPER_ADMIN]
     User:
       type: object
       required:
         - id
         - name
         - email
+        - roles
       properties:
         id:
           type: string
@@ -52,26 +61,6 @@ components:
       $ref: "./parts/users/user-profile-schema.yaml"
     UserActionSchema:
       $ref: "./parts/users/user-action-schema.yaml"
-
-    # Role related schemas
-    NewRole:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-
-    Role:
-      allOf:
-        - $ref: "#/components/schemas/NewRole"
-        - type: object
-          required:
-            - id
-          properties:
-            id:
-              type: string
-              format: uuid
 
     # Client Application related schemas
     NewClientApplication:
