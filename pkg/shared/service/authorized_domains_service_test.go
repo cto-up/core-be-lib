@@ -57,7 +57,7 @@ func TestAddAuthorizeDomains(t *testing.T) {
 	}{
 		{
 			name:           "successful authorization",
-			domains:        []string{"hey.alineo.com", "bo.hey.alineo.com"},
+			domains:        []string{"hey.alineo.com", "bo-hey.alineo.com"},
 			expectedStatus: http.StatusOK,
 		},
 	}
@@ -99,7 +99,7 @@ func TestDeleteAuthorizeDomains(t *testing.T) {
 	}{
 		{
 			name:           "successful authorization",
-			domains:        []string{"hey.alineo.com", "bo.hey.alineo.com"},
+			domains:        []string{"hey.alineo.com", "bo-hey.alineo.com"},
 			expectedStatus: http.StatusOK,
 		},
 	}

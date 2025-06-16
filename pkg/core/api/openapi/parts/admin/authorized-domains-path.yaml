@@ -17,7 +17,7 @@ patch:
                 type: string
                 format: hostname
               description: List of domains to authorize
-              example: ["bo.app.example.com", "app.example.com"]
+              example: ["bo-app.example.com", "app.example.com"]
   responses:
     "200":
       description: Domains successfully authorized
@@ -49,7 +49,7 @@ delete:
                 type: string
                 format: hostname
               description: List of domains to remove
-              example: ["bo.app.example.com", "app.example.com"]
+              example: ["bo-app.example.com", "app.example.com"]
   responses:
     "200":
       description: Domains successfully removed

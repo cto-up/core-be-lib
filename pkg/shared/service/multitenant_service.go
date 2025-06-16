@@ -211,6 +211,9 @@ func GetDomainInfo(c *gin.Context) (*DomainInfo, error) {
 	if tld != "" {
 		fullDomain = domain + "." + tld
 	}
+	// if subdomain starts with "bo-", remove it
+	// this will be used, if the backoffice is used and differentiated from the main app
+	subdomain = strings.TrimPrefix(subdomain, "bo-")
 
 	return &DomainInfo{
 		Subdomain: subdomain,
