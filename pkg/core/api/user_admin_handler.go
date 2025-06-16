@@ -511,11 +511,11 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			req.Name = firstname + " " + lastname
 
 			// check if user has rights to assign roles
-			if isAdmin && !access.IsSuperAdmin(c) {
+			if isAdmin && (!access.IsSuperAdmin(c) && !access.IsAdmin(c)) {
 				errors = append(errors, ImportError{
 					Line:  lineNum,
 					Email: email,
-					Error: "must be an SUPER_ADMIN to assign SUPER_ADMIN role to a user.",
+					Error: "must be an ADMIN or SUPER_ADMIN to assign ADMIN role to a user.",
 				})
 				failed++
 				continue
