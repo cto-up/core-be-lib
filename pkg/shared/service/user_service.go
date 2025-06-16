@@ -71,6 +71,18 @@ func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient,
 	if err != nil {
 		return user, err
 	}
+
+	claims := map[string]interface{}{}
+	for _, role := range req.Roles {
+		claims[string(role)] = true
+	}
+	if len(req.Roles) > 0 {
+		err = baseAuthClient.SetCustomUserClaims(c, userRecord.UID, claims)
+		if err != nil {
+			return user, err
+		}
+	}
+
 	user, err = qtx.CreateUser(c,
 		repository.CreateUserParams{
 			ID:    userRecord.UID,
@@ -78,6 +90,7 @@ func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient,
 			Profile: subentity.UserProfile{
 				Name: req.Name,
 			},
+			Roles:    convertToRoles(req.Roles),
 			TenantID: tenantId,
 		})
 	if err != nil {
@@ -106,10 +119,21 @@ func (uh *UserService) UpdateUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	if err != nil {
 		return err
 	}
+
+	claims := map[string]interface{}{}
+	for _, role := range req.Roles {
+		claims[string(role)] = true
+	}
+	err = baseAuthClient.SetCustomUserClaims(c, userId, claims)
+	if err != nil {
+		return err
+	}
+	// Display Name
+
 	_, err = qtx.UpdateUser(c, repository.UpdateUserParams{
-		ID: userId,
-		Email: pgtype.Text{String: req.Email,
-			Valid: true},
+		ID:       userId,
+		Roles:    convertToRoles(req.Roles),
+		Name:     req.Name,
 		TenantID: tenantId,
 	})
 	if err != nil {
@@ -147,12 +171,19 @@ func (uh *UserService) DeleteUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	return err
 }
 
-func convertRoles(dbRoles []string) []core.Role {
+func convertToRoleDTOs(dbRoles []string) []core.Role {
 	roles := make([]core.Role, len(dbRoles))
 	for i, role := range dbRoles {
 		roles[i] = core.Role(role)
 	}
 	return roles
+}
+func convertToRoles(roles []core.Role) []string {
+	dbRoles := make([]string, len(roles))
+	for i, role := range roles {
+		dbRoles[i] = string(role)
+	}
+	return dbRoles
 }
 
 func (uh *UserService) GetUserByID(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, id string) (FullUser, error) {
@@ -169,7 +200,7 @@ func (uh *UserService) GetUserByID(c *gin.Context, baseAuthClient BaseAuthClient
 		Id:        dbUser.ID,
 		Name:      dbUser.Profile.Name,
 		Email:     dbUser.Email.String,
-		Roles:     convertRoles(dbUser.Roles),
+		Roles:     convertToRoleDTOs(dbUser.Roles),
 		CreatedAt: &dbUser.CreatedAt,
 	}
 
@@ -205,7 +236,7 @@ func (uh *UserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqls
 			Id:        dbUser.ID,
 			Name:      dbUser.Profile.Name,
 			Email:     dbUser.Email.String,
-			Roles:     convertRoles(dbUser.Roles),
+			Roles:     convertToRoleDTOs(dbUser.Roles),
 			CreatedAt: &dbUser.CreatedAt,
 		}
 		users[j] = user

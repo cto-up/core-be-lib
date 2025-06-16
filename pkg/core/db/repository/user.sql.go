@@ -9,22 +9,22 @@ import (
 	"context"
 
 	subentity "ctoup.com/coreapp/pkg/shared/repository/subentity"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO core_users (
-  "id", "email", "profile", "tenant_id"
+  "id", "email", "profile", roles, "tenant_id"
 ) VALUES (
-  $1, $3::text, $2, $4::text
+  $1, $3::text, $2, $4::VARCHAR[], $5::text
 )
-RETURNING id, profile, email, created_at, tenant_id, roles
+RETURNING id, profile, email, core_roles, created_at, tenant_id, roles
 `
 
 type CreateUserParams struct {
 	ID       string                `json:"id"`
 	Profile  subentity.UserProfile `json:"profile"`
 	Email    string                `json:"email"`
+	Roles    []string              `json:"roles"`
 	TenantID string                `json:"tenant_id"`
 }
 
@@ -33,6 +33,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CoreUse
 		arg.ID,
 		arg.Profile,
 		arg.Email,
+		arg.Roles,
 		arg.TenantID,
 	)
 	var i CoreUser
@@ -40,6 +41,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CoreUse
 		&i.ID,
 		&i.Profile,
 		&i.Email,
+		&i.CoreRoles,
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
@@ -67,7 +69,7 @@ func (q *Queries) DeleteUser(ctx context.Context, arg DeleteUserParams) (string,
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
+SELECT id, profile, email, core_roles, created_at, tenant_id, roles FROM core_users
 WHERE email = $1::text
 AND tenant_id = $2::text
 LIMIT 1
@@ -85,6 +87,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) 
 		&i.ID,
 		&i.Profile,
 		&i.Email,
+		&i.CoreRoles,
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
@@ -93,7 +96,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) 
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
+SELECT id, profile, email, core_roles, created_at, tenant_id, roles FROM core_users
 WHERE id = $1
 AND tenant_id = $2::text
 LIMIT 1
@@ -111,6 +114,7 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (CoreU
 		&i.ID,
 		&i.Profile,
 		&i.Email,
+		&i.CoreRoles,
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
@@ -119,7 +123,7 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (CoreU
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
+SELECT id, profile, email, core_roles, created_at, tenant_id, roles FROM core_users
 WHERE (UPPER(email) LIKE UPPER($3) OR $3 IS NULL)
 AND tenant_id = $4::text
 ORDER BY created_at
@@ -152,6 +156,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]CoreUse
 			&i.ID,
 			&i.Profile,
 			&i.Email,
+			&i.CoreRoles,
 			&i.CreatedAt,
 			&i.TenantID,
 			&i.Roles,
@@ -190,20 +195,32 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (s
 const updateUser = `-- name: UpdateUser :one
 UPDATE core_users 
 SET 
-    email = $2
+    roles = $2::VARCHAR[],
+    profile = jsonb_set(
+        profile, 
+        '{name}', 
+        to_jsonb($3::text), 
+        true
+    )
 WHERE id = $1
-AND tenant_id = $3::text
+AND tenant_id = $4::text
 RETURNING id
 `
 
 type UpdateUserParams struct {
-	ID       string      `json:"id"`
-	Email    pgtype.Text `json:"email"`
-	TenantID string      `json:"tenant_id"`
+	ID       string   `json:"id"`
+	Roles    []string `json:"roles"`
+	Name     string   `json:"name"`
+	TenantID string   `json:"tenant_id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (string, error) {
-	row := q.db.QueryRow(ctx, updateUser, arg.ID, arg.Email, arg.TenantID)
+	row := q.db.QueryRow(ctx, updateUser,
+		arg.ID,
+		arg.Roles,
+		arg.Name,
+		arg.TenantID,
+	)
 	var id string
 	err := row.Scan(&id)
 	return id, err

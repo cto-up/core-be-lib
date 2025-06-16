@@ -20,9 +20,9 @@ OFFSET $2;
 
 -- name: CreateUser :one
 INSERT INTO core_users (
-  "id", "email", "profile", "tenant_id"
+  "id", "email", "profile", roles, "tenant_id"
 ) VALUES (
-  $1, sqlc.arg(email)::text, $2, sqlc.arg(tenant_id)::text
+  $1, sqlc.arg(email)::text, $2, sqlc.arg(roles)::VARCHAR[], sqlc.arg(tenant_id)::text
 )
 RETURNING *;
 
@@ -37,11 +37,16 @@ RETURNING id
 -- name: UpdateUser :one
 UPDATE core_users 
 SET 
-    email = $2
+    roles = sqlc.arg(roles)::VARCHAR[],
+    profile = jsonb_set(
+        profile, 
+        '{name}', 
+        to_jsonb(sqlc.arg(name)::text), 
+        true
+    )
 WHERE id = $1
 AND tenant_id = sqlc.arg(tenant_id)::text
-RETURNING id
-;
+RETURNING id;
 
 -- name: DeleteUser :one
 DELETE FROM core_users

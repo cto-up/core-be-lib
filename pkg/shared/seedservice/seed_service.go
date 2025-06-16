@@ -116,6 +116,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 			Profile: subentity.UserProfile{
 				Name: adminName,
 			},
+			Roles: []string{"SUPER_ADMIN", "ADMIN"},
 		})
 	}
 }
