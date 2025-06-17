@@ -17,7 +17,7 @@ INSERT INTO core_users (
 ) VALUES (
   $1, $3::text, $2, $4::VARCHAR[], $5::text
 )
-RETURNING id, profile, email, core_roles, created_at, tenant_id, roles
+RETURNING id, profile, email, created_at, tenant_id, roles
 `
 
 type CreateUserParams struct {
@@ -41,7 +41,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CoreUse
 		&i.ID,
 		&i.Profile,
 		&i.Email,
-		&i.CoreRoles,
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
@@ -69,7 +68,7 @@ func (q *Queries) DeleteUser(ctx context.Context, arg DeleteUserParams) (string,
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, profile, email, core_roles, created_at, tenant_id, roles FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
 WHERE email = $1::text
 AND tenant_id = $2::text
 LIMIT 1
@@ -87,7 +86,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) 
 		&i.ID,
 		&i.Profile,
 		&i.Email,
-		&i.CoreRoles,
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
@@ -96,7 +94,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) 
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, profile, email, core_roles, created_at, tenant_id, roles FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
 WHERE id = $1
 AND tenant_id = $2::text
 LIMIT 1
@@ -114,7 +112,6 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (CoreU
 		&i.ID,
 		&i.Profile,
 		&i.Email,
-		&i.CoreRoles,
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
@@ -123,7 +120,7 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (CoreU
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, profile, email, core_roles, created_at, tenant_id, roles FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
 WHERE (UPPER(email) LIKE UPPER($3) OR $3 IS NULL)
 AND tenant_id = $4::text
 ORDER BY created_at
@@ -156,7 +153,6 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]CoreUse
 			&i.ID,
 			&i.Profile,
 			&i.Email,
-			&i.CoreRoles,
 			&i.CreatedAt,
 			&i.TenantID,
 			&i.Roles,
