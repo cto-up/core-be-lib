@@ -16,10 +16,8 @@ func TestExtractDomainParts(t *testing.T) {
 	}{
 		{"example.com", "", "example", "com"},
 		{"sub.example.com", "sub", "example", "com"},
-		{"bo-corpa.cto.com", "bo-corpa", "cto", "com"},
 		{"example.co.uk", "", "example", "co.uk"},
 		{"sub.example.co.uk", "sub", "example", "co.uk"},
-		{"bo-corpa.cto.co.uk", "bo-corpa", "cto", "co.uk"},
 		{"localhost", "", "localhost", ""},
 		{"192.168.1.1", "", "192.168.1.1", ""},
 	}
@@ -48,10 +46,8 @@ func TestGetSubdomain(t *testing.T) {
 	}{
 		{"simple domain", "example.com", ""},
 		{"standard subdomain", "sub.example.com", "sub"},
-		{"specific case", "bo-corpa.cto.com", "corpa"},
-		{"deep subdomain", "deep.bo-corpa.cto.com", "corpa"},
 		{"country tld", "sub.example.co.uk", "sub"},
-		{"country tld specific case", "bo-corpa.cto.co.uk", "corpa"},
+		{"country tld specific case", "corpa.cto.co.uk", "corpa"},
 	}
 
 	for _, test := range tests {
