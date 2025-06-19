@@ -63,10 +63,6 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
-	if !access.IsAdmin(c) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only admin can add user"})
-		return
-	}
 	var req core.AddUserJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
