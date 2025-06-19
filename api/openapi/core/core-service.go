@@ -12,6 +12,18 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ListClientApplicationsParamsOrder.
+const (
+	ListClientApplicationsParamsOrderAsc  ListClientApplicationsParamsOrder = "asc"
+	ListClientApplicationsParamsOrderDesc ListClientApplicationsParamsOrder = "desc"
+)
+
+// Defines values for ListAPITokensParamsOrder.
+const (
+	ListAPITokensParamsOrderAsc  ListAPITokensParamsOrder = "asc"
+	ListAPITokensParamsOrderDesc ListAPITokensParamsOrder = "desc"
+)
+
 // Defines values for ListTenantConfigsParamsOrder.
 const (
 	ListTenantConfigsParamsOrderAsc  ListTenantConfigsParamsOrder = "asc"
@@ -97,18 +109,6 @@ const (
 	UpdateUserStatusJSONBodyNameEMAILVERIFIED UpdateUserStatusJSONBodyName = "EMAIL_VERIFIED"
 )
 
-// Defines values for ListClientApplicationsParamsOrder.
-const (
-	ListClientApplicationsParamsOrderAsc  ListClientApplicationsParamsOrder = "asc"
-	ListClientApplicationsParamsOrderDesc ListClientApplicationsParamsOrder = "desc"
-)
-
-// Defines values for ListAPITokensParamsOrder.
-const (
-	ListAPITokensParamsOrderAsc  ListAPITokensParamsOrder = "asc"
-	ListAPITokensParamsOrderDesc ListAPITokensParamsOrder = "desc"
-)
-
 // Defines values for ListGlobalConfigsParamsOrder.
 const (
 	ListGlobalConfigsParamsOrderAsc  ListGlobalConfigsParamsOrder = "asc"
@@ -132,6 +132,63 @@ const (
 	UpdateUserStatusFromSuperAdminJSONBodyNameDISABLED      UpdateUserStatusFromSuperAdminJSONBodyName = "DISABLED"
 	UpdateUserStatusFromSuperAdminJSONBodyNameEMAILVERIFIED UpdateUserStatusFromSuperAdminJSONBodyName = "EMAIL_VERIFIED"
 )
+
+// ListClientApplicationsParams defines parameters for ListClientApplications.
+type ListClientApplicationsParams struct {
+	// Page page number
+	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize maximum number of results to return
+	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+
+	// SortBy field to sort by
+	SortBy *string `form:"sortBy,omitempty" json:"sortBy,omitempty"`
+
+	// Order sort order
+	Order *ListClientApplicationsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+
+	// Q search query
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// IncludeInactive include inactive applications
+	IncludeInactive *bool `form:"includeInactive,omitempty" json:"includeInactive,omitempty"`
+}
+
+// ListClientApplicationsParamsOrder defines parameters for ListClientApplications.
+type ListClientApplicationsParamsOrder string
+
+// ListAPITokensParams defines parameters for ListAPITokens.
+type ListAPITokensParams struct {
+	// Page page number
+	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize maximum number of results to return
+	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+
+	// SortBy field to sort by
+	SortBy *string `form:"sortBy,omitempty" json:"sortBy,omitempty"`
+
+	// Order sort order
+	Order *ListAPITokensParamsOrder `form:"order,omitempty" json:"order,omitempty"`
+
+	// IncludeRevoked include revoked tokens
+	IncludeRevoked *bool `form:"includeRevoked,omitempty" json:"includeRevoked,omitempty"`
+
+	// IncludeExpired include expired tokens
+	IncludeExpired *bool `form:"includeExpired,omitempty" json:"includeExpired,omitempty"`
+}
+
+// ListAPITokensParamsOrder defines parameters for ListAPITokens.
+type ListAPITokensParamsOrder string
+
+// GetAPITokenAuditLogsParams defines parameters for GetAPITokenAuditLogs.
+type GetAPITokenAuditLogsParams struct {
+	// Page page number
+	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize maximum number of results to return
+	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+}
 
 // ListTenantConfigsParams defines parameters for ListTenantConfigs.
 type ListTenantConfigsParams struct {
@@ -439,63 +496,6 @@ type ResetPasswordRequestJSONBody struct {
 	Email openapi_types.Email `json:"email"`
 }
 
-// ListClientApplicationsParams defines parameters for ListClientApplications.
-type ListClientApplicationsParams struct {
-	// Page page number
-	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
-
-	// PageSize maximum number of results to return
-	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
-
-	// SortBy field to sort by
-	SortBy *string `form:"sortBy,omitempty" json:"sortBy,omitempty"`
-
-	// Order sort order
-	Order *ListClientApplicationsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-
-	// Q search query
-	Q *string `form:"q,omitempty" json:"q,omitempty"`
-
-	// IncludeInactive include inactive applications
-	IncludeInactive *bool `form:"includeInactive,omitempty" json:"includeInactive,omitempty"`
-}
-
-// ListClientApplicationsParamsOrder defines parameters for ListClientApplications.
-type ListClientApplicationsParamsOrder string
-
-// ListAPITokensParams defines parameters for ListAPITokens.
-type ListAPITokensParams struct {
-	// Page page number
-	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
-
-	// PageSize maximum number of results to return
-	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
-
-	// SortBy field to sort by
-	SortBy *string `form:"sortBy,omitempty" json:"sortBy,omitempty"`
-
-	// Order sort order
-	Order *ListAPITokensParamsOrder `form:"order,omitempty" json:"order,omitempty"`
-
-	// IncludeRevoked include revoked tokens
-	IncludeRevoked *bool `form:"includeRevoked,omitempty" json:"includeRevoked,omitempty"`
-
-	// IncludeExpired include expired tokens
-	IncludeExpired *bool `form:"includeExpired,omitempty" json:"includeExpired,omitempty"`
-}
-
-// ListAPITokensParamsOrder defines parameters for ListAPITokens.
-type ListAPITokensParamsOrder string
-
-// GetAPITokenAuditLogsParams defines parameters for GetAPITokenAuditLogs.
-type GetAPITokenAuditLogsParams struct {
-	// Page page number
-	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
-
-	// PageSize maximum number of results to return
-	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
-}
-
 // RemoveAuthorizedDomainsJSONBody defines parameters for RemoveAuthorizedDomains.
 type RemoveAuthorizedDomainsJSONBody struct {
 	// Domains List of domains to remove
@@ -602,6 +602,18 @@ type UpdateUserStatusFromSuperAdminJSONBody struct {
 // UpdateUserStatusFromSuperAdminJSONBodyName defines parameters for UpdateUserStatusFromSuperAdmin.
 type UpdateUserStatusFromSuperAdminJSONBodyName string
 
+// CreateClientApplicationJSONRequestBody defines body for CreateClientApplication for application/json ContentType.
+type CreateClientApplicationJSONRequestBody = NewClientApplication
+
+// UpdateClientApplicationJSONRequestBody defines body for UpdateClientApplication for application/json ContentType.
+type UpdateClientApplicationJSONRequestBody = NewClientApplication
+
+// CreateAPITokenJSONRequestBody defines body for CreateAPIToken for application/json ContentType.
+type CreateAPITokenJSONRequestBody = NewAPIToken
+
+// RevokeAPITokenJSONRequestBody defines body for RevokeAPIToken for application/json ContentType.
+type RevokeAPITokenJSONRequestBody = APITokenRevoke
+
 // AddTenantConfigJSONRequestBody defines body for AddTenantConfig for application/json ContentType.
 type AddTenantConfigJSONRequestBody AddTenantConfigJSONBody
 
@@ -662,18 +674,6 @@ type UpdateUserStatusJSONRequestBody UpdateUserStatusJSONBody
 // ResetPasswordRequestJSONRequestBody defines body for ResetPasswordRequest for application/json ContentType.
 type ResetPasswordRequestJSONRequestBody ResetPasswordRequestJSONBody
 
-// CreateClientApplicationJSONRequestBody defines body for CreateClientApplication for application/json ContentType.
-type CreateClientApplicationJSONRequestBody = NewClientApplication
-
-// UpdateClientApplicationJSONRequestBody defines body for UpdateClientApplication for application/json ContentType.
-type UpdateClientApplicationJSONRequestBody = NewClientApplication
-
-// CreateAPITokenJSONRequestBody defines body for CreateAPIToken for application/json ContentType.
-type CreateAPITokenJSONRequestBody = NewAPIToken
-
-// RevokeAPITokenJSONRequestBody defines body for RevokeAPIToken for application/json ContentType.
-type RevokeAPITokenJSONRequestBody = APITokenRevoke
-
 // RemoveAuthorizedDomainsJSONRequestBody defines body for RemoveAuthorizedDomains for application/json ContentType.
 type RemoveAuthorizedDomainsJSONRequestBody RemoveAuthorizedDomainsJSONBody
 
@@ -709,6 +709,42 @@ type UpdateUserStatusFromSuperAdminJSONRequestBody UpdateUserStatusFromSuperAdmi
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (GET /admin-api/v1/client-applications)
+	ListClientApplications(c *gin.Context, params ListClientApplicationsParams)
+
+	// (POST /admin-api/v1/client-applications)
+	CreateClientApplication(c *gin.Context)
+
+	// (DELETE /admin-api/v1/client-applications/{id})
+	DeleteClientApplication(c *gin.Context, id openapi_types.UUID)
+
+	// (GET /admin-api/v1/client-applications/{id})
+	GetClientApplicationById(c *gin.Context, id openapi_types.UUID)
+
+	// (PUT /admin-api/v1/client-applications/{id})
+	UpdateClientApplication(c *gin.Context, id openapi_types.UUID)
+
+	// (PATCH /admin-api/v1/client-applications/{id}/deactivate)
+	DeactivateClientApplication(c *gin.Context, id openapi_types.UUID)
+
+	// (GET /admin-api/v1/client-applications/{id}/tokens)
+	ListAPITokens(c *gin.Context, id openapi_types.UUID, params ListAPITokensParams)
+
+	// (POST /admin-api/v1/client-applications/{id}/tokens)
+	CreateAPIToken(c *gin.Context, id openapi_types.UUID)
+
+	// (DELETE /admin-api/v1/client-applications/{id}/tokens/{tokenId})
+	DeleteAPIToken(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
+
+	// (GET /admin-api/v1/client-applications/{id}/tokens/{tokenId})
+	GetAPITokenById(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
+
+	// (GET /admin-api/v1/client-applications/{id}/tokens/{tokenId}/audit)
+	GetAPITokenAuditLogs(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID, params GetAPITokenAuditLogsParams)
+
+	// (PATCH /admin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke)
+	RevokeAPIToken(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
 
 	// (GET /api/v1/configs/tenant-configs)
 	ListTenantConfigs(c *gin.Context, params ListTenantConfigsParams)
@@ -842,42 +878,6 @@ type ServerInterface interface {
 	// (GET /public-api/v1/users/{userid}/profile/picture)
 	GetProfilePicture(c *gin.Context, userid string)
 
-	// (GET /superadmin-api/v1/client-applications)
-	ListClientApplications(c *gin.Context, params ListClientApplicationsParams)
-
-	// (POST /superadmin-api/v1/client-applications)
-	CreateClientApplication(c *gin.Context)
-
-	// (DELETE /superadmin-api/v1/client-applications/{id})
-	DeleteClientApplication(c *gin.Context, id openapi_types.UUID)
-
-	// (GET /superadmin-api/v1/client-applications/{id})
-	GetClientApplicationById(c *gin.Context, id openapi_types.UUID)
-
-	// (PUT /superadmin-api/v1/client-applications/{id})
-	UpdateClientApplication(c *gin.Context, id openapi_types.UUID)
-
-	// (PATCH /superadmin-api/v1/client-applications/{id}/deactivate)
-	DeactivateClientApplication(c *gin.Context, id openapi_types.UUID)
-
-	// (GET /superadmin-api/v1/client-applications/{id}/tokens)
-	ListAPITokens(c *gin.Context, id openapi_types.UUID, params ListAPITokensParams)
-
-	// (POST /superadmin-api/v1/client-applications/{id}/tokens)
-	CreateAPIToken(c *gin.Context, id openapi_types.UUID)
-
-	// (DELETE /superadmin-api/v1/client-applications/{id}/tokens/{tokenId})
-	DeleteAPIToken(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
-
-	// (GET /superadmin-api/v1/client-applications/{id}/tokens/{tokenId})
-	GetAPITokenById(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
-
-	// (GET /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/audit)
-	GetAPITokenAuditLogs(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID, params GetAPITokenAuditLogsParams)
-
-	// (PATCH /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke)
-	RevokeAPIToken(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
-
 	// (DELETE /superadmin-api/v1/config/authorized-domains)
 	RemoveAuthorizedDomains(c *gin.Context)
 
@@ -956,6 +956,431 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(c *gin.Context)
+
+// ListClientApplications operation middleware
+func (siw *ServerInterfaceWrapper) ListClientApplications(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListClientApplicationsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "sortBy" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sortBy", c.Request.URL.Query(), &params.SortBy)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sortBy: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "order" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "order", c.Request.URL.Query(), &params.Order)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter order: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "q", c.Request.URL.Query(), &params.Q)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter q: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "includeInactive" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "includeInactive", c.Request.URL.Query(), &params.IncludeInactive)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter includeInactive: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListClientApplications(c, params)
+}
+
+// CreateClientApplication operation middleware
+func (siw *ServerInterfaceWrapper) CreateClientApplication(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CreateClientApplication(c)
+}
+
+// DeleteClientApplication operation middleware
+func (siw *ServerInterfaceWrapper) DeleteClientApplication(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteClientApplication(c, id)
+}
+
+// GetClientApplicationById operation middleware
+func (siw *ServerInterfaceWrapper) GetClientApplicationById(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetClientApplicationById(c, id)
+}
+
+// UpdateClientApplication operation middleware
+func (siw *ServerInterfaceWrapper) UpdateClientApplication(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateClientApplication(c, id)
+}
+
+// DeactivateClientApplication operation middleware
+func (siw *ServerInterfaceWrapper) DeactivateClientApplication(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeactivateClientApplication(c, id)
+}
+
+// ListAPITokens operation middleware
+func (siw *ServerInterfaceWrapper) ListAPITokens(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAPITokensParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "sortBy" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sortBy", c.Request.URL.Query(), &params.SortBy)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sortBy: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "order" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "order", c.Request.URL.Query(), &params.Order)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter order: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "includeRevoked" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "includeRevoked", c.Request.URL.Query(), &params.IncludeRevoked)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter includeRevoked: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "includeExpired" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "includeExpired", c.Request.URL.Query(), &params.IncludeExpired)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter includeExpired: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListAPITokens(c, id, params)
+}
+
+// CreateAPIToken operation middleware
+func (siw *ServerInterfaceWrapper) CreateAPIToken(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CreateAPIToken(c, id)
+}
+
+// DeleteAPIToken operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAPIToken(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "tokenId" -------------
+	var tokenId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tokenId", c.Param("tokenId"), &tokenId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tokenId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteAPIToken(c, id, tokenId)
+}
+
+// GetAPITokenById operation middleware
+func (siw *ServerInterfaceWrapper) GetAPITokenById(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "tokenId" -------------
+	var tokenId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tokenId", c.Param("tokenId"), &tokenId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tokenId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetAPITokenById(c, id, tokenId)
+}
+
+// GetAPITokenAuditLogs operation middleware
+func (siw *ServerInterfaceWrapper) GetAPITokenAuditLogs(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "tokenId" -------------
+	var tokenId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tokenId", c.Param("tokenId"), &tokenId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tokenId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAPITokenAuditLogsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetAPITokenAuditLogs(c, id, tokenId, params)
+}
+
+// RevokeAPIToken operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAPIToken(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "tokenId" -------------
+	var tokenId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tokenId", c.Param("tokenId"), &tokenId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tokenId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.RevokeAPIToken(c, id, tokenId)
+}
 
 // ListTenantConfigs operation middleware
 func (siw *ServerInterfaceWrapper) ListTenantConfigs(c *gin.Context) {
@@ -2128,431 +2553,6 @@ func (siw *ServerInterfaceWrapper) GetProfilePicture(c *gin.Context) {
 	siw.Handler.GetProfilePicture(c, userid)
 }
 
-// ListClientApplications operation middleware
-func (siw *ServerInterfaceWrapper) ListClientApplications(c *gin.Context) {
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListClientApplicationsParams
-
-	// ------------- Optional query parameter "page" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "pageSize" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "sortBy" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "sortBy", c.Request.URL.Query(), &params.SortBy)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sortBy: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "order", c.Request.URL.Query(), &params.Order)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter order: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "q" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "q", c.Request.URL.Query(), &params.Q)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter q: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "includeInactive" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "includeInactive", c.Request.URL.Query(), &params.IncludeInactive)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter includeInactive: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.ListClientApplications(c, params)
-}
-
-// CreateClientApplication operation middleware
-func (siw *ServerInterfaceWrapper) CreateClientApplication(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.CreateClientApplication(c)
-}
-
-// DeleteClientApplication operation middleware
-func (siw *ServerInterfaceWrapper) DeleteClientApplication(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.DeleteClientApplication(c, id)
-}
-
-// GetClientApplicationById operation middleware
-func (siw *ServerInterfaceWrapper) GetClientApplicationById(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetClientApplicationById(c, id)
-}
-
-// UpdateClientApplication operation middleware
-func (siw *ServerInterfaceWrapper) UpdateClientApplication(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.UpdateClientApplication(c, id)
-}
-
-// DeactivateClientApplication operation middleware
-func (siw *ServerInterfaceWrapper) DeactivateClientApplication(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.DeactivateClientApplication(c, id)
-}
-
-// ListAPITokens operation middleware
-func (siw *ServerInterfaceWrapper) ListAPITokens(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListAPITokensParams
-
-	// ------------- Optional query parameter "page" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "pageSize" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "sortBy" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "sortBy", c.Request.URL.Query(), &params.SortBy)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sortBy: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "order" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "order", c.Request.URL.Query(), &params.Order)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter order: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "includeRevoked" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "includeRevoked", c.Request.URL.Query(), &params.IncludeRevoked)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter includeRevoked: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "includeExpired" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "includeExpired", c.Request.URL.Query(), &params.IncludeExpired)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter includeExpired: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.ListAPITokens(c, id, params)
-}
-
-// CreateAPIToken operation middleware
-func (siw *ServerInterfaceWrapper) CreateAPIToken(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.CreateAPIToken(c, id)
-}
-
-// DeleteAPIToken operation middleware
-func (siw *ServerInterfaceWrapper) DeleteAPIToken(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Path parameter "tokenId" -------------
-	var tokenId openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tokenId", c.Param("tokenId"), &tokenId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tokenId: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.DeleteAPIToken(c, id, tokenId)
-}
-
-// GetAPITokenById operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITokenById(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Path parameter "tokenId" -------------
-	var tokenId openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tokenId", c.Param("tokenId"), &tokenId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tokenId: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetAPITokenById(c, id, tokenId)
-}
-
-// GetAPITokenAuditLogs operation middleware
-func (siw *ServerInterfaceWrapper) GetAPITokenAuditLogs(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Path parameter "tokenId" -------------
-	var tokenId openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tokenId", c.Param("tokenId"), &tokenId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tokenId: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetAPITokenAuditLogsParams
-
-	// ------------- Optional query parameter "page" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "pageSize" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetAPITokenAuditLogs(c, id, tokenId, params)
-}
-
-// RevokeAPIToken operation middleware
-func (siw *ServerInterfaceWrapper) RevokeAPIToken(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Path parameter "tokenId" -------------
-	var tokenId openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "tokenId", c.Param("tokenId"), &tokenId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tokenId: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.RevokeAPIToken(c, id, tokenId)
-}
-
 // RemoveAuthorizedDomains operation middleware
 func (siw *ServerInterfaceWrapper) RemoveAuthorizedDomains(c *gin.Context) {
 
@@ -3288,6 +3288,18 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
+	router.GET(options.BaseURL+"/admin-api/v1/client-applications", wrapper.ListClientApplications)
+	router.POST(options.BaseURL+"/admin-api/v1/client-applications", wrapper.CreateClientApplication)
+	router.DELETE(options.BaseURL+"/admin-api/v1/client-applications/:id", wrapper.DeleteClientApplication)
+	router.GET(options.BaseURL+"/admin-api/v1/client-applications/:id", wrapper.GetClientApplicationById)
+	router.PUT(options.BaseURL+"/admin-api/v1/client-applications/:id", wrapper.UpdateClientApplication)
+	router.PATCH(options.BaseURL+"/admin-api/v1/client-applications/:id/deactivate", wrapper.DeactivateClientApplication)
+	router.GET(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens", wrapper.ListAPITokens)
+	router.POST(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens", wrapper.CreateAPIToken)
+	router.DELETE(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId", wrapper.DeleteAPIToken)
+	router.GET(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId", wrapper.GetAPITokenById)
+	router.GET(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId/audit", wrapper.GetAPITokenAuditLogs)
+	router.PATCH(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId/revoke", wrapper.RevokeAPIToken)
 	router.GET(options.BaseURL+"/api/v1/configs/tenant-configs", wrapper.ListTenantConfigs)
 	router.POST(options.BaseURL+"/api/v1/configs/tenant-configs", wrapper.AddTenantConfig)
 	router.DELETE(options.BaseURL+"/api/v1/configs/tenant-configs/:id", wrapper.DeleteTenantConfig)
@@ -3332,18 +3344,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/background-mobile", wrapper.GetTenantBackgroundMobile)
 	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/logo", wrapper.GetTenantLogo)
 	router.GET(options.BaseURL+"/public-api/v1/users/:userid/profile/picture", wrapper.GetProfilePicture)
-	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications", wrapper.ListClientApplications)
-	router.POST(options.BaseURL+"/superadmin-api/v1/client-applications", wrapper.CreateClientApplication)
-	router.DELETE(options.BaseURL+"/superadmin-api/v1/client-applications/:id", wrapper.DeleteClientApplication)
-	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications/:id", wrapper.GetClientApplicationById)
-	router.PUT(options.BaseURL+"/superadmin-api/v1/client-applications/:id", wrapper.UpdateClientApplication)
-	router.PATCH(options.BaseURL+"/superadmin-api/v1/client-applications/:id/deactivate", wrapper.DeactivateClientApplication)
-	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens", wrapper.ListAPITokens)
-	router.POST(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens", wrapper.CreateAPIToken)
-	router.DELETE(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId", wrapper.DeleteAPIToken)
-	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId", wrapper.GetAPITokenById)
-	router.GET(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId/audit", wrapper.GetAPITokenAuditLogs)
-	router.PATCH(options.BaseURL+"/superadmin-api/v1/client-applications/:id/tokens/:tokenId/revoke", wrapper.RevokeAPIToken)
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.RemoveAuthorizedDomains)
 	router.PATCH(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.AddAuthorizedDomains)
 	router.GET(options.BaseURL+"/superadmin-api/v1/configs/global-configs", wrapper.ListGlobalConfigs)

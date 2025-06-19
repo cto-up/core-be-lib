@@ -101,21 +101,23 @@ paths:
   /superadmin-api/v1/config/authorized-domains:
     $ref: "./parts/admin/authorized-domains-path.yaml"
 
-  # Client Applications and API Tokens (SUPER_ADMIN only)
-  /superadmin-api/v1/client-applications:
+  # Client Applications and API Tokens (ADMIN & SUPER_ADMIN only)
+  /admin-api/v1/client-applications:
     $ref: "./parts/tokens/client-applications-path.yaml"
-  /superadmin-api/v1/client-applications/{id}:
+  /admin-api/v1/client-applications/{id}:
     $ref: "./parts/tokens/client-applications-id-path.yaml"
-  /superadmin-api/v1/client-applications/{id}/deactivate:
+  /admin-api/v1/client-applications/{id}/deactivate:
     $ref: "./parts/tokens/client-applications-id-deactivate-path.yaml"
-  /superadmin-api/v1/client-applications/{id}/tokens:
+  /admin-api/v1/client-applications/{id}/tokens:
     $ref: "./parts/tokens/client-applications-id-tokens-path.yaml"
-  /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}:
+  /admin-api/v1/client-applications/{id}/tokens/{tokenId}:
     $ref: "./parts/tokens/client-applications-id-tokens-id-path.yaml"
-  /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke:
+  /admin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke:
     $ref: "./parts/tokens/client-applications-id-tokens-id-revoke-path.yaml"
-  /superadmin-api/v1/client-applications/{id}/tokens/{tokenId}/audit:
+  /admin-api/v1/client-applications/{id}/tokens/{tokenId}/audit:
     $ref: "./parts/tokens/client-applications-id-tokens-id-audit-path.yaml"
+
+  # prompts
   /api/v1/prompts:
     $ref: "./parts/prompts/prompts-path.yaml"
   /api/v1/prompts/{id}:

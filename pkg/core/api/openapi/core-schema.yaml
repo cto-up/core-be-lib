@@ -29,7 +29,7 @@ components:
             $ref: "#/components/schemas/Role"
     Role:
       type: string
-      enum: [ADMIN, SUPER_ADMIN]
+      enum: [CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN]
     User:
       type: object
       required:

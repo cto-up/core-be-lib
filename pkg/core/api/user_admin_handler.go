@@ -40,9 +40,17 @@ func NewUserAdminHandler(store *db.Store, authClientPool *access.FirebaseTenantC
 	return handler
 }
 func checkAuthorizedRoles(c *gin.Context, roles []core.Role) error {
+	// Check if new user has CUSTOMER_ADMIN role
+	if slices.Contains(roles, "CUSTOMER_ADMIN") && !access.IsCustomerAdmin(c) && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+		return errors.New("must be an CUSTOMER_ADMIN to assign CUSTOMER_ADMIN role to a user")
+	}
 	// Check if new user has ADMIN role
+	if slices.Contains(roles, "ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+		return errors.New("must be an ADMIN to assign ADMIN role to a user")
+	}
+	// Check if new user has SUPER_ADMIN role
 	if slices.Contains(roles, "SUPER_ADMIN") && !access.IsSuperAdmin(c) {
-		return errors.New("must be an SUPER_ADMIN to assign SUPER_ADMIN role to a user.")
+		return errors.New("must be an SUPER_ADMIN to assign SUPER_ADMIN role to a user")
 	}
 	return nil
 }
@@ -129,6 +137,41 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
+
+	// check if user is deleting self
+	if userid == c.GetString(access.AUTH_USER_ID) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete self"})
+		return
+	}
+	// check if user has rights to delete user CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN
+	if !access.IsCustomerAdmin(c) && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user"})
+		return
+	}
+	// check if user is deleting another customer admin
+	user, err := uh.store.GetUserByID(c, repository.GetUserByIDParams{
+		ID:       userid,
+		TenantID: tenantID.(string),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	// Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete CUSTOMER_ADMIN
+	if slices.Contains(user.Roles, "CUSTOMER_ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) && !access.IsCustomerAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete CUSTOMER_ADMIN. Must be ADMIN or SUPER_ADMIN."})
+		return
+	}
+	// Only ADMIN or SUPER_ADMIN can delete ADMIN
+	if slices.Contains(user.Roles, "ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete ADMIN. Must be SUPER_ADMIN."})
+		return
+	}
+	// Only SUPER_ADMIN can delete SUPER_ADMIN
+	if slices.Contains(user.Roles, "SUPER_ADMIN") && !access.IsSuperAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete SUPER_ADMIN. Must be SUPER_ADMIN."})
 		return
 	}
 
@@ -407,7 +450,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	}
 
 	// Validate header
-	requiredColumns := []string{"lastname", "firstname", "email", "is_admin"}
+	requiredColumns := []string{"lastname", "firstname", "email", "is_customer_admin"}
 	missingColumns := []string{}
 
 	// Create a map of header columns for easy lookup
@@ -498,12 +541,12 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			lastname := record[headerMap["lastname"]]
 			firstname := record[headerMap["firstname"]]
 			email := record[headerMap["email"]]
-			isAdminStr := strings.ToLower(record[headerMap["is_admin"]])
+			isCustomerAdminStr := strings.ToLower(record[headerMap["is_customer_admin"]])
 
-			// Parse is_admin value
-			isAdmin := false
-			if isAdminStr == "y" || isAdminStr == "yes" || isAdminStr == "Y" || isAdminStr == "YES" || isAdminStr == "Yes" {
-				isAdmin = true
+			// Parse is_customer_admin value
+			isCustomerAdmin := false
+			if isCustomerAdminStr == "y" || isCustomerAdminStr == "yes" || isCustomerAdminStr == "Y" || isCustomerAdminStr == "YES" || isCustomerAdminStr == "Yes" {
+				isCustomerAdmin = true
 			}
 
 			var req core.AddUserJSONRequestBody
@@ -511,17 +554,17 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			req.Name = firstname + " " + lastname
 
 			// check if user has rights to assign roles
-			if isAdmin && (!access.IsSuperAdmin(c) && !access.IsAdmin(c)) {
+			if isCustomerAdmin && (!access.IsSuperAdmin(c) || !access.IsAdmin(c) || !access.IsCustomerAdmin(c)) {
 				errors = append(errors, ImportError{
 					Line:  lineNum,
 					Email: email,
-					Error: "must be an ADMIN or SUPER_ADMIN to assign ADMIN role to a user.",
+					Error: "must be an CUSTOMER_ADMIN or SUPER_ADMIN to assign ADMIN role to a user.",
 				})
 				failed++
 				continue
 			}
-			if isAdmin {
-				req.Roles = []core.Role{"ADMIN"}
+			if isCustomerAdmin {
+				req.Roles = []core.Role{"CUSTOMER_ADMIN"}
 			}
 			_, err = uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req)
 			if err != nil {

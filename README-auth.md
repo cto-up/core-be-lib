@@ -27,12 +27,13 @@ Used primarily for user authentication in web and mobile applications.
 
 The middleware applies different authentication rules based on the request path:
 
-| Path Pattern        | Authentication Method      | Required Role                    |
-| ------------------- | -------------------------- | -------------------------------- |
-| `/public/*`         | None (Public)              | None                             |
-| `/api/v1/users/*`   | Firebase Auth only         | ADMIN for write operations       |
-| `/superadmin-api/*` | Firebase Auth only         | SUPER_ADMIN for write operations |
-| All other paths     | API Token OR Firebase Auth | None                             |
+| Path Pattern        | Authentication Method      | Required Role                                           |
+| ------------------- | -------------------------- | ------------------------------------------------------- |
+| `/public/*`         | None (Public)              | None                                                    |
+| `/api/v1/users/*`   | Firebase Auth only         | ADMIN, CUSTOMER_ADMIN, SUPER_ADMIN for write operations |
+| `/admin-api/*`      | Firebase Auth only         | ADMIN, SUPER_ADMIN for all operations                   |
+| `/superadmin-api/*` | Firebase Auth only         | SUPER_ADMIN for all operations                          |
+| All other paths     | API Token OR Firebase Auth | None                                                    |
 
 ## Response Status Codes
 

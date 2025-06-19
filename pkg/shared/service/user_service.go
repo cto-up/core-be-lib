@@ -27,6 +27,15 @@ type UserService struct {
 	authClientPool *FirebaseTenantClientConnectionPool
 }
 
+func IsCustomerAdmin(c *gin.Context) bool {
+	claims, exist := c.Get(AUTH_CLAIMS)
+	if !exist {
+		return false
+	}
+	isCustomerAdmin := claims.((map[string]interface{}))["CUSTOMER_ADMIN"] == true
+	return isCustomerAdmin
+}
+
 func IsAdmin(c *gin.Context) bool {
 	claims, exist := c.Get(AUTH_CLAIMS)
 	if !exist {
@@ -40,8 +49,8 @@ func IsSuperAdmin(c *gin.Context) bool {
 	if !exist {
 		return false
 	}
-	isAdmin := claims.((map[string]interface{}))["SUPER_ADMIN"] == true
-	return isAdmin
+	isSuperAdmin := claims.((map[string]interface{}))["SUPER_ADMIN"] == true
+	return isSuperAdmin
 }
 
 func NewUserService(store *db.Store, authClientPool *FirebaseTenantClientConnectionPool) *UserService {
@@ -246,7 +255,13 @@ func (uh *UserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqls
 }
 
 func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, role core.Role) error {
-	if !IsAdmin(c) && !IsSuperAdmin(c) {
+	if !IsAdmin(c) || !IsSuperAdmin(c) {
+		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
+	}
+	if role == "CUSTOMER_ADMIN" && (!IsCustomerAdmin(c) && !IsSuperAdmin(c) && !IsAdmin(c)) {
+		return errors.New("must be at a CUSTOMER_ADMIN or SUPER_ADMIN or ADMIN to perform such operation")
+	}
+	if role == "ADMIN" && (!IsSuperAdmin(c) && !IsAdmin(c)) {
 		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
 	}
 	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
@@ -296,9 +311,13 @@ func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient,
 }
 
 func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, role core.Role) error {
-	if !IsAdmin(c) && !IsSuperAdmin(c) {
-		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
+	if !IsAdmin(c) && !IsSuperAdmin(c) && !IsCustomerAdmin(c) {
+		return errors.New("must be an CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN to perform such operation")
 	}
+	if role == "ADMIN" && (!IsAdmin(c) || !IsSuperAdmin(c)) {
+		return errors.New("must be an CUSTOMER_ADMIN to perform such operation")
+	}
+
 	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
 		return errors.New("must be an SUPER_ADMIN to perform such operation")
 	}

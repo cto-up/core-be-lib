@@ -40,6 +40,7 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		}
 
 		if !strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
+			!strings.HasPrefix(c.Request.URL.Path, "/admin-api") &&
 			!strings.HasPrefix(c.Request.URL.Path, "/superadmin-api") {
 			// Check X-Api-Key header first
 			token := c.GetHeader(XApiKeyHeader)
@@ -83,10 +84,11 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 				abort(am.firebaseAuth, c)
 				return
 			} else {
+				// Only admin users can alter users
 				if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
 					util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
 
-					if idToken.Claims["SUPER_ADMIN"] == true || idToken.Claims["ADMIN"] == true || idToken.Claims[FIREBASE_CLAIM_EMAIL] == "jcantonio@alineo.com" {
+					if idToken.Claims["SUPER_ADMIN"] == true || idToken.Claims["ADMIN"] == true || idToken.Claims["CUSTOMER_ADMIN"] == true {
 						// OK
 					} else {
 						c.JSON(http.StatusForbidden, gin.H{
@@ -97,10 +99,20 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 						return
 					}
 				}
-
-				if strings.HasPrefix(c.Request.URL.Path, "/superadmin-api") &&
-					util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
-					if idToken.Claims["SUPER_ADMIN"] == true || idToken.Claims[FIREBASE_CLAIM_EMAIL] == "jcantonio@alineo.com" {
+				if strings.HasPrefix(c.Request.URL.Path, "/admin-api") {
+					if idToken.Claims["SUPER_ADMIN"] == true || idToken.Claims["ADMIN"] == true {
+						// OK
+					} else {
+						c.JSON(http.StatusForbidden, gin.H{
+							"status":  http.StatusForbidden,
+							"message": "Need to be an ADMIN or SUPER_ADMIN to perform such operation",
+						})
+						c.Abort()
+						return
+					}
+				}
+				if strings.HasPrefix(c.Request.URL.Path, "/superadmin-api") {
+					if idToken.Claims["SUPER_ADMIN"] == true {
 						// OK
 					} else {
 						c.JSON(http.StatusForbidden, gin.H{
@@ -114,6 +126,5 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 				c.Next()
 			}
 		}
-
 	}
 }
