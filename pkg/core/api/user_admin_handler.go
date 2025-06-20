@@ -21,6 +21,7 @@ import (
 	"ctoup.com/coreapp/pkg/shared/event"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	access "ctoup.com/coreapp/pkg/shared/service"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -445,6 +446,11 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 		return
 	}
 
+	// Strip BOM from the first header column if present
+	if len(header) > 0 {
+		header[0] = util.StripBOM(header[0])
+	}
+
 	// Validate header
 	requiredColumns := []string{"lastname", "firstname", "email", "is_customer_admin"}
 	missingColumns := []string{}
@@ -550,11 +556,11 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			req.Name = firstname + " " + lastname
 
 			// check if user has rights to assign roles
-			if isCustomerAdmin && (!access.IsSuperAdmin(c) || !access.IsAdmin(c) || !access.IsCustomerAdmin(c)) {
+			if isCustomerAdmin && (!access.IsSuperAdmin(c) && !access.IsAdmin(c) && !access.IsCustomerAdmin(c)) {
 				errors = append(errors, ImportError{
 					Line:  lineNum,
 					Email: email,
-					Error: "must be an CUSTOMER_ADMIN or SUPER_ADMIN to assign ADMIN role to a user.",
+					Error: "must be an CUSTOMER_ADMIN or SUPER_ADMIN to assign CUSTOMER_ADMIN role to a user.",
 				})
 				failed++
 				continue
