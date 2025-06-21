@@ -12,9 +12,10 @@ import (
 	fileservice "ctoup.com/coreapp/pkg/shared/fileservice"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
-// getTenantPicture est une fonction générique pour récupérer une image du tenant
+// getTenantPicture is a generic function to get a tenant picture
 func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
 	// Get tenant ID from context
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
@@ -27,18 +28,19 @@ func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
 	filename := fmt.Sprintf("%s-%s.webp", tenantID, pictureType)
 	err := fileservice.GetFile(c, os.Getenv("FILE_FOLDER_URL"), filename)
 
-	// Si le fichier n'existe pas, on retourne simplement 404
+	// If the tenant-specific picture does not exist, return 404
 	if err != nil {
 		if c.Writer.Status() == http.StatusNotFound {
 			c.Status(http.StatusNotFound)
 			return
 		}
+		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to get tenant picture")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 }
 
-// uploadTenantPicture est une fonction générique pour uploader une image du tenant
+// uploadTenantPicture is a generic function to upload a tenant picture
 func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) {
 	// Get tenant ID from context
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
@@ -50,12 +52,14 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	// Get the file from the request
 	file, err := c.FormFile("picture")
 	if err != nil {
+		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to get file from request")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
-	// Vérifier que le fichier est bien un webp
+	// Check if the file is a webp
 	if !strings.HasSuffix(strings.ToLower(file.Filename), ".webp") {
+		log.Error().Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Invalid file format. Only webp files are allowed")
 		c.JSON(http.StatusBadRequest, errors.New("only webp files are allowed"))
 		return
 	}
@@ -63,6 +67,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	// Open the uploaded file
 	fileContent, err := file.Open()
 	if err != nil {
+		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to open file")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -71,6 +76,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	// Read the file content
 	byteContainer, err := io.ReadAll(fileContent)
 	if err != nil {
+		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to read file")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -78,6 +84,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	// Save the file with tenant-specific name
 	filename := fmt.Sprintf("%s-%s.webp", tenantID, pictureType)
 	if err := fileservice.SaveFile(c, byteContainer, filename); err != nil {
+		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to save file")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -85,7 +92,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	c.Status(http.StatusNoContent)
 }
 
-// Fonctions publiques qui utilisent les fonctions génériques
+// Public functions to get tenant pictures
 func (s *TenantHandler) GetTenantLogo(c *gin.Context) {
 	s.getTenantPicture(c, "logo")
 }
