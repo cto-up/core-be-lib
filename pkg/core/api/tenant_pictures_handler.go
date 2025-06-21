@@ -48,6 +48,10 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
+	if !access.IsAdmin(c) && !access.IsSuperAdmin(c) && !access.IsCustomerAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can upload tenant pictures"})
+		return
+	}
 
 	// Get the file from the request
 	file, err := c.FormFile("picture")
@@ -105,6 +109,7 @@ func (s *TenantHandler) GetTenantBackgroundMobile(c *gin.Context) {
 	s.getTenantPicture(c, "bg-mobile")
 }
 
+// Admin functions to upload tenant pictures
 func (s *TenantHandler) UploadTenantLogo(c *gin.Context) {
 	s.uploadTenantPicture(c, "logo")
 }
