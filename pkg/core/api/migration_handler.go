@@ -54,10 +54,7 @@ func (h *MigrationHandler) UpdateCoreMigration(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		Version int64 `json:"version" binding:"required"`
-		Dirty   bool  `json:"dirty" binding:"required"`
-	}
+	var req = api.UpdateCoreMigrationJSONBody{}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
@@ -71,7 +68,7 @@ func (h *MigrationHandler) UpdateCoreMigration(c *gin.Context) {
 	}
 
 	err = h.store.UpdateCoreMigration(c, repository.UpdateCoreMigrationParams{
-		Version: req.Version,
+		Version: int64(req.Version),
 		Dirty:   req.Dirty,
 	})
 	if err != nil {
@@ -80,7 +77,7 @@ func (h *MigrationHandler) UpdateCoreMigration(c *gin.Context) {
 	}
 	logger := service.GetLoggerFromContext(c)
 	// Log prvious and new version
-	logger.Info().Int64("old_version", currentMigration.Version).Int64("new_version", req.Version).Bool("dirty", req.Dirty).Msg("Core migration updated")
+	logger.Info().Int64("old_version", currentMigration.Version).Int("new_version", req.Version).Bool("dirty", req.Dirty).Msg("Core migration updated")
 
 	c.Status(http.StatusNoContent)
 }
