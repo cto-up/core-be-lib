@@ -63,6 +63,11 @@ type CoreGlobalConfig struct {
 	UpdatedAt time.Time   `json:"updated_at"`
 }
 
+type CoreMigration struct {
+	Version int64 `json:"version"`
+	Dirty   bool  `json:"dirty"`
+}
+
 type CorePrompt struct {
 	ID                 uuid.UUID   `json:"id"`
 	Name               string      `json:"name"`

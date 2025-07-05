@@ -545,6 +545,15 @@ type UpdateGlobalConfigJSONBody struct {
 	Value *string            `json:"value,omitempty"`
 }
 
+// UpdateCoreMigrationJSONBody defines parameters for UpdateCoreMigration.
+type UpdateCoreMigrationJSONBody struct {
+	// Dirty Whether the migration is in a dirty state
+	Dirty bool `json:"dirty"`
+
+	// Version The current migration version
+	Version int `json:"version"`
+}
+
 // ListTenantsParams defines parameters for ListTenants.
 type ListTenantsParams struct {
 	// Page page number
@@ -685,6 +694,9 @@ type AddGlobalConfigJSONRequestBody AddGlobalConfigJSONBody
 
 // UpdateGlobalConfigJSONRequestBody defines body for UpdateGlobalConfig for application/json ContentType.
 type UpdateGlobalConfigJSONRequestBody UpdateGlobalConfigJSONBody
+
+// UpdateCoreMigrationJSONRequestBody defines body for UpdateCoreMigration for application/json ContentType.
+type UpdateCoreMigrationJSONRequestBody UpdateCoreMigrationJSONBody
 
 // UpdateTenantFeaturesJSONRequestBody defines body for UpdateTenantFeatures for application/json ContentType.
 type UpdateTenantFeaturesJSONRequestBody = TenantFeatures
@@ -898,6 +910,12 @@ type ServerInterface interface {
 
 	// (PUT /superadmin-api/v1/configs/global-configs/{id})
 	UpdateGlobalConfig(c *gin.Context, id openapi_types.UUID)
+
+	// (GET /superadmin-api/v1/migrations/core)
+	GetCoreMigration(c *gin.Context)
+
+	// (PUT /superadmin-api/v1/migrations/core/update)
+	UpdateCoreMigration(c *gin.Context)
 
 	// (GET /superadmin-api/v1/tenant/{tenantid}/features)
 	GetTenantFeatures(c *gin.Context, tenantid openapi_types.UUID)
@@ -2730,6 +2748,32 @@ func (siw *ServerInterfaceWrapper) UpdateGlobalConfig(c *gin.Context) {
 	siw.Handler.UpdateGlobalConfig(c, id)
 }
 
+// GetCoreMigration operation middleware
+func (siw *ServerInterfaceWrapper) GetCoreMigration(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetCoreMigration(c)
+}
+
+// UpdateCoreMigration operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCoreMigration(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateCoreMigration(c)
+}
+
 // GetTenantFeatures operation middleware
 func (siw *ServerInterfaceWrapper) GetTenantFeatures(c *gin.Context) {
 
@@ -3351,6 +3395,8 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/configs/global-configs/:id", wrapper.DeleteGlobalConfig)
 	router.GET(options.BaseURL+"/superadmin-api/v1/configs/global-configs/:id", wrapper.GetGlobalConfigByID)
 	router.PUT(options.BaseURL+"/superadmin-api/v1/configs/global-configs/:id", wrapper.UpdateGlobalConfig)
+	router.GET(options.BaseURL+"/superadmin-api/v1/migrations/core", wrapper.GetCoreMigration)
+	router.PUT(options.BaseURL+"/superadmin-api/v1/migrations/core/update", wrapper.UpdateCoreMigration)
 	router.GET(options.BaseURL+"/superadmin-api/v1/tenant/:tenantid/features", wrapper.GetTenantFeatures)
 	router.PUT(options.BaseURL+"/superadmin-api/v1/tenant/:tenantid/features", wrapper.UpdateTenantFeatures)
 	router.GET(options.BaseURL+"/superadmin-api/v1/tenants", wrapper.ListTenants)

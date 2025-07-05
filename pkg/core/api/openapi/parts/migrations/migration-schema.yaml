@@ -1,0 +1,11 @@
+type: object
+properties:
+  version:
+    type: integer
+    description: The current migration version
+  dirty:
+    type: boolean
+    description: Whether the migration is in a dirty state
+required:
+  - version
+  - dirty

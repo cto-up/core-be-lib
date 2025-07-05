@@ -134,5 +134,11 @@ paths:
   /api/v1/translations/{id}:
     $ref: "./parts/translations/translations-id-path.yaml"
 
+  # Add these new paths
+  /superadmin-api/v1/migrations/core:
+    $ref: "./parts/migrations/core-migrations-path.yaml"
+  /superadmin-api/v1/migrations/core/update:
+    $ref: "./parts/migrations/core-migrations-update-path.yaml"
+
 components:
   $ref: "./core-schema.yaml#/components"

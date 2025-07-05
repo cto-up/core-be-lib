@@ -1,0 +1,10 @@
+get:
+  description: Returns core migration information
+  operationId: getCoreMigration
+  responses:
+    "200":
+      description: core migration response
+      content:
+        application/json:
+          schema:
+            $ref: "./migration-schema.yaml"

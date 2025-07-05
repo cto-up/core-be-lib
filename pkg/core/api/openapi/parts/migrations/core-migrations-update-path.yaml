@@ -1,0 +1,13 @@
+put:
+  description: Updates core migration information
+  operationId: updateCoreMigration
+  requestBody:
+    description: Migration information to update
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "./migration-schema.yaml"
+  responses:
+    "204":
+      description: migration information updated

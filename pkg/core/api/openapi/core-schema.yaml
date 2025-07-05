@@ -11,6 +11,9 @@ components:
       $ref: "./parts/tenant-features-schema.yaml"
     ColorSchema:
       $ref: "./parts/tenant-color-schema.yaml"
+    # Migration related schemas
+    Migration:
+      $ref: "./parts/migrations/migration-schema.yaml"
     # Users
     NewUser:
       type: object

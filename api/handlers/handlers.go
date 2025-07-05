@@ -21,6 +21,7 @@ type Handlers struct {
 	*core.SuperAdminHandler
 	*core.ClientApplicationHandler
 	*core.TranslationHandler
+	*core.MigrationHandler
 }
 
 func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool *access.FirebaseTenantClientConnectionPool, multiTenantService *access.MultitenantService, clientAppService *access.ClientApplicationService) Handlers {
@@ -37,6 +38,7 @@ func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool *access.FirebaseT
 		SuperAdminHandler:        core.NewSuperAdminHandler(authClientPool),
 		ClientApplicationHandler: core.NewClientApplicationHandler(store, clientAppService),
 		TranslationHandler:       core.NewTranslationHandler(store),
+		MigrationHandler:         core.NewMigrationHandler(store),
 	}
 	return handlers
 }
