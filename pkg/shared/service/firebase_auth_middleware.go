@@ -31,6 +31,10 @@ type FirebaseAuthMiddleware struct {
 	multitenantService         *MultitenantService
 }
 
+func (f *FirebaseAuthMiddleware) GetTenantClientConnectionPool(c *gin.Context) *FirebaseTenantClientConnectionPool {
+	return f.tenantClientConnectionPool
+}
+
 // New is constructor of the middleware
 func newFirebaseClient(ctx context.Context) (*auth.Client, error) {
 	fcfg := os.Getenv("FIREBASE_CONFIG")
