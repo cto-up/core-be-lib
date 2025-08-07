@@ -116,8 +116,8 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 		Middlewares: []core.MiddlewareFunc{
 			core.MiddlewareFunc(service.RequestIDMiddleware()),
 			// Use the combined middleware, allowing API tokens
-			core.MiddlewareFunc(authMiddleware.MiddlewareFunc()),
 			core.MiddlewareFunc(tenantMiddleWare.MiddlewareFunc()),
+			core.MiddlewareFunc(authMiddleware.MiddlewareFunc()),
 		},
 	}
 
