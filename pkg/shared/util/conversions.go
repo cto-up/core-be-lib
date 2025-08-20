@@ -371,6 +371,12 @@ func FromNullableTimestamp(value pgtype.Timestamp) *time.Time {
 	}
 	return nil
 }
+func FromNullableTimestamptz(value pgtype.Timestamptz) *time.Time {
+	if value.Valid {
+		return &value.Time
+	}
+	return nil
+}
 
 // Converts a pgtype.UUID to a *uuid.UUID
 func FromNullableUUID(value pgtype.UUID) *uuid.UUID {
