@@ -163,11 +163,6 @@ func (uh *UserService) DeleteUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	defer tx.Rollback(c)
 	qtx := uh.store.Queries.WithTx(tx)
 
-	err = baseAuthClient.DeleteUser(c, userId)
-	if err != nil {
-		return err
-	}
-
 	_, err = qtx.DeleteUser(c, repository.DeleteUserParams{
 		ID:       userId,
 		TenantID: tenantId,
@@ -175,6 +170,12 @@ func (uh *UserService) DeleteUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	if err != nil {
 		return err
 	}
+
+	err = baseAuthClient.DeleteUser(c, userId)
+	if err != nil {
+		return err
+	}
+
 	err = tx.Commit(c)
 
 	return err
