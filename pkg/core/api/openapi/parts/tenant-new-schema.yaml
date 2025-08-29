@@ -4,6 +4,7 @@ required:
   - subdomain
   - enable_email_link_sign_in
   - allow_password_sign_up
+  - allow_signup
 properties:
   name:
     type: string
@@ -12,4 +13,6 @@ properties:
   enable_email_link_sign_in:
     type: boolean
   allow_password_sign_up:
+    type: boolean
+  allow_signup:
     type: boolean

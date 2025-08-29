@@ -93,6 +93,7 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 			Subdomain:             req.Subdomain,
 			EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
 			AllowPasswordSignUp:   req.AllowPasswordSignUp,
+			AllowSignup:           req.AllowSignup,
 		})
 	if err != nil {
 		service.DeleteTenant(c, exh.authClientPool.GetClient(), firebaseTenant.ID)

@@ -1,0 +1,21 @@
+post:
+  description: Creates a new user for the current tenant.
+  operationId: signup
+  requestBody:
+    description: User to add to the store
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../core-schema.yaml#/components/schemas/NewSignup"
+  responses:
+    "201":
+      description: user response
+      content:
+        application/json:
+          schema:
+            $ref: "../core-schema.yaml#/components/schemas/User"
+    "400":
+      description: Invalid input
+    "403":
+      description: Signup not allowed for this tenant

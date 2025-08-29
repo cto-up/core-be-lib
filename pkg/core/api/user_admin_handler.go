@@ -81,7 +81,7 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		return
 	}
 
-	user, err := uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req)
+	user, err := uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -329,33 +329,6 @@ func (uh *UserAdminHandler) UpdateUserStatus(c *gin.Context, userID string) {
 	c.Status(http.StatusNoContent)
 }
 
-func (uh *UserAdminHandler) ResetPasswordRequest(c *gin.Context) {
-	var req struct {
-		Email string `json:"email"`
-	}
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
-		return
-	}
-	url, err := getResetPasswordURL(c, "")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-
-	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
-}
-
 func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID string) {
 
 	var req struct {
@@ -568,7 +541,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			if isCustomerAdmin {
 				req.Roles = []core.Role{"CUSTOMER_ADMIN"}
 			}
-			_, err = uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req)
+			_, err = uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req, nil)
 			if err != nil {
 				// check if error is a firebase error and if so, check if it is a duplicate email error
 				if auth.IsEmailAlreadyExists(err) {

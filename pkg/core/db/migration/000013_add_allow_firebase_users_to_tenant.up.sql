@@ -1,0 +1,2 @@
+ALTER TABLE core_tenants
+ADD COLUMN allow_signup BOOLEAN NOT NULL DEFAULT FALSE;

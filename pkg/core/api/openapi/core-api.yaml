@@ -77,6 +77,10 @@ paths:
   /public-api/v1/tenant:
     $ref: "./parts/public-tenant-path.yaml"
 
+  # public - signup
+  /public-api/v1/signup:
+    $ref: "./parts/public-signup-path.yaml"
+
   # admin
   /api/v1/tenant/profile:
     $ref: "./parts/admin/tenant-profile-path.yaml"

@@ -683,6 +683,9 @@ type UpdateUserStatusJSONRequestBody UpdateUserStatusJSONBody
 // ResetPasswordRequestJSONRequestBody defines body for ResetPasswordRequest for application/json ContentType.
 type ResetPasswordRequestJSONRequestBody ResetPasswordRequestJSONBody
 
+// SignupJSONRequestBody defines body for Signup for application/json ContentType.
+type SignupJSONRequestBody = NewSignup
+
 // RemoveAuthorizedDomainsJSONRequestBody defines body for RemoveAuthorizedDomains for application/json ContentType.
 type RemoveAuthorizedDomainsJSONRequestBody RemoveAuthorizedDomainsJSONBody
 
@@ -874,6 +877,9 @@ type ServerInterface interface {
 
 	// (POST /public-api/v1/password-reset-request)
 	ResetPasswordRequest(c *gin.Context)
+
+	// (POST /public-api/v1/signup)
+	Signup(c *gin.Context)
 
 	// (GET /public-api/v1/tenant)
 	GetPublicTenant(c *gin.Context)
@@ -2495,6 +2501,19 @@ func (siw *ServerInterfaceWrapper) ResetPasswordRequest(c *gin.Context) {
 	siw.Handler.ResetPasswordRequest(c)
 }
 
+// Signup operation middleware
+func (siw *ServerInterfaceWrapper) Signup(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.Signup(c)
+}
+
 // GetPublicTenant operation middleware
 func (siw *ServerInterfaceWrapper) GetPublicTenant(c *gin.Context) {
 
@@ -3383,6 +3402,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/api/v1/users/:userid/status", wrapper.UpdateUserStatus)
 	router.GET(options.BaseURL+"/public-api/v1/health", wrapper.GetHealthCheck)
 	router.POST(options.BaseURL+"/public-api/v1/password-reset-request", wrapper.ResetPasswordRequest)
+	router.POST(options.BaseURL+"/public-api/v1/signup", wrapper.Signup)
 	router.GET(options.BaseURL+"/public-api/v1/tenant", wrapper.GetPublicTenant)
 	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/background", wrapper.GetTenantBackground)
 	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/background-mobile", wrapper.GetTenantBackgroundMobile)

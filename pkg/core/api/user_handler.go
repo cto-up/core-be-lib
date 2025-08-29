@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/api/helpers"
+	core "ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	fileservice "ctoup.com/coreapp/pkg/shared/fileservice"
@@ -23,15 +24,21 @@ import (
 type UserHandler struct {
 	store          *db.Store
 	authClientPool *access.FirebaseTenantClientConnectionPool
+	userService    *access.UserService
 }
 
 func NewUserHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserHandler {
+	userService := access.NewUserService(store, authClientPool)
 	handler := &UserHandler{store: store,
 		authClientPool: authClientPool,
+		userService:    userService,
 	}
 	return handler
 }
 
+/**
+* in case user was created in firebase but not in the store
+ */
 func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
 	userID, exist := ctx.Get(access.AUTH_USER_ID)
 	if !exist {
@@ -181,4 +188,83 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 
 func (s *UserHandler) GetProfilePicture(c *gin.Context, userId string) {
 	fileservice.GetFile(c, os.Getenv("FILE_FOLDER_URL"), userId+".jpg")
+}
+
+func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
+		return
+	}
+	url, err := getResetPasswordURL(c, "")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
+}
+
+func (uh *UserHandler) Signup(c *gin.Context) {
+	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
+	tenant, err := uh.store.GetTenantByTenantID(c, tenantID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !tenant.AllowSignup {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Signup not allowed"})
+		return
+	}
+
+	var req core.NewSignup
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+	newUser := core.NewUser{
+		Email: req.Email,
+		Name:  req.Name,
+		Roles: []core.Role{"USER"},
+	}
+
+	user, err := uh.userService.AddUser(c, baseAuthClient, tenantID.(string), newUser, &req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	url, err := getConfirmationEmailURL(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	err = sendConfirmationEmail(c, baseAuthClient, url, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	c.JSON(http.StatusCreated, user)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
 }

@@ -14,11 +14,11 @@ import (
 
 const createTenant = `-- name: CreateTenant :one
 INSERT INTO core_tenants (
-  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up"
+  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_signup"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6
+  $1, $2, $3, $4, $5, $6, $7
 )
-RETURNING id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features
+RETURNING id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_signup
 `
 
 type CreateTenantParams struct {
@@ -28,6 +28,7 @@ type CreateTenantParams struct {
 	Subdomain             string `json:"subdomain"`
 	EnableEmailLinkSignIn bool   `json:"enable_email_link_sign_in"`
 	AllowPasswordSignUp   bool   `json:"allow_password_sign_up"`
+	AllowSignup           bool   `json:"allow_signup"`
 }
 
 func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (CoreTenant, error) {
@@ -38,6 +39,7 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Cor
 		arg.Subdomain,
 		arg.EnableEmailLinkSignIn,
 		arg.AllowPasswordSignUp,
+		arg.AllowSignup,
 	)
 	var i CoreTenant
 	err := row.Scan(
@@ -52,6 +54,7 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Cor
 		&i.UpdatedAt,
 		&i.Profile,
 		&i.Features,
+		&i.AllowSignup,
 	)
 	return i, err
 }
@@ -69,7 +72,7 @@ func (q *Queries) DeleteTenant(ctx context.Context, id uuid.UUID) (uuid.UUID, er
 }
 
 const getTenantByID = `-- name: GetTenantByID :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_signup FROM core_tenants
 WHERE id = $1 LIMIT 1
 `
 
@@ -88,12 +91,13 @@ func (q *Queries) GetTenantByID(ctx context.Context, id uuid.UUID) (CoreTenant, 
 		&i.UpdatedAt,
 		&i.Profile,
 		&i.Features,
+		&i.AllowSignup,
 	)
 	return i, err
 }
 
 const getTenantBySubdomain = `-- name: GetTenantBySubdomain :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_signup FROM core_tenants
 WHERE subdomain = $1 LIMIT 1
 `
 
@@ -112,12 +116,13 @@ func (q *Queries) GetTenantBySubdomain(ctx context.Context, subdomain string) (C
 		&i.UpdatedAt,
 		&i.Profile,
 		&i.Features,
+		&i.AllowSignup,
 	)
 	return i, err
 }
 
 const getTenantByTenantID = `-- name: GetTenantByTenantID :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_signup FROM core_tenants
 WHERE tenant_id = $1 LIMIT 1
 `
 
@@ -136,12 +141,13 @@ func (q *Queries) GetTenantByTenantID(ctx context.Context, tenantID string) (Cor
 		&i.UpdatedAt,
 		&i.Profile,
 		&i.Features,
+		&i.AllowSignup,
 	)
 	return i, err
 }
 
 const listTenants = `-- name: ListTenants :many
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_signup FROM core_tenants
 WHERE (UPPER(name) LIKE UPPER($3) OR $3 IS NULL)
 ORDER BY
   CASE
@@ -193,6 +199,7 @@ func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]Cor
 			&i.UpdatedAt,
 			&i.Profile,
 			&i.Features,
+			&i.AllowSignup,
 		); err != nil {
 			return nil, err
 		}
@@ -210,7 +217,8 @@ SET
     "name" = $2,
     "subdomain" = $3,
     "enable_email_link_sign_in" = $4,
-    "allow_password_sign_up" = $5
+    "allow_password_sign_up" = $5,
+    "allow_signup" = $6
 WHERE id = $1
 RETURNING id
 `
@@ -221,6 +229,7 @@ type UpdateTenantParams struct {
 	Subdomain             string    `json:"subdomain"`
 	EnableEmailLinkSignIn bool      `json:"enable_email_link_sign_in"`
 	AllowPasswordSignUp   bool      `json:"allow_password_sign_up"`
+	AllowSignup           bool      `json:"allow_signup"`
 }
 
 func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (uuid.UUID, error) {
@@ -230,6 +239,7 @@ func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (uui
 		arg.Subdomain,
 		arg.EnableEmailLinkSignIn,
 		arg.AllowPasswordSignUp,
+		arg.AllowSignup,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
