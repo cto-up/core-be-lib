@@ -368,9 +368,10 @@ func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClien
 func (uh *UserService) UpdateUserStatus(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, requestName string, requestValue bool) error {
 	// Lookup the user associated with the specified uid.
 	params := (&auth.UserToUpdate{})
-	if requestName == "EMAIL_VERIFIED" {
+	switch requestName {
+	case "EMAIL_VERIFIED":
 		params = params.EmailVerified(requestValue)
-	} else if requestName == "DISABLED" {
+	case "DISABLED":
 		params = params.Disabled(requestValue)
 	}
 	_, err := baseAuthClient.UpdateUser(c, userID, params)

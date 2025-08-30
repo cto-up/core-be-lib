@@ -29,7 +29,7 @@ func UpdateTenant(ctx context.Context, authClient *auth.Client, tenantID string,
 		DisplayName(tenantJSON.Subdomain).
 		EnableEmailLinkSignIn(tenantJSON.EnableEmailLinkSignIn).
 		AllowPasswordSignUp(tenantJSON.AllowPasswordSignUp)
-	// Create the tenant
+	// Update the tenant
 	tenant, err := authClient.TenantManager.UpdateTenant(ctx, tenantID, params)
 	if err != nil {
 		return nil, fmt.Errorf("error updating tenant: %v", err)

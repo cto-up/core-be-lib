@@ -13,6 +13,7 @@ import (
 	core "ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/core/service"
 	fileservice "ctoup.com/coreapp/pkg/shared/fileservice"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	access "ctoup.com/coreapp/pkg/shared/service"
@@ -22,16 +23,20 @@ import (
 )
 
 type UserHandler struct {
-	store          *db.Store
-	authClientPool *access.FirebaseTenantClientConnectionPool
-	userService    *access.UserService
+	store                    *db.Store
+	authClientPool           *access.FirebaseTenantClientConnectionPool
+	userService              *access.UserService
+	emailVerificationService *service.EmailVerificationService
 }
 
 func NewUserHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserHandler {
 	userService := access.NewUserService(store, authClientPool)
-	handler := &UserHandler{store: store,
-		authClientPool: authClientPool,
-		userService:    userService,
+	emailVerificationService := service.NewEmailVerificationService(store, authClientPool)
+	handler := &UserHandler{
+		store:                    store,
+		authClientPool:           authClientPool,
+		userService:              userService,
+		emailVerificationService: emailVerificationService,
 	}
 	return handler
 }
@@ -266,5 +271,118 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, user)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
+	c.JSON(http.StatusOK, gin.H{"message": "Verification email sent"})
+}
+
+// VerifyEmail handles email verification using token
+func (uh *UserHandler) VerifyEmail(c *gin.Context) {
+	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := uh.emailVerificationService.VerifyEmailToken(c, req.Token, tenantID.(string)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":        "Email verified successfully",
+		"email_verified": true,
+	})
+}
+
+// ResendEmailVerification resends verification email to authenticated user
+func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
+	userID, exists := c.Get(access.AUTH_USER_ID)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+
+	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "TenantID not found"})
+		return
+	}
+
+	userEmail, exists := c.Get(access.AUTH_EMAIL)
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User email not found"})
+		return
+	}
+
+	// Check if email is already verified
+	isVerified, err := uh.emailVerificationService.GetUserVerificationStatus(c, userID.(string), tenantID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check verification status"})
+		return
+	}
+
+	if isVerified {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already verified"})
+		return
+	}
+
+	// Get base URL for verification link
+	url, err := getConfirmationEmailURL(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification URL"})
+		return
+	}
+
+	// Resend verification email (includes rate limiting)
+	if err := uh.emailVerificationService.ResendVerificationEmail(c, userID.(string), tenantID.(string), userEmail.(string), url); err != nil {
+		// Check if it's a rate limit error
+		if fmt.Sprintf("%v", err) == "rate limit exceeded" ||
+			(len(fmt.Sprintf("%v", err)) > 20 && fmt.Sprintf("%v", err)[:20] == "rate limit exceeded.") {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Verification email sent successfully"})
+}
+
+// GetMyEmailVerificationStatus returns current user's email verification status
+func (uh *UserHandler) GetMyEmailVerificationStatus(c *gin.Context) {
+	userID, exists := c.Get(access.AUTH_USER_ID)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+
+	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "TenantID not found"})
+		return
+	}
+
+	userEmail, exists := c.Get(access.AUTH_EMAIL)
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User email not found"})
+		return
+	}
+
+	// Get verification status
+	isVerified, err := uh.emailVerificationService.GetUserVerificationStatus(c, userID.(string), tenantID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get verification status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"email":          userEmail.(string),
+		"email_verified": isVerified,
+	})
 }

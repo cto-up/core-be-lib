@@ -137,6 +137,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 			Subdomain:             req.Subdomain,
 			EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
 			AllowPasswordSignUp:   req.AllowPasswordSignUp,
+			AllowSignup:           req.AllowSignup,
 		})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))

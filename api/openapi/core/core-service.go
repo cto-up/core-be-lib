@@ -496,6 +496,12 @@ type ResetPasswordRequestJSONBody struct {
 	Email openapi_types.Email `json:"email"`
 }
 
+// VerifyEmailJSONBody defines parameters for VerifyEmail.
+type VerifyEmailJSONBody struct {
+	// Token Email verification token received via email
+	Token string `json:"token"`
+}
+
 // RemoveAuthorizedDomainsJSONBody defines parameters for RemoveAuthorizedDomains.
 type RemoveAuthorizedDomainsJSONBody struct {
 	// Domains List of domains to remove
@@ -686,6 +692,9 @@ type ResetPasswordRequestJSONRequestBody ResetPasswordRequestJSONBody
 // SignupJSONRequestBody defines body for Signup for application/json ContentType.
 type SignupJSONRequestBody = NewSignup
 
+// VerifyEmailJSONRequestBody defines body for VerifyEmail for application/json ContentType.
+type VerifyEmailJSONRequestBody VerifyEmailJSONBody
+
 // RemoveAuthorizedDomainsJSONRequestBody defines body for RemoveAuthorizedDomains for application/json ContentType.
 type RemoveAuthorizedDomainsJSONRequestBody RemoveAuthorizedDomainsJSONBody
 
@@ -778,6 +787,12 @@ type ServerInterface interface {
 
 	// (POST /api/v1/me)
 	CreateMeUser(c *gin.Context)
+
+	// (POST /api/v1/me/email-verification/resend)
+	ResendEmailVerification(c *gin.Context)
+
+	// (GET /api/v1/me/email-verification/status)
+	GetMyEmailVerificationStatus(c *gin.Context)
 
 	// (GET /api/v1/me/profile)
 	GetMeProfile(c *gin.Context)
@@ -895,6 +910,9 @@ type ServerInterface interface {
 
 	// (GET /public-api/v1/users/{userid}/profile/picture)
 	GetProfilePicture(c *gin.Context, userid string)
+
+	// (POST /public-api/v1/verify-email)
+	VerifyEmail(c *gin.Context)
 
 	// (DELETE /superadmin-api/v1/config/authorized-domains)
 	RemoveAuthorizedDomains(c *gin.Context)
@@ -1568,6 +1586,32 @@ func (siw *ServerInterfaceWrapper) CreateMeUser(c *gin.Context) {
 	}
 
 	siw.Handler.CreateMeUser(c)
+}
+
+// ResendEmailVerification operation middleware
+func (siw *ServerInterfaceWrapper) ResendEmailVerification(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ResendEmailVerification(c)
+}
+
+// GetMyEmailVerificationStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetMyEmailVerificationStatus(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMyEmailVerificationStatus(c)
 }
 
 // GetMeProfile operation middleware
@@ -2590,6 +2634,19 @@ func (siw *ServerInterfaceWrapper) GetProfilePicture(c *gin.Context) {
 	siw.Handler.GetProfilePicture(c, userid)
 }
 
+// VerifyEmail operation middleware
+func (siw *ServerInterfaceWrapper) VerifyEmail(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.VerifyEmail(c)
+}
+
 // RemoveAuthorizedDomains operation middleware
 func (siw *ServerInterfaceWrapper) RemoveAuthorizedDomains(c *gin.Context) {
 
@@ -3369,6 +3426,8 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/api/v1/configs/tenant-configs/:id", wrapper.GetTenantConfigByID)
 	router.PUT(options.BaseURL+"/api/v1/configs/tenant-configs/:id", wrapper.UpdateTenantConfig)
 	router.POST(options.BaseURL+"/api/v1/me", wrapper.CreateMeUser)
+	router.POST(options.BaseURL+"/api/v1/me/email-verification/resend", wrapper.ResendEmailVerification)
+	router.GET(options.BaseURL+"/api/v1/me/email-verification/status", wrapper.GetMyEmailVerificationStatus)
 	router.GET(options.BaseURL+"/api/v1/me/profile", wrapper.GetMeProfile)
 	router.PUT(options.BaseURL+"/api/v1/me/profile", wrapper.UpdateMeProfile)
 	router.POST(options.BaseURL+"/api/v1/me/profile/picture", wrapper.UploadProfilePicture)
@@ -3408,6 +3467,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/background-mobile", wrapper.GetTenantBackgroundMobile)
 	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/logo", wrapper.GetTenantLogo)
 	router.GET(options.BaseURL+"/public-api/v1/users/:userid/profile/picture", wrapper.GetProfilePicture)
+	router.POST(options.BaseURL+"/public-api/v1/verify-email", wrapper.VerifyEmail)
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.RemoveAuthorizedDomains)
 	router.PATCH(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.AddAuthorizedDomains)
 	router.GET(options.BaseURL+"/superadmin-api/v1/configs/global-configs", wrapper.ListGlobalConfigs)

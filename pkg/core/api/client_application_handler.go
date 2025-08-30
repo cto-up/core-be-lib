@@ -490,7 +490,7 @@ func (h *ClientApplicationHandler) CreateAPIToken(c *gin.Context, id uuid.UUID) 
 	expiresAt := req.ExpiresAt
 
 	// Calculate days from now
-	expiryDays := int(expiresAt.Sub(time.Now()).Hours() / 24)
+	expiryDays := int(time.Until(expiresAt).Hours() / 24)
 
 	// Handle scopes
 	var scopes []string

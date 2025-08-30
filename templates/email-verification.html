@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify Your Email Address</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css"
+    />
+    <style>
+      .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .logo {
+        max-width: 150px;
+        margin-bottom: 20px;
+      }
+      .verification-box {
+        border: 2px solid #00d1b2;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+        background-color: #f0fffe;
+      }
+      .verify-button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #00d1b2;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+        margin: 15px 0;
+      }
+      .verify-button:hover {
+        background-color: #00b89c;
+        color: white;
+      }
+      .security-notice {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 4px;
+        padding: 10px;
+        margin: 15px 0;
+        font-size: 14px;
+      }
+      .footer-text {
+        color: #666;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="email-container">
+      <img
+        src="https://via.placeholder.com/150x50?text=CTO+Up"
+        alt="CTO Up Logo"
+        class="logo"
+      />
+
+      <div class="box">
+        <h1 class="title is-3 has-text-primary">Verify Your Email Address</h1>
+        <p class="subtitle is-5">
+          Welcome to CTO Up! Please confirm your email address to complete your registration.
+        </p>
+
+        <div class="content">
+          <p>
+            Hi there! We're excited to have you join CTO Up. To ensure the security of your account 
+            and enable all features, please verify your email address by clicking the button below:
+          </p>
+
+          <div class="verification-box has-text-centered">
+            <p class="has-text-weight-semibold">Click here to verify your email:</p>
+            <a href="{{.Link}}" class="verify-button">
+              Verify Email Address
+            </a>
+          </div>
+
+          <div class="security-notice">
+            <p class="has-text-weight-semibold">🔒 Security Notice:</p>
+            <ul>
+              <li>This verification link will expire in 24 hours</li>
+              <li>If you didn't create an account with us, please ignore this email</li>
+              <li>Never share this verification link with anyone</li>
+            </ul>
+          </div>
+
+          <p>
+            If you're having trouble clicking the button above, you can copy and paste 
+            the following URL into your web browser:
+          </p>
+          <p style="word-break: break-all; background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
+            <a href="{{.Link}}">{{.Link}}</a>
+          </p>
+
+          <hr />
+
+          <p class="is-size-7">
+            <strong>Why verify your email?</strong><br />
+            Email verification helps us:
+          </p>
+          <ul class="is-size-7">
+            <li>Ensure you receive important account notifications</li>
+            <li>Protect your account from unauthorized access</li>
+            <li>Enable password recovery if needed</li>
+            <li>Comply with security best practices</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="has-text-centered mt-4">
+        <p class="footer-text">
+          This email was sent to <strong>{{.Email}}</strong><br />
+          If you have any questions, please contact our support team.
+        </p>
+        <p class="footer-text mt-2">
+          © 2024 CTO Up. All rights reserved.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

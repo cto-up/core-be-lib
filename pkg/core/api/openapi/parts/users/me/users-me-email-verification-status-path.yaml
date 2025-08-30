@@ -1,0 +1,27 @@
+get:
+  description: Get current user's email verification status
+  operationId: getMyEmailVerificationStatus
+  responses:
+    "200":
+      description: Email verification status retrieved successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+                format: email
+                example: "user@example.com"
+              email_verified:
+                type: boolean
+                example: true
+              verification_sent_at:
+                type: string
+                format: date-time
+                description: "Timestamp when last verification email was sent"
+                example: "2024-01-15T10:30:00Z"
+    "401":
+      description: Unauthorized - user not authenticated
+    "500":
+      description: Internal server error

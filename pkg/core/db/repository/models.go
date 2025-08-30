@@ -54,6 +54,18 @@ type CoreClientApplication struct {
 	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
 }
 
+type CoreEmailVerificationToken struct {
+	ID        uuid.UUID          `json:"id"`
+	UserID    string             `json:"user_id"`
+	TenantID  string             `json:"tenant_id"`
+	Token     string             `json:"token"`
+	TokenHash []byte             `json:"token_hash"`
+	ExpiresAt time.Time          `json:"expires_at"`
+	UsedAt    pgtype.Timestamptz `json:"used_at"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
+}
+
 type CoreGlobalConfig struct {
 	ID        uuid.UUID   `json:"id"`
 	Name      string      `json:"name"`
