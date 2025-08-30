@@ -29,7 +29,7 @@ OFFSET $2;
 
 -- name: CreateTenant :one
 INSERT INTO core_tenants (
-  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_signup"
+  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up"
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7
 )
@@ -42,7 +42,7 @@ SET
     "subdomain" = $3,
     "enable_email_link_sign_in" = $4,
     "allow_password_sign_up" = $5,
-    "allow_signup" = $6
+    "allow_sign_up" = $6
 WHERE id = $1
 RETURNING id;
 

@@ -7,7 +7,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: "../core-schema.yaml#/components/schemas/NewSignup"
+          $ref: "../core-schema.yaml#/components/schemas/NewSignUp"
   responses:
     "201":
       description: user response
@@ -18,4 +18,4 @@ post:
     "400":
       description: Invalid input
     "403":
-      description: Signup not allowed for this tenant
+      description: Sign up not allowed for this tenant

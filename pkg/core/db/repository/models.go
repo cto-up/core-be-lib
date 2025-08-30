@@ -115,7 +115,7 @@ type CoreTenant struct {
 	UpdatedAt             time.Time                `json:"updated_at"`
 	Profile               subentity.TenantProfile  `json:"profile"`
 	Features              subentity.TenantFeatures `json:"features"`
-	AllowSignup           bool                     `json:"allow_signup"`
+	AllowSignUp           bool                     `json:"allow_sign_up"`
 }
 
 type CoreTenantConfig struct {

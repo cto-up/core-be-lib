@@ -690,7 +690,7 @@ type UpdateUserStatusJSONRequestBody UpdateUserStatusJSONBody
 type ResetPasswordRequestJSONRequestBody ResetPasswordRequestJSONBody
 
 // SignupJSONRequestBody defines body for Signup for application/json ContentType.
-type SignupJSONRequestBody = NewSignup
+type SignupJSONRequestBody = NewSignUp
 
 // VerifyEmailJSONRequestBody defines body for VerifyEmail for application/json ContentType.
 type VerifyEmailJSONRequestBody VerifyEmailJSONBody
@@ -893,7 +893,7 @@ type ServerInterface interface {
 	// (POST /public-api/v1/password-reset-request)
 	ResetPasswordRequest(c *gin.Context)
 
-	// (POST /public-api/v1/signup)
+	// (POST /public-api/v1/sign-up)
 	Signup(c *gin.Context)
 
 	// (GET /public-api/v1/tenant)
@@ -3461,7 +3461,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/api/v1/users/:userid/status", wrapper.UpdateUserStatus)
 	router.GET(options.BaseURL+"/public-api/v1/health", wrapper.GetHealthCheck)
 	router.POST(options.BaseURL+"/public-api/v1/password-reset-request", wrapper.ResetPasswordRequest)
-	router.POST(options.BaseURL+"/public-api/v1/signup", wrapper.Signup)
+	router.POST(options.BaseURL+"/public-api/v1/sign-up", wrapper.Signup)
 	router.GET(options.BaseURL+"/public-api/v1/tenant", wrapper.GetPublicTenant)
 	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/background", wrapper.GetTenantBackground)
 	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/background-mobile", wrapper.GetTenantBackgroundMobile)

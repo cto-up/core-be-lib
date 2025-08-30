@@ -15,7 +15,7 @@ components:
     Migration:
       $ref: "./parts/migrations/migration-schema.yaml"
     # Users
-    NewSignup:
+    NewSignUp:
       type: object
       required:
         - name

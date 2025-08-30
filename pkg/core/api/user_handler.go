@@ -233,12 +233,12 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !tenant.AllowSignup {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Signup not allowed"})
+	if !tenant.AllowSignUp {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Sign up not allowed"})
 		return
 	}
 
-	var req core.NewSignup
+	var req core.NewSignUp
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

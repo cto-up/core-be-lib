@@ -1,2 +1,2 @@
 ALTER TABLE core_tenants
-DROP COLUMN allow_signup;
+DROP COLUMN allow_sign_up;
