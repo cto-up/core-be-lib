@@ -58,11 +58,14 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 
 	// write the tenant id to the response
 	c.JSON(http.StatusOK, repository.CoreTenant{
-		Subdomain: tenant.Subdomain,
-		Name:      tenant.Name,
-		TenantID:  tenant.TenantID,
-		Features:  tenant.Features,
-		Profile:   tenant.Profile,
+		Subdomain:             tenant.Subdomain,
+		Name:                  tenant.Name,
+		TenantID:              tenant.TenantID,
+		Features:              tenant.Features,
+		Profile:               tenant.Profile,
+		AllowSignUp:           tenant.AllowSignUp,
+		//AllowPasswordSignUp:   tenant.AllowPasswordSignUp,
+		//EnableEmailLinkSignIn: tenant.EnableEmailLinkSignIn,
 	})
 }
 
