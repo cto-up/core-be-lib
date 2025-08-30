@@ -123,21 +123,26 @@ func getConfirmationEmailURL(c *gin.Context) (string, error) {
 	return url, nil
 }
 
-func sendConfirmationEmail(c *gin.Context, baseAuthClient service.BaseAuthClient, url, toEmail string) error {
+func sendConfirmationEmail(url, toEmail string, confirmationToken string) error {
 	fromEmail := os.Getenv("SYSTEM_EMAIL")
 	if fromEmail == "" {
 		fromEmail = "noreply@ctoup.com"
 	}
 
+	/** Option 1: Generate the email verification link via firebase
 	actionCodeSettings := &auth.ActionCodeSettings{
 		URL: url,
 	}
 
 	link, err := baseAuthClient.EmailVerificationLinkWithSettings(c, toEmail, actionCodeSettings)
+
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to generate email verification link")
 		return err
-	}
+	}*/
+
+	// Option 2: Generate the email verification link manually
+	link := fmt.Sprintf("%s?token=%s", url, confirmationToken)
 
 	// Send the link via email
 	templateData := struct {

@@ -259,12 +259,19 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	// create email verification token
+	token, err := uh.emailVerificationService.CreateEmailVerificationToken(c, user.ID, tenantID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
 	url, err := getConfirmationEmailURL(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	err = sendConfirmationEmail(c, baseAuthClient, url, req.Email)
+	err = sendConfirmationEmail(url, req.Email, token)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
