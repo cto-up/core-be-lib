@@ -102,3 +102,32 @@ func TestGetDomain(t *testing.T) {
 		})
 	}
 }
+func TestGetDomainInfo(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		expected string
+	}{
+		{"subdomain with path", "sub.example.com/dklkcsc", "http://sub.example.com"},
+		{"subdomain", "sub.example.com", "http://sub.example.com"},
+		{"subdomain with port and path", "sub.example.com:8080/dklkcsc", "http://sub.example.com:8080"},
+		{"subdomain with port", "sub.example.com:8080", "http://sub.example.com:8080"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create a mock gin context with the test host
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("GET", "http://"+test.host, nil)
+			c.Request.Header.Set("Host", test.host)
+
+			domainInfo, err := GetDomainInfo(c)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if domainInfo.BaseURL != test.expected {
+				t.Errorf("Expected domain %q, got %q", test.expected, domainInfo.FullHost)
+			}
+		})
+	}
+}

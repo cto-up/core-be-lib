@@ -320,9 +320,22 @@ type NewPrompt struct {
 // NewPromptFormat Output format of the prompt execution
 type NewPromptFormat string
 
+// NewSignUp defines model for NewSignUp.
+type NewSignUp struct {
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
+}
+
 // NewTenant defines model for NewTenant.
 type NewTenant struct {
-	AllowPasswordSignUp   bool   `json:"allow_password_sign_up"`
+	// AllowPasswordSignUp Firebase setting to Allow password sign up (can skip)
+	AllowPasswordSignUp bool `json:"allow_password_sign_up"`
+
+	// AllowSignUp Allow users to sign up for this tenant
+	AllowSignUp bool `json:"allow_sign_up"`
+
+	// EnableEmailLinkSignIn Firebase setting to Enable email link sign in (can skip)
 	EnableEmailLinkSignIn bool   `json:"enable_email_link_sign_in"`
 	Name                  string `json:"name"`
 	Subdomain             string `json:"subdomain"`
@@ -372,7 +385,13 @@ type PromptResponse struct {
 
 // PublicTenantSchema defines model for PublicTenantSchema.
 type PublicTenantSchema struct {
-	AllowPasswordSignUp   bool `json:"allow_password_sign_up"`
+	// AllowPasswordSignUp Firebase setting to Allow password sign up (can skip)
+	AllowPasswordSignUp bool `json:"allow_password_sign_up"`
+
+	// AllowSignUp Allow users to sign up for this tenant
+	AllowSignUp bool `json:"allow_sign_up"`
+
+	// EnableEmailLinkSignIn Firebase setting to Enable email link sign in (can skip)
 	EnableEmailLinkSignIn bool `json:"enable_email_link_sign_in"`
 
 	// Features Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
@@ -416,7 +435,13 @@ type Role string
 
 // Tenant defines model for Tenant.
 type Tenant struct {
-	AllowPasswordSignUp   bool               `json:"allow_password_sign_up"`
+	// AllowPasswordSignUp Firebase setting to Allow password sign up (can skip)
+	AllowPasswordSignUp bool `json:"allow_password_sign_up"`
+
+	// AllowSignUp Allow users to sign up for this tenant
+	AllowSignUp bool `json:"allow_sign_up"`
+
+	// EnableEmailLinkSignIn Firebase setting to Enable email link sign in (can skip)
 	EnableEmailLinkSignIn bool               `json:"enable_email_link_sign_in"`
 	Id                    openapi_types.UUID `json:"id"`
 	Name                  string             `json:"name"`

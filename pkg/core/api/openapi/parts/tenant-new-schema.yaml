@@ -4,6 +4,7 @@ required:
   - subdomain
   - enable_email_link_sign_in
   - allow_password_sign_up
+  - allow_sign_up
 properties:
   name:
     type: string
@@ -11,5 +12,10 @@ properties:
     type: string
   enable_email_link_sign_in:
     type: boolean
+    description: Firebase setting to Enable email link sign in (can skip)
   allow_password_sign_up:
     type: boolean
+    description: Firebase setting to Allow password sign up (can skip)
+  allow_sign_up:
+    type: boolean
+    description: Allow users to sign up for this tenant

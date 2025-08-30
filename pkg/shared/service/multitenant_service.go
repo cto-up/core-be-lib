@@ -127,6 +127,7 @@ type DomainInfo struct {
 	TLD       string
 	FullHost  string
 	Port      string // The port number if present (e.g., "9999")
+	BaseURL   string
 }
 
 // isIPAddress checks if the hostname is an IP address
@@ -211,6 +212,10 @@ func GetDomainInfo(c *gin.Context) (*DomainInfo, error) {
 	if tld != "" {
 		fullDomain = domain + "." + tld
 	}
+	baseURL := fmt.Sprintf("%s://%s.%s", host.Scheme, subdomain, fullDomain)
+	if port != "" {
+		baseURL = fmt.Sprintf("%s:%s", baseURL, port)
+	}
 
 	return &DomainInfo{
 		subdomain: subdomain,
@@ -218,6 +223,7 @@ func GetDomainInfo(c *gin.Context) (*DomainInfo, error) {
 		TLD:       tld,
 		FullHost:  hostname,
 		Port:      port,
+		BaseURL:   baseURL,
 	}, nil
 }
 

@@ -41,7 +41,7 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 		return
 	}
 
-	user, err := uh.userService.AddUser(c, baseAuthClient, tenant.TenantID, req)
+	user, err := uh.userService.AddUser(c, baseAuthClient, tenant.TenantID, req, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

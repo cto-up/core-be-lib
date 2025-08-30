@@ -1,0 +1,41 @@
+post:
+  description: Verify user's email address using verification token
+  operationId: verifyEmail
+  requestBody:
+    description: Email verification token
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [token]
+          properties:
+            token:
+              type: string
+              description: Email verification token received via email
+  responses:
+    "200":
+      description: Email verified successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Email verified successfully"
+              email_verified:
+                type: boolean
+                example: true
+    "400":
+      description: Invalid or expired token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Invalid or expired verification token"
+    "500":
+      description: Internal server error

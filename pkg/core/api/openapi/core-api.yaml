@@ -77,6 +77,20 @@ paths:
   /public-api/v1/tenant:
     $ref: "./parts/public-tenant-path.yaml"
 
+  # public - sign up
+  /public-api/v1/sign-up:
+    $ref: "./parts/public-sign-up-path.yaml"
+
+  # public - email verification
+  /public-api/v1/verify-email:
+    $ref: "./parts/users/email-verification-path.yaml"
+
+  # authenticated - email verification
+  /api/v1/me/email-verification/resend:
+    $ref: "./parts/users/email-verification-resend-path.yaml"
+  /api/v1/me/email-verification/status:
+    $ref: "./parts/users/me/users-me-email-verification-status-path.yaml"
+
   # admin
   /api/v1/tenant/profile:
     $ref: "./parts/admin/tenant-profile-path.yaml"

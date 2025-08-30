@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"ctoup.com/coreapp/pkg/shared/emailservice"
-	access "ctoup.com/coreapp/pkg/shared/service"
+	"ctoup.com/coreapp/pkg/shared/service"
 	"firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -18,7 +18,7 @@ func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 		subdomain = subdomains[0]
 	}
 
-	host, err := access.GetHost(c)
+	host, err := service.GetHost(c)
 	if err != nil {
 		return "", err
 	}
@@ -29,7 +29,7 @@ func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 	}
 
 	host.Host = host.Host[strings.Index(host.Host, ".")+1:]
-	domain, err := access.GetBaseDomainWithPort(c)
+	domain, err := service.GetBaseDomainWithPort(c)
 	if err != nil {
 		return "", err
 	}
@@ -38,7 +38,7 @@ func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 	return url, nil
 }
 
-func resetPasswordRequest(c *gin.Context, baseAuthClient access.BaseAuthClient, url, toEmail string) error {
+func resetPasswordRequest(c *gin.Context, baseAuthClient service.BaseAuthClient, url, toEmail string) error {
 	fromEmail := os.Getenv("SYSTEM_EMAIL")
 	if fromEmail == "" {
 		fromEmail = "noreply@ctoup.com"
@@ -74,7 +74,7 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient access.BaseAuthClient, 
 	return nil
 }
 
-func sendWelcomeEmail(c *gin.Context, baseAuthClient access.BaseAuthClient, url, toEmail string) error {
+func sendWelcomeEmail(c *gin.Context, baseAuthClient service.BaseAuthClient, url, toEmail string) error {
 	fromEmail := os.Getenv("SYSTEM_EMAIL")
 	if fromEmail == "" {
 		fromEmail = "noreply@ctoup.com"
@@ -109,4 +109,59 @@ func sendWelcomeEmail(c *gin.Context, baseAuthClient access.BaseAuthClient, url,
 	}
 	return nil
 
+}
+
+func getConfirmationEmailURL(c *gin.Context) (string, error) {
+	domainInfo, err := service.GetDomainInfo(c)
+	if err != nil {
+		return "", err
+	}
+	baseURL := domainInfo.BaseURL
+
+	url := fmt.Sprintf("%s/verify-email", baseURL)
+
+	return url, nil
+}
+
+func sendConfirmationEmail(url, toEmail string, confirmationToken string) error {
+	fromEmail := os.Getenv("SYSTEM_EMAIL")
+	if fromEmail == "" {
+		fromEmail = "noreply@ctoup.com"
+	}
+
+	/** Option 1: Generate the email verification link via firebase
+	actionCodeSettings := &auth.ActionCodeSettings{
+		URL: url,
+	}
+
+	link, err := baseAuthClient.EmailVerificationLinkWithSettings(c, toEmail, actionCodeSettings)
+
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to generate email verification link")
+		return err
+	}*/
+
+	// Option 2: Generate the email verification link manually
+	link := fmt.Sprintf("%s?token=%s", url, confirmationToken)
+
+	// Send the link via email
+	templateData := struct {
+		Link  string
+		Email string
+	}{
+		Link:  link,
+		Email: toEmail,
+	}
+
+	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Please verify your email address", "")
+	if err := r.ParseTemplate("templates/email-verification.html", templateData); err != nil {
+		log.Error().Err(err).Msg("Failed to parse template for email verification")
+		return err
+	}
+
+	if err := r.SendEmail(); err != nil {
+		log.Error().Err(err).Msg("Failed to send email verification")
+		return err
+	}
+	return nil
 }

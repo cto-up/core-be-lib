@@ -58,11 +58,14 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 
 	// write the tenant id to the response
 	c.JSON(http.StatusOK, repository.CoreTenant{
-		Subdomain: tenant.Subdomain,
-		Name:      tenant.Name,
-		TenantID:  tenant.TenantID,
-		Features:  tenant.Features,
-		Profile:   tenant.Profile,
+		Subdomain:             tenant.Subdomain,
+		Name:                  tenant.Name,
+		TenantID:              tenant.TenantID,
+		Features:              tenant.Features,
+		Profile:               tenant.Profile,
+		AllowSignUp:           tenant.AllowSignUp,
+		//AllowPasswordSignUp:   tenant.AllowPasswordSignUp,
+		//EnableEmailLinkSignIn: tenant.EnableEmailLinkSignIn,
 	})
 }
 
@@ -93,6 +96,7 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 			Subdomain:             req.Subdomain,
 			EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
 			AllowPasswordSignUp:   req.AllowPasswordSignUp,
+			AllowSignUp:           req.AllowSignUp,
 		})
 	if err != nil {
 		service.DeleteTenant(c, exh.authClientPool.GetClient(), firebaseTenant.ID)
@@ -136,6 +140,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 			Subdomain:             req.Subdomain,
 			EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
 			AllowPasswordSignUp:   req.AllowPasswordSignUp,
+			AllowSignUp:           req.AllowSignUp,
 		})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))

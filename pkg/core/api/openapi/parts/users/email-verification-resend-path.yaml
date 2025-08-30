@@ -1,0 +1,38 @@
+post:
+  description: Resend email verification link to authenticated user
+  operationId: resendEmailVerification
+  responses:
+    "200":
+      description: Verification email sent successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Verification email sent successfully"
+    "400":
+      description: Bad request - user already verified or invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Email already verified"
+    "401":
+      description: Unauthorized - user not authenticated
+    "429":
+      description: Too many requests - rate limit exceeded
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Too many verification emails sent. Please try again later."
+    "500":
+      description: Internal server error

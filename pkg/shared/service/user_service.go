@@ -59,7 +59,7 @@ func NewUserService(store *db.Store, authClientPool *FirebaseTenantClientConnect
 	return userService
 }
 
-func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient, tenantId string, req core.AddUserJSONRequestBody) (repository.CoreUser, error) {
+func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
 
 	user := repository.CoreUser{}
 	tx, err := uh.store.ConnPool.Begin(c)
@@ -75,6 +75,10 @@ func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient,
 		DisplayName(req.Name).
 		PhotoURL("/images/avatar-1.jpeg").
 		Disabled(false)
+
+	if password != nil {
+		params = params.Password(*password)
+	}
 
 	userRecord, err := baseAuthClient.CreateUser(c, params)
 	if err != nil {
@@ -365,9 +369,10 @@ func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClien
 func (uh *UserService) UpdateUserStatus(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, requestName string, requestValue bool) error {
 	// Lookup the user associated with the specified uid.
 	params := (&auth.UserToUpdate{})
-	if requestName == "EMAIL_VERIFIED" {
+	switch requestName {
+	case "EMAIL_VERIFIED":
 		params = params.EmailVerified(requestValue)
-	} else if requestName == "DISABLED" {
+	case "DISABLED":
 		params = params.Disabled(requestValue)
 	}
 	_, err := baseAuthClient.UpdateUser(c, userID, params)
