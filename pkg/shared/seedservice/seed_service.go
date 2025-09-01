@@ -66,6 +66,7 @@ func (ss *SeedService) Seed() error {
 
 	_, err = ss.seedAdminUser(c, qtx, userEmail, userPassword)
 	if err != nil {
+		log.Fatal().Err(err).Msg("Error seeding admin user")
 		return err
 	}
 
@@ -98,6 +99,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 
 		userRecord, err := ss.client.CreateUser(c, params)
 		if err != nil {
+			log.Fatal().Err(err).Msg("Error creating admin user")
 			return user, err
 		}
 
@@ -107,6 +109,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 		err = ss.client.SetCustomUserClaims(c, userRecord.UID, claims)
 
 		if err != nil {
+			log.Fatal().Err(err).Msg("Error setting custom user claims")
 			return user, err
 		}
 
