@@ -27,18 +27,33 @@ type UserHandler struct {
 	authClientPool           *access.FirebaseTenantClientConnectionPool
 	userService              *access.UserService
 	emailVerificationService *service.EmailVerificationService
+	fileService              *fileservice.FileService
 }
 
 func NewUserHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserHandler {
 	userService := access.NewUserService(store, authClientPool)
 	emailVerificationService := service.NewEmailVerificationService(store, authClientPool)
+	fileService := fileservice.NewFileService()
 	handler := &UserHandler{
 		store:                    store,
 		authClientPool:           authClientPool,
 		userService:              userService,
+		fileService:              fileService,
 		emailVerificationService: emailVerificationService,
 	}
 	return handler
+}
+
+func getProfilePictureFilePath(tenantId string, userId any) string {
+	var tenantPart string
+	if tenantId != "" {
+		tenantPart = tenantId
+	} else {
+		tenantPart = "www"
+	}
+
+	newFilePath := `/tenants/` + tenantPart + `/core/users/` + userId.(string) + "/profile-picture.jpg"
+	return newFilePath
 }
 
 /**
@@ -162,7 +177,8 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 			return
 		}
 	}
-	newFileName := userId.(string) + ".jpg"
+	tenantId, _ := c.Get(access.AUTH_TENANT_ID_KEY)
+	newFilePath := getProfilePictureFilePath(tenantId.(string), userId)
 
 	fileContent, err := file.Open()
 	if err != nil {
@@ -177,7 +193,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 	fmt.Printf("size:%d", len(byteContainer))
 
 	// The file is received, so let's save it
-	if err := fileservice.SaveFile(c, byteContainer, newFileName); err != nil {
+	if err := s.fileService.SaveFile(c, byteContainer, newFilePath); err != nil {
 		log.Printf("Failed to save file: %s", err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"message": "Unable to save the file",
@@ -192,7 +208,10 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 }
 
 func (s *UserHandler) GetProfilePicture(c *gin.Context, userId string) {
-	fileservice.GetFile(c, os.Getenv("FILE_FOLDER_URL"), userId+".jpg")
+	tenantId, _ := c.Get(access.AUTH_TENANT_ID_KEY)
+	filePath := getProfilePictureFilePath(tenantId.(string), userId)
+
+	s.fileService.GetFile(c, filePath)
 }
 
 func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {

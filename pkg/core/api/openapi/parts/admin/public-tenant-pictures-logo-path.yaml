@@ -1,14 +1,31 @@
 get:
-  description: Returns the tenant logo. Returns 404 if no logo is set.
+  description: Returns the tenant logo. Returns 404 if no logo is set. Supports ETag-based caching.
   operationId: getTenantLogo
+  parameters:
+    - name: If-None-Match
+      in: header
+      description: ETag value for cache validation
+      required: false
+      schema:
+        type: string
   responses:
     "200":
       description: Logo response
+      headers:
+        ETag:
+          description: Entity tag for cache validation
+          schema:
+            type: string
+        Cache-Control:
+          description: Cache control directives
+          schema:
+            type: string
       content:
         image/webp:
           schema:
             type: string
             format: binary
-
+    "304":
+      description: Not Modified - cached version is still valid
     "404":
       description: Logo not found

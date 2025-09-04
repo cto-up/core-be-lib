@@ -10,6 +10,7 @@ import (
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	fileservice "ctoup.com/coreapp/pkg/shared/fileservice"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	"ctoup.com/coreapp/pkg/shared/service"
 	"github.com/google/uuid"
@@ -21,6 +22,7 @@ import (
 type TenantHandler struct {
 	authClientPool     *service.FirebaseTenantClientConnectionPool
 	multiTenantService *service.MultitenantService
+	FileService        *fileservice.FileService
 	store              *db.Store
 }
 
@@ -58,12 +60,12 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 
 	// write the tenant id to the response
 	c.JSON(http.StatusOK, repository.CoreTenant{
-		Subdomain:             tenant.Subdomain,
-		Name:                  tenant.Name,
-		TenantID:              tenant.TenantID,
-		Features:              tenant.Features,
-		Profile:               tenant.Profile,
-		AllowSignUp:           tenant.AllowSignUp,
+		Subdomain:   tenant.Subdomain,
+		Name:        tenant.Name,
+		TenantID:    tenant.TenantID,
+		Features:    tenant.Features,
+		Profile:     tenant.Profile,
+		AllowSignUp: tenant.AllowSignUp,
 		//AllowPasswordSignUp:   tenant.AllowPasswordSignUp,
 		//EnableEmailLinkSignIn: tenant.EnableEmailLinkSignIn,
 	})
@@ -222,9 +224,11 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 }
 
 func NewTenantHandler(store *db.Store, authClientPool *service.FirebaseTenantClientConnectionPool, multiTenantService *service.MultitenantService) *TenantHandler {
+	fileService := fileservice.NewFileService()
 	return &TenantHandler{
 		store:              store,
 		authClientPool:     authClientPool,
+		FileService:        fileService,
 		multiTenantService: multiTenantService,
 	}
 }

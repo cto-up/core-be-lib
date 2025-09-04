@@ -5,15 +5,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 
 	"ctoup.com/coreapp/api/helpers"
-	fileservice "ctoup.com/coreapp/pkg/shared/fileservice"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
+
+func getTenantPictureFilePath(tenantID string, pictureType string) string {
+	newFilePath := fmt.Sprintf("/tenants/%s/core/pictures/%s.webp", tenantID, pictureType)
+	return newFilePath
+}
 
 // getTenantPicture is a generic function to get a tenant picture
 func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
@@ -25,19 +28,9 @@ func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
 	}
 
 	// Try to get the tenant-specific picture
-	filename := fmt.Sprintf("%s-%s.webp", tenantID, pictureType)
-	err := fileservice.GetFile(c, os.Getenv("FILE_FOLDER_URL"), filename)
+	filepath := getTenantPictureFilePath(tenantID.(string), pictureType)
 
-	// If the tenant-specific picture does not exist, return 404
-	if err != nil {
-		if c.Writer.Status() == http.StatusNotFound {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to get tenant picture")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
+	s.FileService.GetFile(c, filepath)
 }
 
 // uploadTenantPicture is a generic function to upload a tenant picture
@@ -86,8 +79,8 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	}
 
 	// Save the file with tenant-specific name
-	filename := fmt.Sprintf("%s-%s.webp", tenantID, pictureType)
-	if err := fileservice.SaveFile(c, byteContainer, filename); err != nil {
+	filepath := getTenantPictureFilePath(tenantID.(string), pictureType)
+	if err := s.FileService.SaveFile(c, byteContainer, filepath); err != nil {
 		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to save file")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
