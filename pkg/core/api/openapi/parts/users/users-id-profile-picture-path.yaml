@@ -1,5 +1,5 @@
 get:
-  description: Returns a user based on a single ID, if the user does not have access to the user
+  description: Returns a user profile picture. Supports ETag-based caching for improved performance.
   operationId: GetProfilePicture
   parameters:
     - name: userid
@@ -8,10 +8,42 @@ get:
       required: true
       schema:
         type: string
-  responses:
-    "200":
-      description: image file response
-      x-is-file: true
+    - name: If-None-Match
+      in: header
+      description: ETag value for cache validation
+      required: false
       schema:
         type: string
-        format: binary
+  responses:
+    "200":
+      description: Profile picture response
+      headers:
+        ETag:
+          description: Entity tag for cache validation
+          schema:
+            type: string
+        Cache-Control:
+          description: Cache control directives
+          schema:
+            type: string
+        Content-Type:
+          description: MIME type of the image
+          schema:
+            type: string
+      content:
+        image/jpeg:
+          schema:
+            type: string
+            format: binary
+        image/png:
+          schema:
+            type: string
+            format: binary
+        image/webp:
+          schema:
+            type: string
+            format: binary
+    "304":
+      description: Not Modified - cached version is still valid
+    "404":
+      description: Profile picture not found

@@ -14,7 +14,7 @@ import (
 )
 
 func getTenantPictureFilePath(tenantID string, pictureType string) string {
-	newFilePath := fmt.Sprintf("/tenants/%s/pictures/%s.webp", tenantID, pictureType)
+	newFilePath := fmt.Sprintf("/tenants/%s/core/pictures/%s.webp", tenantID, pictureType)
 	return newFilePath
 }
 
@@ -30,18 +30,7 @@ func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
 	// Try to get the tenant-specific picture
 	filepath := getTenantPictureFilePath(tenantID.(string), pictureType)
 
-	err := s.FileService.GetFile(c, filepath)
-
-	// If the tenant-specific picture does not exist, return 404
-	if err != nil {
-		if c.Writer.Status() == http.StatusNotFound {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to get tenant picture")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
+	s.FileService.GetFile(c, filepath)
 }
 
 // uploadTenantPicture is a generic function to upload a tenant picture

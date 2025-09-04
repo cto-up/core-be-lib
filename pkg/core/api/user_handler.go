@@ -52,7 +52,7 @@ func getProfilePictureFilePath(tenantId string, userId any) string {
 		tenantPart = "www"
 	}
 
-	newFilePath := `/tenants/` + tenantPart + `/users/` + userId.(string) + "/profile-picture.jpg"
+	newFilePath := `/tenants/` + tenantPart + `/core/users/` + userId.(string) + "/profile-picture.jpg"
 	return newFilePath
 }
 
@@ -210,6 +210,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 func (s *UserHandler) GetProfilePicture(c *gin.Context, userId string) {
 	tenantId, _ := c.Get(access.AUTH_TENANT_ID_KEY)
 	filePath := getProfilePictureFilePath(tenantId.(string), userId)
+
 	s.fileService.GetFile(c, filePath)
 }
 

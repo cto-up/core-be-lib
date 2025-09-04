@@ -1,14 +1,31 @@
 get:
-  description: Returns the tenant background mobile image. Returns 404 if no background mobile image is set.
+  description: Returns the tenant background mobile image. Returns 404 if no background mobile image is set. Supports ETag-based caching.
   operationId: getTenantBackgroundMobile
+  parameters:
+    - name: If-None-Match
+      in: header
+      description: ETag value for cache validation
+      required: false
+      schema:
+        type: string
   responses:
     "200":
       description: Background mobile image response
+      headers:
+        ETag:
+          description: Entity tag for cache validation
+          schema:
+            type: string
+        Cache-Control:
+          description: Cache control directives
+          schema:
+            type: string
       content:
         image/webp:
           schema:
             type: string
             format: binary
-
+    "304":
+      description: Not Modified - cached version is still valid
     "404":
       description: Background mobile image not found

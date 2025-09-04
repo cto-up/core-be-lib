@@ -2,10 +2,16 @@ package service
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"cloud.google.com/go/storage" // GCS client
 
@@ -43,29 +49,29 @@ func NewFileService() *FileService {
 	case "gcs":
 		bucketName = os.Getenv("GCS_BUCKET_NAME")
 		if bucketName == "" {
-			log.Fatal().Msg("GCS_BUCKET_NAME environment variable not set.")
+			log.Error().Msg("GCS_BUCKET_NAME environment variable not set.")
 		}
 		err := createGCSBucketIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to create GCS bucket")
+			log.Err(err).Msg("Failed to create GCS bucket")
 		}
 	case "s3":
 		bucketName = os.Getenv("S3_BUCKET_NAME")
 		if bucketName == "" {
-			log.Fatal().Msg("S3_BUCKET_NAME environment variable not set.")
+			log.Error().Msg("S3_BUCKET_NAME environment variable not set.")
 		}
 		err := createS3BucketIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to create S3 bucket")
+			log.Err(err).Msg("Failed to create S3 bucket")
 		}
 	case "azure":
 		bucketName = os.Getenv("AZURE_STORAGE_CONTAINER_NAME")
 		if bucketName == "" {
-			log.Fatal().Msg("AZURE_STORAGE_CONTAINER_NAME environment variable not set.")
+			log.Error().Msg("AZURE_STORAGE_CONTAINER_NAME environment variable not set.")
 		}
 		err := createAzureContainerIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to create Azure container")
+			log.Err(err).Msg("Failed to create Azure container")
 		}
 	case "file":
 	}
@@ -88,7 +94,7 @@ func NewFileService() *FileService {
 	// Open the bucket once and store the client
 	b, err := blob.OpenBucket(context.Background(), bucketURL)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("Failed to open bucket at URL: %s", bucketURL)
+		log.Err(err).Msgf("Failed to open bucket at URL: %s", bucketURL)
 	}
 
 	return &FileService{
@@ -105,9 +111,23 @@ func createGCSBucketIfNotExists(ctx context.Context, bucketName string) error {
 
 	// Check for GCS credentials content first (for CI/CD)
 	credsJSON := os.Getenv("GCS_CREDENTIALS_JSON")
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	if credsJSON != "" {
+		// unmarshal the credentials JSON to get the project ID
+		creds := struct {
+			ProjectID string `json:"project_id"`
+		}{}
+		err := json.Unmarshal([]byte(credsJSON), &creds)
+		if err != nil {
+			return err
+		}
+		projectID = creds.ProjectID
+
 		log.Info().Msg("Using JSON credentials from environment variable.")
 		client, err = storage.NewClient(ctx, option.WithCredentialsJSON([]byte(credsJSON)))
+		if err != nil {
+			return err
+		}
 	} else {
 		// Fall back to ADC (file path)
 		log.Info().Msg("Using credentials from file path or ADC.")
@@ -129,7 +149,7 @@ func createGCSBucketIfNotExists(ctx context.Context, bucketName string) error {
 	}
 
 	log.Info().Msg("GCS bucket not found, creating it now.")
-	if err := client.Bucket(bucketName).Create(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"), nil); err != nil {
+	if err := client.Bucket(bucketName).Create(ctx, projectID, nil); err != nil {
 		return err
 	}
 	log.Info().Msg("GCS bucket created successfully.")
@@ -247,6 +267,7 @@ func (fs *FileService) DeleteFile(ctx context.Context, filename string) error {
 }
 
 // GetFile retrieves a file from the specified bucket and writes its contents to the HTTP response.
+// It supports ETag-based caching for improved performance.
 func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {
 	// Create a new reader to the specified file.
 	reader, err := fs.bucket.NewReader(ctx, filename, nil)
@@ -261,13 +282,83 @@ func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {
 	}
 	defer reader.Close()
 
-	// Write the blob contents to the response.
-	if _, err = io.Copy(ctx.Writer, reader); err != nil {
-		log.Error().Err(err).Msg("Failed to copy file to response writer")
+	// Read the file content to generate ETag
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to read file content")
 		ctx.AbortWithError(500, err)
 		return err
 	}
 
-	// Explicitly close the reader.
+	// Generate ETag based on content hash
+	etag := fs.generateETag(content)
+
+	// Set content type based on file extension
+	contentType := fs.getContentType(filename)
+
+	// Set cache headers
+	ctx.Header("ETag", etag)
+	ctx.Header("Content-Type", contentType)
+	ctx.Header("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+
+	// Add headers to encourage caching for CORS requests
+	ctx.Header("Vary", "Origin, Authorization")
+	ctx.Header("Access-Control-Expose-Headers", "ETag, Cache-Control")
+
+	// Check if client has cached version
+	// Note: Even if client sends Cache-Control: no-cache, we still check ETag
+	// This allows conditional requests to work properly
+	if clientETag := ctx.GetHeader("If-None-Match"); clientETag != "" {
+		// Remove quotes if present
+		clientETag = strings.Trim(clientETag, `"`)
+		serverETag := strings.Trim(etag, `"`)
+
+		if clientETag == serverETag {
+			// Override any no-cache directives for unchanged content
+			ctx.Header("Cache-Control", "public, max-age=3600")
+			ctx.Status(http.StatusNotModified)
+			return nil
+		}
+	}
+
+	// Write the blob contents to the response.
+	if _, err = ctx.Writer.Write(content); err != nil {
+		log.Error().Err(err).Msg("Failed to write file to response writer")
+		ctx.AbortWithError(500, err)
+		return err
+	}
+
 	return nil
+}
+
+// generateETag creates an ETag based on the file content hash
+func (fs *FileService) generateETag(content []byte) string {
+	hash := md5.Sum(content)
+	return fmt.Sprintf(`"%x"`, hash)
+}
+
+// getContentType determines the MIME type based on file extension
+func (fs *FileService) getContentType(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	// Handle common image types explicitly
+	switch ext {
+	case ".webp":
+		return "image/webp"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".svg":
+		return "image/svg+xml"
+	default:
+		// Use mime package for other types
+		contentType := mime.TypeByExtension(ext)
+		if contentType == "" {
+			return "application/octet-stream"
+		}
+		return contentType
+	}
 }
