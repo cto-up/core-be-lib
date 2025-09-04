@@ -110,14 +110,20 @@ func createGCSBucketIfNotExists(ctx context.Context, bucketName string) error {
 	var err error
 
 	// Check for GCS credentials content first (for CI/CD)
-	credsJSON := os.Getenv("GCS_CREDENTIALS_JSON")
-	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
-	if credsJSON != "" {
+	//
+	credsPath := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	projectID := ""
+	if credsPath != "" {
+		// read the credentials file
+		credsJSON, err := os.ReadFile(credsPath)
+		if err != nil {
+			return err
+		}
 		// unmarshal the credentials JSON to get the project ID
 		creds := struct {
 			ProjectID string `json:"project_id"`
 		}{}
-		err := json.Unmarshal([]byte(credsJSON), &creds)
+		err = json.Unmarshal([]byte(credsJSON), &creds)
 		if err != nil {
 			return err
 		}

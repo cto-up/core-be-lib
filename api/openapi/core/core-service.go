@@ -496,6 +496,30 @@ type ResetPasswordRequestJSONBody struct {
 	Email openapi_types.Email `json:"email"`
 }
 
+// GetTenantBackgroundParams defines parameters for GetTenantBackground.
+type GetTenantBackgroundParams struct {
+	// IfNoneMatch ETag value for cache validation
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
+// GetTenantBackgroundMobileParams defines parameters for GetTenantBackgroundMobile.
+type GetTenantBackgroundMobileParams struct {
+	// IfNoneMatch ETag value for cache validation
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
+// GetTenantLogoParams defines parameters for GetTenantLogo.
+type GetTenantLogoParams struct {
+	// IfNoneMatch ETag value for cache validation
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
+// GetProfilePictureParams defines parameters for GetProfilePicture.
+type GetProfilePictureParams struct {
+	// IfNoneMatch ETag value for cache validation
+	IfNoneMatch *string `json:"If-None-Match,omitempty"`
+}
+
 // VerifyEmailJSONBody defines parameters for VerifyEmail.
 type VerifyEmailJSONBody struct {
 	// Token Email verification token received via email
@@ -900,16 +924,16 @@ type ServerInterface interface {
 	GetPublicTenant(c *gin.Context)
 
 	// (GET /public-api/v1/tenant/pictures/background)
-	GetTenantBackground(c *gin.Context)
+	GetTenantBackground(c *gin.Context, params GetTenantBackgroundParams)
 
 	// (GET /public-api/v1/tenant/pictures/background-mobile)
-	GetTenantBackgroundMobile(c *gin.Context)
+	GetTenantBackgroundMobile(c *gin.Context, params GetTenantBackgroundMobileParams)
 
 	// (GET /public-api/v1/tenant/pictures/logo)
-	GetTenantLogo(c *gin.Context)
+	GetTenantLogo(c *gin.Context, params GetTenantLogoParams)
 
 	// (GET /public-api/v1/users/{userid}/profile/picture)
-	GetProfilePicture(c *gin.Context, userid string)
+	GetProfilePicture(c *gin.Context, userid string, params GetProfilePictureParams)
 
 	// (POST /public-api/v1/verify-email)
 	VerifyEmail(c *gin.Context)
@@ -2574,6 +2598,32 @@ func (siw *ServerInterfaceWrapper) GetPublicTenant(c *gin.Context) {
 // GetTenantBackground operation middleware
 func (siw *ServerInterfaceWrapper) GetTenantBackground(c *gin.Context) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetTenantBackgroundParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-None-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-None-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -2581,12 +2631,38 @@ func (siw *ServerInterfaceWrapper) GetTenantBackground(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetTenantBackground(c)
+	siw.Handler.GetTenantBackground(c, params)
 }
 
 // GetTenantBackgroundMobile operation middleware
 func (siw *ServerInterfaceWrapper) GetTenantBackgroundMobile(c *gin.Context) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetTenantBackgroundMobileParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-None-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-None-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -2594,12 +2670,38 @@ func (siw *ServerInterfaceWrapper) GetTenantBackgroundMobile(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetTenantBackgroundMobile(c)
+	siw.Handler.GetTenantBackgroundMobile(c, params)
 }
 
 // GetTenantLogo operation middleware
 func (siw *ServerInterfaceWrapper) GetTenantLogo(c *gin.Context) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetTenantLogoParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-None-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-None-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -2607,7 +2709,7 @@ func (siw *ServerInterfaceWrapper) GetTenantLogo(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetTenantLogo(c)
+	siw.Handler.GetTenantLogo(c, params)
 }
 
 // GetProfilePicture operation middleware
@@ -2624,6 +2726,30 @@ func (siw *ServerInterfaceWrapper) GetProfilePicture(c *gin.Context) {
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetProfilePictureParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-None-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-None-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -2631,7 +2757,7 @@ func (siw *ServerInterfaceWrapper) GetProfilePicture(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetProfilePicture(c, userid)
+	siw.Handler.GetProfilePicture(c, userid, params)
 }
 
 // VerifyEmail operation middleware

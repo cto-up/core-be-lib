@@ -207,7 +207,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 	})
 }
 
-func (s *UserHandler) GetProfilePicture(c *gin.Context, userId string) {
+func (s *UserHandler) GetProfilePicture(c *gin.Context, userId string, params core.GetProfilePictureParams) {
 	tenantId, _ := c.Get(access.AUTH_TENANT_ID_KEY)
 	filePath := getProfilePictureFilePath(tenantId.(string), userId)
 
