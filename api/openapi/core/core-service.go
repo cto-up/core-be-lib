@@ -241,7 +241,7 @@ type UpdateMeProfileJSONBody struct {
 
 // UploadProfilePictureMultipartBody defines parameters for UploadProfilePicture.
 type UploadProfilePictureMultipartBody struct {
-	FileName *openapi_types.File `json:"fileName,omitempty"`
+	File *openapi_types.File `json:"file,omitempty"`
 }
 
 // ListPromptsParams defines parameters for ListPrompts.

@@ -9,7 +9,7 @@ post:
         schema:
           type: object
           properties:
-            fileName:
+            file:
               type: string
               format: binary
   responses:
