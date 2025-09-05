@@ -187,10 +187,13 @@ func (uh *UserService) DeleteUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	}
 
 	err = baseAuthClient.DeleteUser(c, userId)
-	if auth.IsUserNotFound(err) {
-		log.Error().Err(err).Msgf("User does not exist: %v", userId)
-	} else {
-		return err
+
+	if err != nil {
+		if auth.IsUserNotFound(err) {
+			log.Error().Err(err).Msgf("User does not exist: %v", userId)
+		} else {
+			return err
+		}
 	}
 
 	err = tx.Commit(c)
