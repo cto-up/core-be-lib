@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"ctoup.com/coreapp/api/helpers"
+	"ctoup.com/coreapp/api/openapi/core"
 	access "ctoup.com/coreapp/pkg/shared/service"
+
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
@@ -90,15 +92,15 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 }
 
 // Public functions to get tenant pictures
-func (s *TenantHandler) GetTenantLogo(c *gin.Context) {
+func (s *TenantHandler) GetTenantLogo(c *gin.Context, params core.GetTenantLogoParams) {
 	s.getTenantPicture(c, "logo")
 }
 
-func (s *TenantHandler) GetTenantBackground(c *gin.Context) {
+func (s *TenantHandler) GetTenantBackground(c *gin.Context, params core.GetTenantBackgroundParams) {
 	s.getTenantPicture(c, "bg")
 }
 
-func (s *TenantHandler) GetTenantBackgroundMobile(c *gin.Context) {
+func (s *TenantHandler) GetTenantBackgroundMobile(c *gin.Context, params core.GetTenantBackgroundMobileParams) {
 	s.getTenantPicture(c, "bg-mobile")
 }
 

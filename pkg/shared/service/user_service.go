@@ -11,6 +11,7 @@ import (
 	"firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/rs/zerolog/log"
 
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 )
@@ -158,6 +159,16 @@ func (uh *UserService) UpdateUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	return err
 }
 
+/**
+ * DeleteUser deletes a user from the database and from firebase
+ * If the user does not exist in firebase,
+ * it will log an error but will still delete the user from the database.
+ * @param c
+ * @param baseAuthClient
+ * @param tenantId
+ * @param userId
+ * @return error
+ */
 func (uh *UserService) DeleteUser(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userId string) error {
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
@@ -176,7 +187,9 @@ func (uh *UserService) DeleteUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	}
 
 	err = baseAuthClient.DeleteUser(c, userId)
-	if err != nil {
+	if auth.IsUserNotFound(err) {
+		log.Error().Err(err).Msgf("User does not exist: %v", userId)
+	} else {
 		return err
 	}
 

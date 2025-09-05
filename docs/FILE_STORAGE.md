@@ -41,7 +41,7 @@ FILE_FOLDER_URL=/path/to/folder
 ```
 FILE_STORAGE_PROVIDER=gcs
 GCS_BUCKET_NAME=your-bucket-name
-GCS_CREDENTIALS_JSON=your-credentials-json
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 ```
 
 # Cloud Provider Credentials Tutorial
