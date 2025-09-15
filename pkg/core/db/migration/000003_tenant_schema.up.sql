@@ -1,6 +1,6 @@
 
--- public.core_tenants definition
-CREATE TABLE public.core_tenants (
+-- core_tenants definition
+CREATE TABLE core_tenants (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
         tenant_id VARCHAR(64) NOT NULL UNIQUE,
         name VARCHAR(128) NOT NULL UNIQUE,
@@ -12,8 +12,8 @@ CREATE TABLE public.core_tenants (
     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     CONSTRAINT tenants_pk PRIMARY KEY (id)
 );
-CREATE INDEX idx_tenants_name ON public.core_tenants ("name");
-CREATE INDEX idx_tenants_subdomain ON public.core_tenants ("subdomain");
+CREATE INDEX idx_tenants_name ON core_tenants ("name");
+CREATE INDEX idx_tenants_subdomain ON core_tenants ("subdomain");
 
 CREATE TRIGGER update_tenants_modtime
 BEFORE UPDATE ON core_tenants

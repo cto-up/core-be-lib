@@ -1,6 +1,6 @@
 
--- public.core_prompts definition
-CREATE TABLE public.core_prompts (
+-- core_prompts definition
+CREATE TABLE core_prompts (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
     content TEXT NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE public.core_prompts (
     CONSTRAINT core_prompts_pk PRIMARY KEY (id),
     CONSTRAINT core_unique_prompt_name_per_tenant UNIQUE (tenant_id, name)
 );
-CREATE INDEX idx_core_prompts_tenant_id ON public.core_prompts ("tenant_id");
+CREATE INDEX idx_core_prompts_tenant_id ON core_prompts ("tenant_id");
 
 CREATE TRIGGER update_core_prompts_modtime
 BEFORE UPDATE ON core_prompts

@@ -1,5 +1,5 @@
 -- Client Applications schema
-CREATE TABLE public.core_client_applications (
+CREATE TABLE core_client_applications (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
     description TEXT,
@@ -13,8 +13,8 @@ CREATE TABLE public.core_client_applications (
 );
 
 -- Create indexes for better performance
-CREATE INDEX idx_client_applications_tenant_id ON public.core_client_applications (tenant_id);
-CREATE INDEX idx_client_applications_active ON public.core_client_applications (active);
+CREATE INDEX idx_client_applications_tenant_id ON core_client_applications (tenant_id);
+CREATE INDEX idx_client_applications_active ON core_client_applications (active);
 
 -- Add trigger for updating the modification timestamp
 CREATE TRIGGER update_client_applications_modtime
@@ -23,7 +23,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_modified_column();
 
 -- API Tokens schema with encryption and security best practices
-CREATE TABLE public.core_api_tokens (
+CREATE TABLE core_api_tokens (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     client_application_id uuid NOT NULL REFERENCES core_client_applications(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
@@ -48,10 +48,10 @@ CREATE TABLE public.core_api_tokens (
 );
 
 -- Create indexes for better performance
-CREATE INDEX idx_api_tokens_client_application_id ON public.core_api_tokens (client_application_id);
-CREATE INDEX idx_api_tokens_token_prefix ON public.core_api_tokens (token_prefix);
-CREATE INDEX idx_api_tokens_revoked ON public.core_api_tokens (revoked);
-CREATE INDEX idx_api_tokens_expires_at ON public.core_api_tokens (expires_at);
+CREATE INDEX idx_api_tokens_client_application_id ON core_api_tokens (client_application_id);
+CREATE INDEX idx_api_tokens_token_prefix ON core_api_tokens (token_prefix);
+CREATE INDEX idx_api_tokens_revoked ON core_api_tokens (revoked);
+CREATE INDEX idx_api_tokens_expires_at ON core_api_tokens (expires_at);
 
 -- Add trigger for updating the modification timestamp
 CREATE TRIGGER update_api_tokens_modtime
@@ -60,7 +60,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_modified_column();
 
 -- API Token audit log for security tracking
-CREATE TABLE public.core_api_token_audit_logs (
+CREATE TABLE core_api_token_audit_logs (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     token_id uuid NOT NULL REFERENCES core_api_tokens(id) ON DELETE CASCADE,
     action VARCHAR(50) NOT NULL, -- CREATE, USE, REVOKE, etc.
@@ -72,5 +72,5 @@ CREATE TABLE public.core_api_token_audit_logs (
 );
 
 -- Create index for faster queries
-CREATE INDEX idx_api_token_audit_logs_token_id ON public.core_api_token_audit_logs (token_id);
-CREATE INDEX idx_api_token_audit_logs_timestamp ON public.core_api_token_audit_logs (timestamp);
+CREATE INDEX idx_api_token_audit_logs_token_id ON core_api_token_audit_logs (token_id);
+CREATE INDEX idx_api_token_audit_logs_timestamp ON core_api_token_audit_logs (timestamp);

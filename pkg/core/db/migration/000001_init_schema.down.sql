@@ -1,5 +1,5 @@
--- public.core_users definition
+-- core_users definition
 
 -- Drop table
 
-DROP TABLE if exists public.core_users;
+DROP TABLE if exists core_users;

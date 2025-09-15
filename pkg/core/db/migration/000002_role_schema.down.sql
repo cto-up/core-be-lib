@@ -1,5 +1,5 @@
--- public.core_roles definition
+-- core_roles definition
 
 -- Drop table
 
-DROP TABLE if exists public.core_roles;
+DROP TABLE if exists core_roles;

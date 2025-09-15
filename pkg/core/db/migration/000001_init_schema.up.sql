@@ -7,9 +7,9 @@ END;
 $$ language 'plpgsql';
 
 
--- public.core_users definition
+-- core_users definition
 
-CREATE TABLE public.core_users (
+CREATE TABLE core_users (
 	-- user id provided by the identity provider
 	id varchar NOT NULL UNIQUE,
 	"profile" jsonb,

@@ -11,4 +11,4 @@ DROP INDEX IF EXISTS idx_email_verification_tokens_token;
 DROP INDEX IF EXISTS idx_email_verification_tokens_user_id;
 
 -- Drop email verification tokens table
-DROP TABLE IF EXISTS public.core_email_verification_tokens;
+DROP TABLE IF EXISTS core_email_verification_tokens;

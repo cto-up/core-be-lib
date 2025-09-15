@@ -1,5 +1,5 @@
 -- Create email verification tokens table
-CREATE TABLE public.core_email_verification_tokens (
+CREATE TABLE core_email_verification_tokens (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     user_id varchar NOT NULL,
     tenant_id varchar(64) NOT NULL,
@@ -14,10 +14,10 @@ CREATE TABLE public.core_email_verification_tokens (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_email_verification_tokens_user_id ON public.core_email_verification_tokens(user_id);
-CREATE INDEX idx_email_verification_tokens_token ON public.core_email_verification_tokens(token);
-CREATE INDEX idx_email_verification_tokens_expires_at ON public.core_email_verification_tokens(expires_at);
-CREATE INDEX idx_email_verification_tokens_tenant_id ON public.core_email_verification_tokens(tenant_id);
+CREATE INDEX idx_email_verification_tokens_user_id ON core_email_verification_tokens(user_id);
+CREATE INDEX idx_email_verification_tokens_token ON core_email_verification_tokens(token);
+CREATE INDEX idx_email_verification_tokens_expires_at ON core_email_verification_tokens(expires_at);
+CREATE INDEX idx_email_verification_tokens_tenant_id ON core_email_verification_tokens(tenant_id);
 
 -- Create trigger for updated_at
 CREATE TRIGGER update_email_verification_tokens_modtime

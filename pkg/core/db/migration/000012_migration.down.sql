@@ -1,3 +1,3 @@
 -- Drop table
 
--- DROP TABLE public.core_migrations;
+-- DROP TABLE core_migrations;

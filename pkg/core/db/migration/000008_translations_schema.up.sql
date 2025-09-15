@@ -1,5 +1,5 @@
 -- Create a translations table for all entities
-CREATE TABLE public.core_translations (
+CREATE TABLE core_translations (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     entity_type varchar NOT NULL, -- 'business_sector', 'commercial_level', etc.
     entity_id uuid NOT NULL,
@@ -13,8 +13,8 @@ CREATE TABLE public.core_translations (
 );
 
 -- Add indexes for better performance
-CREATE INDEX idx_core_translations_entity ON public.core_translations (entity_type, entity_id);
-CREATE INDEX idx_core_translations_language ON public.core_translations (language);
-CREATE INDEX idx_core_translations_field ON public.core_translations (field);
-CREATE INDEX idx_core_translations_tenant ON public.core_translations (tenant_id);
+CREATE INDEX idx_core_translations_entity ON core_translations (entity_type, entity_id);
+CREATE INDEX idx_core_translations_language ON core_translations (language);
+CREATE INDEX idx_core_translations_field ON core_translations (field);
+CREATE INDEX idx_core_translations_tenant ON core_translations (tenant_id);
 
