@@ -153,16 +153,8 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 		return
 	}
 
-	// Ensure temp directory exists
-	tempDir := os.TempDir()
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		log.Error().Err(err).Msg("Failed to create temp directory")
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
 	// Save the file to a temporary location
-	tmpFile, err := os.CreateTemp(tempDir, file.Filename)
+	tmpFile, err := os.CreateTemp("", file.Filename)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create temporary file")
 		c.AbortWithStatus(http.StatusInternalServerError)
