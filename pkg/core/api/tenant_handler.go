@@ -75,18 +75,21 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 func (exh *TenantHandler) AddTenant(c *gin.Context) {
 	var req api.AddTenantJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error().Err(err).Msg("Failed to bind request body")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	firebaseTenant, err := service.CreateTenant(c, exh.authClientPool.GetClient(), req)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to create tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	userID, exist := c.Get(service.AUTH_USER_ID)
 	if !exist {
 		// should not happen as the middleware ensures that the user is authenticated
+		log.Error().Msg("User not authenticated")
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
 		return
 	}
@@ -102,6 +105,7 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 		})
 	if err != nil {
 		service.DeleteTenant(c, exh.authClientPool.GetClient(), firebaseTenant.ID)
+		log.Error().Err(err).Msg("Failed to create tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

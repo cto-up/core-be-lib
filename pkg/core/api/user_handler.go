@@ -148,6 +148,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 	// Get the file from the request
 	file, err := c.FormFile("file")
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get file from request")
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
@@ -155,6 +156,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 	// Save the file to a temporary location
 	tmpFile, err := os.CreateTemp("", file.Filename)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to create temporary file")
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -182,6 +184,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 
 	fileContent, err := file.Open()
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to open file")
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -190,11 +193,10 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	fmt.Printf("size:%d", len(byteContainer))
 
 	// The file is received, so let's save it
 	if err := s.fileService.SaveFile(c, byteContainer, newFilePath); err != nil {
-		log.Printf("Failed to save file: %s", err)
+		log.Err(err).Msg("Failed to save file")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"message": "Unable to save the file",
 		})
