@@ -15,15 +15,14 @@ func TestPromptExecutionService(t *testing.T) {
 	service := NewPromptExecutionService(store)
 
 	// Create a test prompt
-	prompt, err := store.CreatePrompt(context.Background(), repository.CreatePromptParams{
+	prompt := repository.CorePrompt{
 		UserID:     "test-user",
 		TenantID:   "test-tenant",
 		Name:       "greeting",
 		Content:    "Hello {{.name}}, welcome to {{.company}}!",
 		Parameters: []string{"name", "company"},
 		Tags:       []string{"greeting", "welcome"},
-	})
-	require.NoError(t, err)
+	}
 
 	tests := []struct {
 		name           string
