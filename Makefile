@@ -31,6 +31,9 @@ sqlc:
 	cd pkg/core/db; echo "I'm in backend core"; \
 	sqlc generate
 
+build-prompt:
+	go build -o prompt cmd/prompt/main.go
+
 BASE_API_BE_DIR := api/openapi
 BASE_API_FE_DIR := ../core-fe-lib/lib/openapi
 

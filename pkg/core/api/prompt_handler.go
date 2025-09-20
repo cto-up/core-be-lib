@@ -471,9 +471,14 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
-
+		result, err := h.executionService.ConvertAnswerToString(generatedAnswer)
+		if err != nil {
+			log.Printf("Error converting answer to string: %v", err)
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
 		c.JSON(http.StatusOK, api.PromptResponse{
-			Result: generatedAnswer,
+			Result: result, // result is either a string or a json string
 		})
 		return
 	}
