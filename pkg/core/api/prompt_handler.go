@@ -451,7 +451,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 
 	// Handle non-streaming case
 	if !streaming {
-		generatedAnswer, err := h.executionService.GenerateAnswer(c,
+		generatedAnswer, err := h.executionService.GenerateTextAnswer(c,
 			chainConfig,
 			parametersValues,
 			userID.(string),
@@ -489,7 +489,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	go func() {
 		defer close(clientChan)
 
-		_, err := h.executionService.GenerateAnswer(c,
+		_, err := h.executionService.GenerateTextAnswer(c,
 			chainConfig,
 			parametersValues,
 			userID.(string),

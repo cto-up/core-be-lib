@@ -147,7 +147,7 @@ func GenerateSimpleAnswer(
 	}
 
 	// 3. Call the generic GenerateAnswer service method
-	return s.GenerateAnswer(ctx,
+	return s.GenerateTextAnswer(ctx,
 		chainConfig,
 		parametersValues,
 		"a-user-id", // Sample user ID

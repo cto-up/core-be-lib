@@ -31,7 +31,7 @@ const (
 const ERR_MODEL_DOES_NOT_SUPPORT_JSON_OBJECT = "model does not support json_object"
 
 // GenerateAnswer handles both regular and structured responses based on chain type
-func (s *PromptExecutionService) GenerateAnswer(
+func (s *PromptExecutionService) generateAnswer(
 	ctx context.Context,
 	chainConfig *gochains.BaseChain,
 	params map[string]any,
@@ -170,7 +170,7 @@ func (s *PromptExecutionService) GenerateTextAnswer(
 	clientChan chan<- event.ProgressEvent,
 ) (string, error) {
 
-	result, err := s.GenerateAnswer(ctx, chainConfig, params, userID, clientChan)
+	result, err := s.generateAnswer(ctx, chainConfig, params, userID, clientChan)
 	if err != nil {
 		return "", err
 	}
@@ -198,7 +198,7 @@ func (s *PromptExecutionService) GenerateStructuredAnswer(
 
 	chainConfig.SetChainType(gochains.ChainTypeStructured)
 
-	result, err := s.GenerateAnswer(ctx, chainConfig, params, userID, clientChan)
+	result, err := s.generateAnswer(ctx, chainConfig, params, userID, clientChan)
 	if err != nil {
 		return nil, err
 	}

@@ -24,12 +24,6 @@ post:
       description: LLM to use for execution
       schema:
         type: string
-    - name: output
-      in: query
-      description: Output format of the prompt execution
-      schema:
-        type: string
-        enum: [text, markdown, json]
     - name: maxTokens
       in: query
       description: Maximum number of tokens to generate

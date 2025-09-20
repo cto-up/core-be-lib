@@ -52,13 +52,6 @@ const (
 	OPENAI    ExecutePromptParamsProvider = "OPENAI"
 )
 
-// Defines values for ExecutePromptParamsOutput.
-const (
-	ExecutePromptParamsOutputJson     ExecutePromptParamsOutput = "json"
-	ExecutePromptParamsOutputMarkdown ExecutePromptParamsOutput = "markdown"
-	ExecutePromptParamsOutputText     ExecutePromptParamsOutput = "text"
-)
-
 // Defines values for ExecutePromptJSONBodyFormat.
 const (
 	ExecutePromptJSONBodyFormatJson     ExecutePromptJSONBodyFormat = "json"
@@ -68,9 +61,9 @@ const (
 
 // Defines values for UpdatePromptJSONBodyFormat.
 const (
-	UpdatePromptJSONBodyFormatJson     UpdatePromptJSONBodyFormat = "json"
-	UpdatePromptJSONBodyFormatMarkdown UpdatePromptJSONBodyFormat = "markdown"
-	UpdatePromptJSONBodyFormatText     UpdatePromptJSONBodyFormat = "text"
+	Json     UpdatePromptJSONBodyFormat = "json"
+	Markdown UpdatePromptJSONBodyFormat = "markdown"
+	Text     UpdatePromptJSONBodyFormat = "text"
 )
 
 // Defines values for ListTranslationsParamsOrder.
@@ -321,9 +314,6 @@ type ExecutePromptParams struct {
 	// Llm LLM to use for execution
 	Llm *string `form:"llm,omitempty" json:"llm,omitempty"`
 
-	// Output Output format of the prompt execution
-	Output *ExecutePromptParamsOutput `form:"output,omitempty" json:"output,omitempty"`
-
 	// MaxTokens Maximum number of tokens to generate
 	MaxTokens *int32 `form:"maxTokens,omitempty" json:"maxTokens,omitempty"`
 
@@ -333,9 +323,6 @@ type ExecutePromptParams struct {
 
 // ExecutePromptParamsProvider defines parameters for ExecutePrompt.
 type ExecutePromptParamsProvider string
-
-// ExecutePromptParamsOutput defines parameters for ExecutePrompt.
-type ExecutePromptParamsOutput string
 
 // ExecutePromptJSONBodyFormat defines parameters for ExecutePrompt.
 type ExecutePromptJSONBodyFormat string
@@ -1801,14 +1788,6 @@ func (siw *ServerInterfaceWrapper) ExecutePrompt(c *gin.Context) {
 	err = runtime.BindQueryParameter("form", true, false, "llm", c.Request.URL.Query(), &params.Llm)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter llm: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "output" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "output", c.Request.URL.Query(), &params.Output)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter output: %w", err), http.StatusBadRequest)
 		return
 	}
 

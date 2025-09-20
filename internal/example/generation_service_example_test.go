@@ -121,22 +121,19 @@ Please provide a comprehensive skills analysis including technical skills, soft 
 			// Execute
 			result, err := promptService.GenerateStructuredAnswer(context.Background(), chain, params, "test-user-structured", nil)
 			if err != nil {
-				if err.Error() == service.ERR_MODEL_DOES_NOT_SUPPORT_JSON_OBJECT {
-					chain, err = gochains.NewChainBuilder().
-						WithTemplate(template).
-						WithParams([]string{"position", "job_description", "company_values"}).
-						WithCustomJSONFormat().
-						WithModel(tc.provider, tc.model).
-						Build()
-					require.NoError(t, err)
-					result, err := promptService.GenerateTextAnswer(context.Background(), chain, params, "test-user-structured", nil)
-					structuredResult, err := service.ExtractAndValidateJSON(result, chain)
+				chain, err = gochains.NewChainBuilder().
+					WithTemplate(template).
+					WithParams([]string{"position", "job_description", "company_values"}).
+					WithCustomJSONFormat().
+					WithModel(tc.provider, tc.model).
+					Build()
+				require.NoError(t, err)
+				result, err := promptService.GenerateTextAnswer(context.Background(), chain, params, "test-user-structured", nil)
+				structuredResult, err := service.ExtractAndValidateJSON(result, chain)
 
-					require.NoError(t, err)
-					t.Logf("Non-structured response for %s: %s, %v", tc.name, result, structuredResult)
-					return
-				}
-				t.Logf("Error for %s: %v", tc.name, err)
+				require.NoError(t, err)
+				t.Logf("Non-structured response for %s: %s, %v", tc.name, result, structuredResult)
+				return
 			}
 
 			// Assert
