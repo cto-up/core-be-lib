@@ -61,10 +61,6 @@ func (bc *BaseChain) GetModel() llms.Model {
 	return bc.model
 }
 
-func (bc *BaseChain) SetModel(model llms.Model) {
-	bc.model = model
-}
-
 func (bc *BaseChain) GetChainType() ChainType {
 	return bc.chainType
 }
