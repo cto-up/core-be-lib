@@ -61,8 +61,15 @@ func (bc *BaseChain) GetModel() llms.Model {
 	return bc.model
 }
 
+func (bc *BaseChain) SetModel(model llms.Model) {
+	bc.model = model
+}
+
 func (bc *BaseChain) GetChainType() ChainType {
 	return bc.chainType
+}
+func (bc *BaseChain) SetChainType(chainType ChainType) {
+	bc.chainType = chainType
 }
 
 func (bc *BaseChain) GetResponseSchemas() []outputparser.ResponseSchema {
@@ -74,8 +81,8 @@ func (bc *BaseChain) IsStructured() bool {
 }
 
 // NewBaseChain creates a standard BaseChain.
-func NewBaseChain(templateText string, paramDefinition []string, formatInstructions string, maxTokens int, temperature float64, provider llmmodels.Provider, model string, isJson bool) (*BaseChain, error) {
-	llmmodel, err := llmmodels.NewLLM(provider, model, isJson)
+func NewBaseChain(templateText string, paramDefinition []string, formatInstructions string, maxTokens int, temperature float64, provider llmmodels.Provider, model string) (*BaseChain, error) {
+	llmmodel, err := llmmodels.NewLLM(provider, model, false)
 	if err != nil {
 		return nil, err
 	}
@@ -271,10 +278,25 @@ func (cb *ChainBuilder) WithStructuredOutput(schemas []outputparser.ResponseSche
 	return cb
 }
 
-func (cb *ChainBuilder) WithCustomJSONFormat(formatInstructions string) *ChainBuilder {
-	cb.chainType = ChainTypeStructured
-	cb.customFormatInstr = formatInstructions
-	cb.isJson = true
+const _structuredFormatInstructionTemplate = "The output should be a json object formatted in the following schema: \n```json\n{\n%s}\n```" // nolint
+const _structuredLineTemplate = "\"%s\": %s // %s\n"
+
+func (cb *ChainBuilder) WithCustomJSONFormat() *ChainBuilder {
+	cb.chainType = ChainTypeDefault
+
+	jsonLines := ""
+	for _, rs := range cb.responseSchemas {
+		jsonLines += "\t" + fmt.Sprintf(
+			_structuredLineTemplate,
+			rs.Name,
+			"string", /* type of the filed*/
+			rs.Description,
+		)
+	}
+	cb.customFormatInstr = fmt.Sprintf(_structuredFormatInstructionTemplate, jsonLines)
+	cb.templateText = enhanceTemplateForStructuredOutput(cb.templateText, jsonLines)
+
+	cb.isJson = false
 	return cb
 }
 
@@ -300,7 +322,6 @@ func (cb *ChainBuilder) Build() (*BaseChain, error) {
 			cb.temperature,
 			cb.provider,
 			cb.model,
-			cb.isJson,
 		)
 	}
 }

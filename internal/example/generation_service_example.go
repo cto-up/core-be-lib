@@ -51,8 +51,7 @@ Please provide a comprehensive skills analysis including technical skills, soft 
 		1000,
 		0.2,
 		llmmodels.ProviderGoogleAI,
-		"gemini-2.5-flash",
-		false)
+		"gemini-2.5-flash")
 
 	return chain, err
 
@@ -124,7 +123,6 @@ func GenerateSimpleAnswer(
 	temperature := 0.7
 	provider := llmmodels.ProviderOpenaAI
 	llm := "gpt-3.5-turbo"
-	isJson := false // This is not a structured/JSON response
 
 	request := SimpleAnswerRequest{
 		Topic: "Quantum Computing",
@@ -143,7 +141,6 @@ func GenerateSimpleAnswer(
 		temperature,
 		provider,
 		llm,
-		isJson,
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create simple chain: %w", err)

@@ -422,13 +422,6 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		formatInstructions = prompt.FormatInstructions.String
 	}
 
-	format := "markdown"
-	if req.Format != nil {
-		format = string(*req.Format)
-	} else {
-		format = prompt.Format
-	}
-
 	// Create chain config
 	chainConfig, err := gochains.NewBaseChain(
 		content,
@@ -438,7 +431,6 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		temperature,
 		provider,
 		llm,
-		format == "json",
 	)
 	if err != nil {
 		log.Printf("Error NewBaseChain: %v", err)

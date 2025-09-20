@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -26,6 +27,8 @@ const (
 const (
 	_llmChainDefaultOutputKey = "text"
 )
+
+const ERR_MODEL_DOES_NOT_SUPPORT_JSON_OBJECT = "model does not support json_object"
 
 // GenerateAnswer handles both regular and structured responses based on chain type
 func (s *PromptExecutionService) GenerateAnswer(
@@ -81,13 +84,13 @@ func (s *PromptExecutionService) GenerateAnswer(
 			// Check if errMsg includes 'json_object' is not supported with this model
 			errorReasons := []string{
 				"'json_object' is not supported with this model",
-				"'json_schema' is not present",
+				"'json_schema'",
 				"format not supported",
-				"cannot process",
 			}
 
 			if util.ContainsAny(errMsg, errorReasons) {
-				fmt.Println("Does not support json_object.")
+				// try to call again without json_object
+				return nil, errors.New(ERR_MODEL_DOES_NOT_SUPPORT_JSON_OBJECT)
 			}
 		}
 		return nil, fmt.Errorf("chain execution failed: %w", err)
@@ -107,19 +110,9 @@ func (s *PromptExecutionService) GenerateAnswer(
 			}
 			return nil, fmt.Errorf("expected string for structured output, got %T", res["text"])
 		}
-		cleanedString, err := extractJSONFromResponse(responseString)
-		if err != nil {
-			// if we have an error, return the raw string
-			return responseString, err
-		}
-
-		var structuredResult map[string]any
-		if err := json.Unmarshal([]byte(cleanedString), &structuredResult); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal structured output from string: %w. String was: %s, cleaned string was: %s", err, responseString, cleanedString)
-		}
-
-		if err := chainConfig.ValidateStructuredResponse(structuredResult); err != nil {
-			return nil, fmt.Errorf("structured response validation failed: %w", err)
+		structuredResult, err1 := ExtractAndValidateJSON(responseString, chainConfig)
+		if err1 != nil {
+			return responseString, err1
 		}
 		return structuredResult, nil
 
@@ -127,6 +120,24 @@ func (s *PromptExecutionService) GenerateAnswer(
 		// Default behavior - return as string
 		return res["text"].(string), nil
 	}
+}
+
+func ExtractAndValidateJSON(responseString string, chainConfig *gochains.BaseChain) (map[string]any, error) {
+	cleanedString, err := extractJSONFromResponse(responseString)
+	if err != nil {
+		// if we have an error, return the raw string
+		return nil, err
+	}
+
+	var structuredResult map[string]any
+	if err := json.Unmarshal([]byte(cleanedString), &structuredResult); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal structured output from string: %w. String was: %s, cleaned string was: %s", err, responseString, cleanedString)
+	}
+
+	if err := chainConfig.ValidateStructuredResponse(structuredResult); err != nil {
+		return nil, fmt.Errorf("structured response validation failed: %w", err)
+	}
+	return structuredResult, nil
 }
 
 // extractJSONFromResponse handles markdown code fences or raw JSON and other pre-processing
@@ -185,9 +196,7 @@ func (s *PromptExecutionService) GenerateStructuredAnswer(
 	clientChan chan<- event.ProgressEvent,
 ) (map[string]any, error) {
 
-	if !chainConfig.IsStructured() {
-		return nil, fmt.Errorf("chain is not configured for structured output")
-	}
+	chainConfig.SetChainType(gochains.ChainTypeStructured)
 
 	result, err := s.GenerateAnswer(ctx, chainConfig, params, userID, clientChan)
 	if err != nil {

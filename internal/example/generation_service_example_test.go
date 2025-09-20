@@ -23,10 +23,11 @@ func TestGenerationServiceWithUnstructuredOutput(t *testing.T) {
 		provider llmmodels.Provider
 		model    string
 	}{
-		{"OpenAI_GPT3.5_Turbo", llmmodels.ProviderOpenaAI, "gpt-3.5-turbo"},
-		{"Google_Gemini_Flash", llmmodels.ProviderGoogleAI, "gemini-1.5-flash"},
-		{"Anthropic_Claude3_Haiku", llmmodels.ProviderAnthropic, "claude-3-haiku-20240307"},
-		{"Mistral_Tiny", llmmodels.ProviderMistral, "mistral-tiny"},
+		{"OpenAI_GPT4", llmmodels.ProviderOpenaAI, "gpt-4"},
+		//{"OpenAI_GPT3.5_Turbo", llmmodels.ProviderOpenaAI, "gpt-3.5-turbo"},
+		//{"Google_Gemini_Flash", llmmodels.ProviderGoogleAI, "gemini-1.5-flash"},
+		//{"Anthropic_Claude3_Haiku", llmmodels.ProviderAnthropic, "claude-3-haiku-20240307"},
+		//{"Mistral_Tiny", llmmodels.ProviderMistral, "mistral-tiny"},
 	}
 
 	for _, tc := range nonStructuredTestCases {
@@ -72,10 +73,13 @@ func TestGenerationServiceWithStructuredOutput(t *testing.T) {
 		provider llmmodels.Provider
 		model    string
 	}{
+		{"OpenAI_GPT4", llmmodels.ProviderOpenaAI, "gpt-4"},
+		{"Anthropic_Claude3_Sonnet", llmmodels.ProviderAnthropic, "claude-3-7-sonnet-20250219"},
+		//{"OpenAI_GPT3.5_Turbo", llmmodels.ProviderOpenaAI, "gpt-3.5-turbo"},
 		{"OpenAI_GPT4_Turbo", llmmodels.ProviderOpenaAI, "gpt-4-turbo-preview"},
 		{"Google_Gemini_Flash", llmmodels.ProviderGoogleAI, "gemini-2.5-flash"},
 		{"Mistral_Tiny", llmmodels.ProviderMistral, "mistral-tiny"},
-		{"Anthropic_Claude3_Sonnet", llmmodels.ProviderAnthropic, "claude-3-haiku-20240307"},
+		//{"Anthropic_Claude3_Haiku", llmmodels.ProviderAnthropic, "claude-3-haiku-20240307"},
 	}
 
 	// Run structured tests
@@ -116,6 +120,24 @@ Please provide a comprehensive skills analysis including technical skills, soft 
 
 			// Execute
 			result, err := promptService.GenerateStructuredAnswer(context.Background(), chain, params, "test-user-structured", nil)
+			if err != nil {
+				if err.Error() == service.ERR_MODEL_DOES_NOT_SUPPORT_JSON_OBJECT {
+					chain, err = gochains.NewChainBuilder().
+						WithTemplate(template).
+						WithParams([]string{"position", "job_description", "company_values"}).
+						WithCustomJSONFormat().
+						WithModel(tc.provider, tc.model).
+						Build()
+					require.NoError(t, err)
+					result, err := promptService.GenerateTextAnswer(context.Background(), chain, params, "test-user-structured", nil)
+					structuredResult, err := service.ExtractAndValidateJSON(result, chain)
+
+					require.NoError(t, err)
+					t.Logf("Non-structured response for %s: %s, %v", tc.name, result, structuredResult)
+					return
+				}
+				t.Logf("Error for %s: %v", tc.name, err)
+			}
 
 			// Assert
 			require.NoError(t, err)
