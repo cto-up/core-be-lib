@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"ctoup.com/coreapp/pkg/core/db/testutils"
 	"ctoup.com/coreapp/pkg/core/service"
 	gochains "ctoup.com/coreapp/pkg/core/service/gochains"
 	"ctoup.com/coreapp/pkg/shared/llmmodels"
@@ -15,8 +14,6 @@ import (
 
 func TestGenerationServiceWithUnstructuredOutput(t *testing.T) {
 	// Setup the service
-	store := testutils.NewTestStore(t)
-	promptService := service.NewPromptExecutionService(store)
 	// Define and run non-structured tests
 	nonStructuredTestCases := []struct {
 		name     string
@@ -53,7 +50,7 @@ Please provide a comprehensive skills analysis including technical skills, soft 
 				"company_values":  "Ownership, impact, and continuous learning.",
 			}
 
-			result, err := promptService.GenerateTextAnswer(context.Background(), chain, params, "test-user-non-structured", nil)
+			result, err := service.GenerateTextAnswer(context.Background(), chain, params, nil)
 
 			require.NoError(t, err)
 			require.NotEmpty(t, result, "The generated text should not be empty")
@@ -63,9 +60,6 @@ Please provide a comprehensive skills analysis including technical skills, soft 
 }
 
 func TestGenerationServiceWithStructuredOutput(t *testing.T) {
-	// Setup the service
-	store := testutils.NewTestStore(t)
-	promptService := service.NewPromptExecutionService(store)
 
 	// Define test cases for structured output
 	structuredTestCases := []struct {
@@ -119,7 +113,7 @@ Please provide a comprehensive skills analysis including technical skills, soft 
 			}
 
 			// Execute
-			result, err := promptService.GenerateStructuredAnswer(context.Background(), chain, params, "test-user-structured", nil)
+			result, err := service.GenerateStructuredAnswer(context.Background(), chain, params, nil)
 			if err != nil {
 				chain, err = gochains.NewChainBuilder().
 					WithTemplate(template).
@@ -128,7 +122,8 @@ Please provide a comprehensive skills analysis including technical skills, soft 
 					WithModel(tc.provider, tc.model).
 					Build()
 				require.NoError(t, err)
-				result, err := promptService.GenerateTextAnswer(context.Background(), chain, params, "test-user-structured", nil)
+				result, err := service.GenerateTextAnswer(context.Background(), chain, params, nil)
+				require.NoError(t, err)
 				structuredResult, err := service.ExtractAndValidateJSON(result, chain)
 
 				require.NoError(t, err)

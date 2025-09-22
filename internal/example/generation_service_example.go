@@ -111,7 +111,6 @@ func CreateSimpleChain(template string, params []string) (*gochains.BaseChain, e
 // GenerateSimpleAnswer demonstrates how to generate a simple, non-structured text answer.
 func GenerateSimpleAnswer(
 	ctx context.Context,
-	s *service.PromptExecutionService,
 	clientChan chan<- event.ProgressEvent,
 ) (interface{}, error) {
 
@@ -147,10 +146,9 @@ func GenerateSimpleAnswer(
 	}
 
 	// 3. Call the generic GenerateAnswer service method
-	return s.GenerateTextAnswer(ctx,
+	return service.GenerateTextAnswer(ctx,
 		chainConfig,
 		parametersValues,
-		"a-user-id", // Sample user ID
 		clientChan,
 	)
 }
@@ -158,7 +156,6 @@ func GenerateSimpleAnswer(
 // GenerateSkillsAnalysis generates skills analysis using structured output
 func GenerateSkillsAnalysis(
 	ctx context.Context,
-	s *service.PromptExecutionService,
 	request SkillGeneratorRequest,
 	userID string,
 	clientChan chan<- event.ProgressEvent,
@@ -175,7 +172,7 @@ func GenerateSkillsAnalysis(
 		"company_values":  request.CompanyValues,
 	}
 
-	return s.GenerateStructuredAnswer(ctx, chainConfig, params, userID, clientChan)
+	return service.GenerateStructuredAnswer(ctx, chainConfig, params, clientChan)
 }
 
 /*

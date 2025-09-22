@@ -11,8 +11,6 @@ import (
 	standardlog "log"
 
 	"ctoup.com/coreapp/internal/example"
-	"ctoup.com/coreapp/pkg/core/db"
-	"ctoup.com/coreapp/pkg/core/service"
 	"ctoup.com/coreapp/pkg/shared/repository"
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 	_ "github.com/golang-migrate/migrate/database/postgres"
@@ -94,16 +92,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
 	// Example usage
-	store := db.NewStore(connPool)
-	service := service.NewPromptExecutionService(store)
 
-	result, err := example.GenerateSimpleAnswer(ctx, service, nil)
+	result, err := example.GenerateSimpleAnswer(ctx, nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to generate simple answer")
 	}
 	log.Info().Msgf("Simple Answer: %v", result)
 
-	result, err = example.GenerateSkillsAnalysis(ctx, service, example.SkillGeneratorRequest{
+	result, err = example.GenerateSkillsAnalysis(ctx, example.SkillGeneratorRequest{
 		Position:       "Software Engineer",
 		JobDescription: "Develop software",
 		CompanyValues:  "Innovate",

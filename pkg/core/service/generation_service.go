@@ -31,11 +31,10 @@ const (
 const ERR_MODEL_DOES_NOT_SUPPORT_JSON_OBJECT = "model does not support json_object"
 
 // GenerateAnswer handles both regular and structured responses based on chain type
-func (s *PromptExecutionService) generateAnswer(
+func generateAnswer(
 	ctx context.Context,
 	chainConfig *gochains.BaseChain,
 	params map[string]any,
-	userID string,
 	clientChan chan<- event.ProgressEvent,
 ) (interface{}, error) {
 
@@ -162,15 +161,14 @@ func extractJSONFromResponse(jsonString string) (string, error) {
 }
 
 // GenerateTextAnswer specifically returns string responses (backwards compatible)
-func (s *PromptExecutionService) GenerateTextAnswer(
+func GenerateTextAnswer(
 	ctx context.Context,
 	chainConfig *gochains.BaseChain,
 	params map[string]any,
-	userID string,
 	clientChan chan<- event.ProgressEvent,
 ) (string, error) {
 
-	result, err := s.generateAnswer(ctx, chainConfig, params, userID, clientChan)
+	result, err := generateAnswer(ctx, chainConfig, params, clientChan)
 	if err != nil {
 		return "", err
 	}
@@ -188,17 +186,16 @@ func (s *PromptExecutionService) GenerateTextAnswer(
 }
 
 // GenerateStructuredAnswer specifically returns structured responses
-func (s *PromptExecutionService) GenerateStructuredAnswer(
+func GenerateStructuredAnswer(
 	ctx context.Context,
 	chainConfig *gochains.BaseChain,
 	params map[string]any,
-	userID string,
 	clientChan chan<- event.ProgressEvent,
 ) (map[string]any, error) {
 
 	chainConfig.SetChainType(gochains.ChainTypeStructured)
 
-	result, err := s.generateAnswer(ctx, chainConfig, params, userID, clientChan)
+	result, err := generateAnswer(ctx, chainConfig, params, clientChan)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +208,7 @@ func (s *PromptExecutionService) GenerateStructuredAnswer(
 }
 
 // ConvertAnswerToString converts any value to string, handling both string and JSON marshaling
-func (s *PromptExecutionService) ConvertAnswerToString(value any) (string, error) {
+func ConvertAnswerToString(value any) (string, error) {
 	// Check if the result is already a string
 	if resultStr, ok := value.(string); ok {
 		return resultStr, nil

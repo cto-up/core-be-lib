@@ -105,7 +105,7 @@ func NewStructuredChain(
 	templateText string,
 	paramDefinition []string,
 	responseSchemas []outputparser.ResponseSchema,
-	customFormatInstr string,
+	formatInstrLLMWithNoJSONSupport string,
 	maxTokens int,
 	temperature float64,
 	provider llmmodels.Provider,
@@ -124,13 +124,13 @@ func NewStructuredChain(
 		structuredParser := outputparser.NewStructured(responseSchemas)
 		outputParser = structuredParser
 		formatInstructions = structuredParser.GetFormatInstructions()
-	} else if customFormatInstr != "" {
+	} else if formatInstrLLMWithNoJSONSupport != "" {
 		// Use a custom JSON format with a dedicated parser.
 		outputParser = &BaseOutputParser{
-			formatInstructions: customFormatInstr,
+			formatInstructions: formatInstrLLMWithNoJSONSupport,
 			parserType:         "structured_parser",
 		}
-		formatInstructions = customFormatInstr
+		formatInstructions = formatInstrLLMWithNoJSONSupport
 	} else {
 		return nil, fmt.Errorf("structured chain requires either response schemas or custom format instructions")
 	}
@@ -215,16 +215,16 @@ func (bc *BaseChain) GetFormatInstructions() string {
 
 // ChainBuilder provides a fluent interface for building chains.
 type ChainBuilder struct {
-	templateText      string
-	paramDefinition   []string
-	maxTokens         int
-	temperature       float64
-	provider          llmmodels.Provider
-	model             string
-	isJson            bool
-	chainType         ChainType
-	responseSchemas   []outputparser.ResponseSchema
-	customFormatInstr string
+	templateText                    string
+	paramDefinition                 []string
+	maxTokens                       int
+	temperature                     float64
+	provider                        llmmodels.Provider
+	model                           string
+	isJson                          bool
+	chainType                       ChainType
+	responseSchemas                 []outputparser.ResponseSchema
+	formatInstrLLMWithNoJSONSupport string
 }
 
 // NewChainBuilder creates a new chain builder.
@@ -289,7 +289,7 @@ func (cb *ChainBuilder) WithCustomJSONFormat() *ChainBuilder {
 			rs.Description,
 		)
 	}
-	cb.customFormatInstr = fmt.Sprintf(_structuredFormatInstructionTemplate, jsonLines)
+	cb.formatInstrLLMWithNoJSONSupport = fmt.Sprintf(_structuredFormatInstructionTemplate, jsonLines)
 	cb.templateText = enhanceTemplateForStructuredOutput(cb.templateText, jsonLines)
 
 	cb.isJson = false
@@ -303,7 +303,7 @@ func (cb *ChainBuilder) Build() (*BaseChain, error) {
 			cb.templateText,
 			cb.paramDefinition,
 			cb.responseSchemas,
-			cb.customFormatInstr,
+			cb.formatInstrLLMWithNoJSONSupport,
 			cb.maxTokens,
 			cb.temperature,
 			cb.provider,

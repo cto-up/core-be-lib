@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"ctoup.com/coreapp/pkg/core/db"
 	gochains "ctoup.com/coreapp/pkg/core/service/gochains"
 	"github.com/tmc/langchaingo/memory"
 	"github.com/tmc/langchaingo/prompts"
@@ -12,12 +11,10 @@ import (
 
 type PromptExecutionService struct {
 	chainFactory *gochains.ChainFactory
-	store        *db.Store
 }
 
-func NewPromptExecutionService(store *db.Store) *PromptExecutionService {
+func NewPromptExecutionService() *PromptExecutionService {
 	return &PromptExecutionService{
-		store:        store,
 		chainFactory: gochains.NewChainFactory(memory.NewSimple()),
 	}
 }
@@ -26,7 +23,7 @@ type ExecutePromptParams struct {
 	Parameters map[string]string
 }
 
-func (s *PromptExecutionService) ExecutePrompt(ctx context.Context, content string, parameters []string, parametersValues ExecutePromptParams) (string, error) {
+func ExecutePrompt(ctx context.Context, content string, parameters []string, parametersValues ExecutePromptParams) (string, error) {
 	// Validate that all required parameters are provided
 	for _, requiredParam := range parameters {
 		if _, exists := parametersValues.Parameters[requiredParam]; !exists {

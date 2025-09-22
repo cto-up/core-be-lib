@@ -28,9 +28,8 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type PromptHandler struct {
-	authClientPool   *access.FirebaseTenantClientConnectionPool
-	store            *db.Store
-	executionService *service.PromptExecutionService
+	authClientPool *access.FirebaseTenantClientConnectionPool
+	store          *db.Store
 }
 
 // AddPrompt implements api.ServerInterface.
@@ -299,7 +298,7 @@ func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptPara
 		parameters = prompt.Parameters
 	}
 
-	result, err := h.executionService.ExecutePrompt(c, content, parameters, service.ExecutePromptParams{
+	result, err := service.ExecutePrompt(c, content, parameters, service.ExecutePromptParams{
 		Parameters: *req.ParametersValues,
 	})
 
@@ -368,12 +367,6 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
-	}
-
-	userID, exist := c.Get(access.AUTH_USER_ID)
-	if !exist {
-		c.JSON(http.StatusBadRequest, "Need to be authenticated")
-		return
 	}
 
 	// Set up parameters
@@ -451,10 +444,9 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 
 	// Handle non-streaming case
 	if !streaming {
-		generatedAnswer, err := h.executionService.GenerateTextAnswer(c,
+		generatedAnswer, err := service.GenerateTextAnswer(c,
 			chainConfig,
 			parametersValues,
-			userID.(string),
 			nil,
 		)
 
@@ -463,7 +455,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
-		result, err := h.executionService.ConvertAnswerToString(generatedAnswer)
+		result, err := service.ConvertAnswerToString(generatedAnswer)
 		if err != nil {
 			log.Printf("Error converting answer to string: %v", err)
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -489,10 +481,9 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	go func() {
 		defer close(clientChan)
 
-		_, err := h.executionService.GenerateTextAnswer(c,
+		_, err := service.GenerateTextAnswer(c,
 			chainConfig,
 			parametersValues,
-			userID.(string),
 			clientChan,
 		)
 
@@ -528,8 +519,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 
 func NewPromptHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *PromptHandler {
 	return &PromptHandler{
-		store:            store,
-		authClientPool:   authClientPool,
-		executionService: service.NewPromptExecutionService(store),
+		store:          store,
+		authClientPool: authClientPool,
 	}
 }

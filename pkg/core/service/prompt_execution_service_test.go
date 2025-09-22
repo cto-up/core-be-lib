@@ -5,14 +5,11 @@ import (
 	"testing"
 
 	"ctoup.com/coreapp/pkg/core/db/repository"
-	"ctoup.com/coreapp/pkg/core/db/testutils"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestPromptExecutionService(t *testing.T) {
-	store := testutils.NewTestStore(t)
-	service := NewPromptExecutionService(store)
 
 	// Create a test prompt
 	prompt := repository.CorePrompt{
@@ -63,7 +60,7 @@ func TestPromptExecutionService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := service.ExecutePrompt(context.Background(), prompt.Content, prompt.Parameters, tt.params)
+			result, err := ExecutePrompt(context.Background(), prompt.Content, prompt.Parameters, tt.params)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
