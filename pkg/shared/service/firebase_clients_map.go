@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	utils "ctoup.com/coreapp/pkg/shared/util"
 	"firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 )
@@ -60,8 +61,11 @@ func (p *FirebaseTenantClientConnectionPool) GetClient() *auth.Client {
 }
 
 // GetFirebaseTenantClient retrieves or creates a Firebase tenant client
-func (p *FirebaseTenantClientConnectionPool) GetTenantClient(c *gin.Context) (*FirebaseTenantClient, error) {
-	tenantID, err := p.multitenantService.GetFirebaseTenantID(c)
+func (p *FirebaseTenantClientConnectionPool) GetTenantClient(ctx *gin.Context) (*FirebaseTenantClient, error) {
+	subdomain, err := utils.GetSubdomain(ctx)
+
+	// get tenant from context using subdomain
+	tenantID, err := p.multitenantService.GetFirebaseTenantID(ctx, subdomain)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +114,10 @@ func (p *FirebaseTenantClientConnectionPool) RemoveFirebaseTenantClient(name str
 
 // Get BaseAuthClient for a given tenant based on Subdomain
 func (p *FirebaseTenantClientConnectionPool) GetBaseAuthClient(ctx *gin.Context) (BaseAuthClient, error) {
-	tenantID, err := p.multitenantService.GetFirebaseTenantID(ctx)
+	subdomain, err := utils.GetSubdomain(ctx)
+
+	// get tenant from context using subdomain
+	tenantID, err := p.multitenantService.GetFirebaseTenantID(ctx, subdomain)
 	if err != nil {
 		return nil, err
 	}

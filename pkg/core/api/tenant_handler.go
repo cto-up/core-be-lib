@@ -16,6 +16,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+
+	utils "ctoup.com/coreapp/pkg/shared/util"
 )
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
@@ -28,12 +30,12 @@ type TenantHandler struct {
 
 // (GET /public-api/v1/tenant)
 func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
-
-	subdomain, err := service.GetSubdomain(c)
+	subdomain, err := utils.GetSubdomain(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+
 	if subdomain == "" || subdomain == "www" {
 		c.JSON(http.StatusOK, repository.CoreTenant{
 			Subdomain: "www",

@@ -3,6 +3,7 @@ package service
 import (
 	"net/http"
 
+	utils "ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,18 +23,20 @@ func NewTenantMiddleware(unAuthorized func(c *gin.Context), multitenantService *
 
 // MiddlewareFunc is function to verify token
 func (fam *TenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ctx *gin.Context) {
+		subdomain, err := utils.GetSubdomain(ctx)
 
-		tenantID, err := fam.multitenantService.GetFirebaseTenantID(c)
+		// get tenant from context using subdomain
+		tenantID, err := fam.multitenantService.GetFirebaseTenantID(ctx, subdomain)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
+			ctx.JSON(http.StatusUnauthorized, gin.H{
 				"status":  http.StatusUnauthorized,
 				"message": err.Error(),
 			})
-			c.Abort()
+			ctx.Abort()
 			return
 		}
-		c.Set(AUTH_TENANT_ID_KEY, tenantID)
-		c.Next()
+		ctx.Set(AUTH_TENANT_ID_KEY, tenantID)
+		ctx.Next()
 	}
 }

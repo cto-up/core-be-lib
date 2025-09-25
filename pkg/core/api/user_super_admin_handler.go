@@ -7,12 +7,14 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/api/helpers"
-	core "ctoup.com/coreapp/api/openapi/core"
+	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+
+	utils "ctoup.com/coreapp/pkg/shared/util"
 )
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
@@ -250,13 +252,13 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 		return
 	}
 
-	host, err := access.GetHost(c)
+	host, err := utils.GetHost(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	domain, err := access.GetDomain(c)
+	domain, err := utils.GetDomain(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
