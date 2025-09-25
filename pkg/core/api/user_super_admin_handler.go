@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	utils "ctoup.com/coreapp/pkg/shared/util"
+	"ctoup.com/coreapp/pkg/shared/util"
 )
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
@@ -252,13 +252,13 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 		return
 	}
 
-	host, err := utils.GetHost(c)
+	host, err := util.GetHost(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	domain, err := utils.GetDomain(c)
+	domain, err := util.GetDomain(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -268,7 +268,13 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 
 	url := fmt.Sprintf("%s/signin?from=/", hostUrl)
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
 		return

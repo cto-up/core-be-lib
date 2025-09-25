@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/api/helpers"
@@ -224,7 +225,14 @@ func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
 		return
@@ -249,6 +257,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
+
 	tenant, err := uh.store.GetTenantByTenantID(c, tenantID.(string))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -264,11 +273,19 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+
+	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
 	newUser := core.NewUser{
 		Email: req.Email,
 		Name:  req.Name,
@@ -280,6 +297,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+
 	// create email verification token
 	token, err := uh.emailVerificationService.CreateEmailVerificationToken(c, user.ID, tenantID.(string))
 	if err != nil {
@@ -292,11 +310,13 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+
 	err = sendConfirmationEmail(url, req.Email, token)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+
 	c.JSON(http.StatusCreated, user)
 	// c.JSON(http.StatusOK, gin.H{"message": "Verification email sent"})
 }

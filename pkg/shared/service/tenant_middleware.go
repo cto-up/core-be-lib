@@ -25,6 +25,11 @@ func NewTenantMiddleware(unAuthorized func(c *gin.Context), multitenantService *
 func (fam *TenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		subdomain, err := utils.GetSubdomain(ctx)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			ctx.Abort()
+			return
+		}
 
 		// get tenant from context using subdomain
 		tenantID, err := fam.multitenantService.GetFirebaseTenantID(ctx, subdomain)

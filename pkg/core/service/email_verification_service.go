@@ -11,6 +11,7 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/emailservice"
 	access "ctoup.com/coreapp/pkg/shared/service"
+	utils "ctoup.com/coreapp/pkg/shared/util"
 	"firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -96,8 +97,13 @@ func (s *EmailVerificationService) VerifyEmailToken(ctx *gin.Context, token stri
 		return fmt.Errorf("invalid or expired verification token")
 	}
 
+	subdomain, err := utils.GetSubdomain(ctx)
+	if err != nil {
+		return err
+	}
+
 	// Get Firebase auth client for the tenant
-	authClient, err := s.authClientPool.GetBaseAuthClient(ctx)
+	authClient, err := s.authClientPool.GetBaseAuthClient(ctx, subdomain)
 	if err != nil {
 		return fmt.Errorf("failed to get Firebase auth client: %w", err)
 	}
