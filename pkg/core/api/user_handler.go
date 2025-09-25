@@ -298,8 +298,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, user)
-
-	c.JSON(http.StatusOK, gin.H{"message": "Verification email sent"})
+	// c.JSON(http.StatusOK, gin.H{"message": "Verification email sent"})
 }
 
 // VerifyEmail handles email verification using token
