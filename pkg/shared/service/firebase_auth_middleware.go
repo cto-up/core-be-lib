@@ -78,11 +78,18 @@ func (fam *FirebaseAuthMiddleware) verifyToken(c *gin.Context) (*auth.Token, boo
 
 	var idToken *auth.Token
 
-	authClient, err := fam.tenantClientConnectionPool.GetBaseAuthClient(c)
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get subdomain")
+		return nil, true
+	}
+
+	authClient, err := fam.tenantClientConnectionPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get auth client")
 		return nil, true
 	}
+
 	idToken, err = authClient.VerifyIDToken(context.Background(), token)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to verify id token")

@@ -113,9 +113,7 @@ func (p *FirebaseTenantClientConnectionPool) RemoveFirebaseTenantClient(name str
 }
 
 // Get BaseAuthClient for a given tenant based on Subdomain
-func (p *FirebaseTenantClientConnectionPool) GetBaseAuthClient(ctx *gin.Context) (BaseAuthClient, error) {
-	subdomain, err := utils.GetSubdomain(ctx)
-
+func (p *FirebaseTenantClientConnectionPool) GetBaseAuthClient(ctx context.Context, subdomain string) (BaseAuthClient, error) {
 	// get tenant from context using subdomain
 	tenantID, err := p.multitenantService.GetFirebaseTenantID(ctx, subdomain)
 	if err != nil {
