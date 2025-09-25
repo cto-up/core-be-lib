@@ -75,7 +75,13 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -115,7 +121,14 @@ func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -172,7 +185,13 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -193,16 +212,25 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
+
 	user, err := uh.userService.GetUserByID(c, baseAuthClient, tenantID.(string), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+
 	c.JSON(http.StatusOK, user)
 }
 
@@ -263,7 +291,13 @@ func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, role core.
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -286,17 +320,25 @@ func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, role cor
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
 	err = uh.userService.UnassignRole(c, baseAuthClient, tenantID.(string), userID, role)
 	if err != nil {
 		log.Printf("error %v\n", err)
 		c.Status(http.StatusInternalServerError)
 		return
 	}
+
 	c.Status(http.StatusNoContent)
 }
 
@@ -314,23 +356,28 @@ func (uh *UserAdminHandler) UpdateUserStatus(c *gin.Context, userID string) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = uh.userService.UpdateUserStatus(c, baseAuthClient, tenantID.(string), userID, (string)(req.Name), req.Value)
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+
 	c.Status(http.StatusNoContent)
 }
 
 func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID string) {
-
 	var req struct {
 		Email string `json:"email"`
 	}
@@ -365,16 +412,24 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
 		return
 	}
+
 	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
 }
 
@@ -387,7 +442,13 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	}
 
 	// Get Firebase auth client for tenant
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c)
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
