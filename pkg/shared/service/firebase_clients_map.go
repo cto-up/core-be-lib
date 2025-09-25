@@ -4,9 +4,7 @@ import (
 	"context"
 	"sync"
 
-	utils "ctoup.com/coreapp/pkg/shared/util"
 	"firebase.google.com/go/auth"
-	"github.com/gin-gonic/gin"
 )
 
 var AuthClient *auth.Client
@@ -61,9 +59,7 @@ func (p *FirebaseTenantClientConnectionPool) GetClient() *auth.Client {
 }
 
 // GetFirebaseTenantClient retrieves or creates a Firebase tenant client
-func (p *FirebaseTenantClientConnectionPool) GetTenantClient(ctx *gin.Context) (*FirebaseTenantClient, error) {
-	subdomain, err := utils.GetSubdomain(ctx)
-
+func (p *FirebaseTenantClientConnectionPool) GetTenantClient(ctx context.Context, subdomain string) (*FirebaseTenantClient, error) {
 	// get tenant from context using subdomain
 	tenantID, err := p.multitenantService.GetFirebaseTenantID(ctx, subdomain)
 	if err != nil {
