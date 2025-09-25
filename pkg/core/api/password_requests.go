@@ -10,6 +10,8 @@ import (
 	"firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+
+	utils "ctoup.com/coreapp/pkg/shared/util"
 )
 
 func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
@@ -18,7 +20,7 @@ func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 		subdomain = subdomains[0]
 	}
 
-	host, err := service.GetHost(c)
+	host, err := utils.GetHost(c)
 	if err != nil {
 		return "", err
 	}
@@ -29,7 +31,7 @@ func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 	}
 
 	host.Host = host.Host[strings.Index(host.Host, ".")+1:]
-	domain, err := service.GetBaseDomainWithPort(c)
+	domain, err := utils.GetBaseDomainWithPort(c)
 	if err != nil {
 		return "", err
 	}
@@ -112,7 +114,7 @@ func sendWelcomeEmail(c *gin.Context, baseAuthClient service.BaseAuthClient, url
 }
 
 func getConfirmationEmailURL(c *gin.Context) (string, error) {
-	domainInfo, err := service.GetDomainInfo(c)
+	domainInfo, err := utils.GetDomainInfo(c)
 	if err != nil {
 		return "", err
 	}

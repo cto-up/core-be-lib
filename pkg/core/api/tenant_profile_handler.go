@@ -10,15 +10,20 @@ import (
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+
+	utils "ctoup.com/coreapp/pkg/shared/util"
 )
 
 func (s *TenantHandler) GetTenantProfile(ctx *gin.Context) {
+	subdomain, err := utils.GetSubdomain(ctx)
+
 	// get tenant from context using subdomain
-	tenantID, err := s.multiTenantService.GetFirebaseTenantID(ctx)
+	tenantID, err := s.multiTenantService.GetFirebaseTenantID(ctx, subdomain)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+
 	tenant, err := s.store.GetTenantByTenantID(ctx, tenantID)
 	if err != nil {
 		if err.Error() == pgx.ErrNoRows.Error() {
