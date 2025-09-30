@@ -268,13 +268,7 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 
 	url := fmt.Sprintf("%s/signin?from=/", hostUrl)
 
-	subdomain, err := util.GetSubdomain(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
-		return
-	}
-
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, tenant.Subdomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
 		return
