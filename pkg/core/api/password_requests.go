@@ -46,6 +46,13 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient service.BaseAuthClient,
 		fromEmail = "noreply@ctoup.com"
 	}
 
+	// Log the URL being used for ActionCodeSettings
+	urlPrefix := url
+	if len(url) > 10 {
+		urlPrefix = url[:10]
+	}
+	log.Info().Str("url_prefix", urlPrefix).Str("email", toEmail).Msg("Generating password reset link")
+
 	actionCodeSettings := &auth.ActionCodeSettings{
 		URL: url,
 	}
@@ -55,6 +62,17 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient service.BaseAuthClient,
 		log.Error().Err(err).Msg("Failed to generate reset link")
 		return err
 	}
+
+	// Log the generated link to verify it's not empty
+	if link == "" {
+		log.Error().Str("email", toEmail).Str("url", url).Msg("Firebase returned empty password reset link")
+		return fmt.Errorf("firebase returned empty password reset link")
+	}
+	linkPrefix := link
+	if len(link) > 10 {
+		linkPrefix = link[:10]
+	}
+	log.Info().Str("link_prefix", linkPrefix).Int("link_length", len(link)).Str("email", toEmail).Msg("Successfully generated password reset link")
 
 	// Send the link via email (implement your email sending logic here)
 	templateData := struct {
@@ -73,6 +91,7 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient service.BaseAuthClient,
 		log.Error().Err(err).Msg("Failed to send reset link")
 		return err
 	}
+	log.Info().Str("email", toEmail).Msg("Password reset email sent successfully")
 	return nil
 }
 
@@ -109,6 +128,7 @@ func sendWelcomeEmail(c *gin.Context, baseAuthClient service.BaseAuthClient, url
 		log.Error().Err(err).Msg("Failed to send reset link")
 		return err
 	}
+	log.Info().Str("email", toEmail).Msg("Welcome email sent successfully")
 	return nil
 
 }
