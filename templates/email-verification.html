@@ -65,36 +65,48 @@
       <div class="box">
         <h1 class="title is-3 has-text-primary">Verify Your Email Address</h1>
         <p class="subtitle is-5">
-          Welcome to CTO Up! Please confirm your email address to complete your registration.
+          Welcome to CTO Up! Please confirm your email address to complete your
+          registration.
         </p>
 
         <div class="content">
           <p>
-            Hi there! We're excited to have you join CTO Up. To ensure the security of your account 
-            and enable all features, please verify your email address by clicking the button below:
+            Hi there! We're excited to have you join CTO Up. To ensure the
+            security of your account and enable all features, please verify your
+            email address by clicking the button below:
           </p>
 
           <div class="verification-box has-text-centered">
-            <p class="has-text-weight-semibold">Click here to verify your email:</p>
-            <a href="{{.Link}}" class="verify-button">
-              Verify Email Address
-            </a>
+            <p class="has-text-weight-semibold">
+              Click here to verify your email:
+            </p>
+            <a href="{{.Link}}" class="verify-button"> Verify Email Address </a>
           </div>
 
           <div class="security-notice">
             <p class="has-text-weight-semibold">🔒 Security Notice:</p>
             <ul>
-              <li>This verification link will expire in 24 hours</li>
-              <li>If you didn't create an account with us, please ignore this email</li>
+              <li>This verification link will expire in 1 hour</li>
+              <li>
+                If you didn't create an account with us, please ignore this
+                email
+              </li>
               <li>Never share this verification link with anyone</li>
             </ul>
           </div>
 
           <p>
-            If you're having trouble clicking the button above, you can copy and paste 
-            the following URL into your web browser:
+            If you're having trouble clicking the button above, you can copy and
+            paste the following URL into your web browser:
           </p>
-          <p style="word-break: break-all; background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
+          <p
+            style="
+              word-break: break-all;
+              background-color: #f5f5f5;
+              padding: 10px;
+              border-radius: 4px;
+            "
+          >
             <a href="{{.Link}}">{{.Link}}</a>
           </p>
 
@@ -118,9 +130,7 @@
           This email was sent to <strong>{{.Email}}</strong><br />
           If you have any questions, please contact our support team.
         </p>
-        <p class="footer-text mt-2">
-          © 2024 CTO Up. All rights reserved.
-        </p>
+        <p class="footer-text mt-2">© 2024 CTO Up. All rights reserved.</p>
       </div>
     </div>
   </body>
