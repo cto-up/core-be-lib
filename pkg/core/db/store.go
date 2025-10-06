@@ -26,8 +26,10 @@ type Store struct {
 	ConnPool *pgxpool.Pool
 }
 
-func NewStore(connPool *pgxpool.Pool) *Store {
-	migrate(connPool.Config().ConnString())
+func NewStore(connPool *pgxpool.Pool, performMigration ...bool) *Store {
+	if len(performMigration) > 0 && performMigration[0] {
+		migrate(connPool.Config().ConnString())
+	}
 	return &Store{
 		Queries:  repository.New(connPool),
 		ConnPool: connPool,
