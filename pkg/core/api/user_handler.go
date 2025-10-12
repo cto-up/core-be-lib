@@ -311,7 +311,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		return
 	}
 
-	err = sendConfirmationEmail(url, req.Email, token)
+	err = sendConfirmationEmail(c, url, req.Email, token)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

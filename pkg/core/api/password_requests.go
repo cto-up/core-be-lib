@@ -82,7 +82,7 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient service.BaseAuthClient,
 	}
 
 	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Reset Password Link", "")
-	if err := r.ParseTemplate("templates/email-reset.html", templateData); err != nil {
+	if err := r.ParseTemplateWithDomain(c, "email-reset.html", templateData); err != nil {
 		log.Error().Err(err).Msg("Failed to parse template for reset link")
 		return err
 	}
@@ -119,7 +119,7 @@ func sendWelcomeEmail(c *gin.Context, baseAuthClient service.BaseAuthClient, url
 	}
 
 	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Welcome, Set Your Password", "")
-	if err := r.ParseTemplate("templates/email-welcome.html", templateData); err != nil {
+	if err := r.ParseTemplateWithDomain(c, "email-welcome.html", templateData); err != nil {
 		log.Error().Err(err).Msg("Failed to parse template for reset link")
 		return err
 	}
@@ -145,7 +145,7 @@ func getConfirmationEmailURL(c *gin.Context) (string, error) {
 	return url, nil
 }
 
-func sendConfirmationEmail(url, toEmail string, confirmationToken string) error {
+func sendConfirmationEmail(c *gin.Context, url, toEmail string, confirmationToken string) error {
 	fromEmail := os.Getenv("SYSTEM_EMAIL")
 	if fromEmail == "" {
 		fromEmail = "noreply@ctoup.com"
@@ -176,7 +176,7 @@ func sendConfirmationEmail(url, toEmail string, confirmationToken string) error 
 	}
 
 	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Please verify your email address", "")
-	if err := r.ParseTemplate("templates/email-verification.html", templateData); err != nil {
+	if err := r.ParseTemplateWithDomain(c, "email-verification.html", templateData); err != nil {
 		log.Error().Err(err).Msg("Failed to parse template for email verification")
 		return err
 	}

@@ -144,7 +144,8 @@ func (s *EmailVerificationService) SendVerificationEmail(ctx *gin.Context, email
 
 	// Create email request
 	r := emailservice.NewEmailRequest(fromEmail, []string{email}, "Please verify your email address", "")
-	if err := r.ParseTemplate("templates/email-verification.html", templateData); err != nil {
+
+	if err := r.ParseTemplateWithDomain(ctx, "email-verification.html", templateData); err != nil {
 		log.Error().Err(err).Msg("Failed to parse email verification template")
 		return fmt.Errorf("failed to prepare verification email: %w", err)
 	}

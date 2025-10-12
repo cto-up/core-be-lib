@@ -95,7 +95,7 @@ var multiPartTLDs = map[string]bool{
 
 // DomainInfo holds the parsed domain information
 type DomainInfo struct {
-	subdomain string
+	Subdomain string
 	Domain    string
 	TLD       string
 	FullHost  string
@@ -191,7 +191,7 @@ func GetDomainInfo(c *gin.Context) (*DomainInfo, error) {
 	}
 
 	return &DomainInfo{
-		subdomain: subdomain,
+		Subdomain: subdomain,
 		Domain:    fullDomain,
 		TLD:       tld,
 		FullHost:  hostname,
@@ -206,7 +206,7 @@ func GetSubdomain(c *gin.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return domainInfo.subdomain, nil
+	return domainInfo.Subdomain, nil
 }
 
 // GetDomain extracts the domain (including TLD)

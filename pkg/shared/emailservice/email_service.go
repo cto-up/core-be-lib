@@ -6,7 +6,12 @@ import (
 	"html/template"
 	"net/smtp"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
+
+	utils "ctoup.com/coreapp/pkg/shared/util"
+	"github.com/gin-gonic/gin"
 )
 
 // SMTPConfig holds the SMTP configuration details
@@ -86,4 +91,61 @@ func (r *EmailRequest) ParseTemplate(templateFileName string, data interface{}) 
 	}
 	r.Body = buf.String()
 	return nil
+}
+
+// ParseTemplateWithDomain parses an HTML template using domain-aware hierarchical lookup
+// It searches for templates in the following order:
+// 1. templates/domain/subdomain/templateName
+// 2. templates/domain/templateName
+// 3. templates/templateName
+func (r *EmailRequest) ParseTemplateWithDomain(ctx *gin.Context, templateName string, data interface{}) error {
+	templatePath, err := GetTemplate(ctx, templateName)
+	if err != nil {
+		return fmt.Errorf("failed to find template: %w", err)
+	}
+
+	return r.ParseTemplate(templatePath, data)
+}
+
+// GetTemplate finds a template file using hierarchical lookup based on domain and subdomain
+// It searches in the following order:
+// 1. templates/domain/subdomain/templateName
+// 2. templates/domain/templateName
+// 3. templates/templateName
+//
+// For example, if origin is "human.alineo.com" and templateName is "email-verification.html":
+// 1. templates/alineo.com/human/email-verification.html
+// 2. templates/alineo.com/email-verification.html
+// 3. templates/email-verification.html
+func GetTemplate(ctx *gin.Context, templateName string) (string, error) {
+	domainInfo, err := utils.GetDomainInfo(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get domain info: %w", err)
+	}
+
+	// Build the search paths in order of priority
+	searchPaths := make([]string, 0, 3)
+
+	// If we have both domain and subdomain, try domain/subdomain/template first
+	if domainInfo.Domain != "" && domainInfo.Subdomain != "" {
+		searchPaths = append(searchPaths, filepath.Join("templates", domainInfo.Domain, domainInfo.Subdomain, templateName))
+	}
+
+	// If we have domain, try domain/template
+	if domainInfo.Domain != "" {
+		searchPaths = append(searchPaths, filepath.Join("templates", domainInfo.Domain, templateName))
+	}
+
+	// Always try the base template as fallback
+	searchPaths = append(searchPaths, filepath.Join("templates", templateName))
+
+	// Search for the first existing template file
+	for _, path := range searchPaths {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	// If no template found, return error with all attempted paths
+	return "", fmt.Errorf("template '%s' not found in any of the following locations: %s", templateName, strings.Join(searchPaths, ", "))
 }
