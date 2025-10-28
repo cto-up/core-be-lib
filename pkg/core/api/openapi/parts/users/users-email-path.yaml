@@ -1,0 +1,17 @@
+get:
+  description: Returns a user based on their email
+  operationId: getUserByEmail
+  parameters:
+    - name: email
+      in: path
+      description: email of user to fetch
+      required: true
+      schema:
+        type: string
+  responses:
+    "200":
+      description: user response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/User"

@@ -26,7 +26,7 @@ paths:
   # health
   /public-api/v1/health:
     $ref: "./parts/health/health-path.yaml"
-  # users
+  # users (api token not allowed)
   /api/v1/users/{userid}:
     $ref: "./parts/users/users-id-path.yaml"
   /api/v1/users/{userid}/status:
@@ -39,6 +39,9 @@ paths:
     $ref: "./parts/users/users-path.yaml"
   /api/v1/users/import:
     $ref: "./parts/users/admin-users-import-path.yaml"
+  # users (api token allowed)
+  /api/v1/users/by-email/{email}:
+    $ref: "./parts/users/users-email-path.yaml"
 
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}:
     $ref: "./parts/users/super-admin-users-id-path.yaml"

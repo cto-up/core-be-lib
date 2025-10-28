@@ -39,9 +39,10 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			return
 		}
 
-		if !strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
-			!strings.HasPrefix(c.Request.URL.Path, "/admin-api") &&
-			!strings.HasPrefix(c.Request.URL.Path, "/superadmin-api") {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users/by-email") ||
+			(!strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
+				!strings.HasPrefix(c.Request.URL.Path, "/admin-api") &&
+				!strings.HasPrefix(c.Request.URL.Path, "/superadmin-api")) {
 			// Check X-Api-Key header first
 			token := c.GetHeader(XApiKeyHeader)
 
@@ -53,7 +54,7 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					c.Set("api_token", tokenRow)
 					c.Set("api_token_scopes", tokenRow.Scopes)
 					// c.Set(AUTH_EMAIL,)
-					//c.Set(AUTH_CLAIMS, idToken.Claims)
+					// c.Set(AUTH_CLAIMS, idToken.Claims)
 					c.Set(AUTH_USER_ID, tokenRow.CreatedBy)
 					c.Next()
 					return

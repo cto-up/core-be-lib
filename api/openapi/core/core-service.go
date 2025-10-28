@@ -874,6 +874,9 @@ type ServerInterface interface {
 	// (POST /api/v1/users)
 	AddUser(c *gin.Context)
 
+	// (GET /api/v1/users/by-email/{email})
+	GetUserByEmail(c *gin.Context, email string)
+
 	// (POST /api/v1/users/import)
 	ImportUsersFromAdmin(c *gin.Context)
 
@@ -2323,6 +2326,30 @@ func (siw *ServerInterfaceWrapper) AddUser(c *gin.Context) {
 	siw.Handler.AddUser(c)
 }
 
+// GetUserByEmail operation middleware
+func (siw *ServerInterfaceWrapper) GetUserByEmail(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "email" -------------
+	var email string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "email", c.Param("email"), &email, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter email: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetUserByEmail(c, email)
+}
+
 // ImportUsersFromAdmin operation middleware
 func (siw *ServerInterfaceWrapper) ImportUsersFromAdmin(c *gin.Context) {
 
@@ -3556,6 +3583,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.PUT(options.BaseURL+"/api/v1/translations/:id", wrapper.UpdateTranslation)
 	router.GET(options.BaseURL+"/api/v1/users", wrapper.ListUsers)
 	router.POST(options.BaseURL+"/api/v1/users", wrapper.AddUser)
+	router.GET(options.BaseURL+"/api/v1/users/by-email/:email", wrapper.GetUserByEmail)
 	router.POST(options.BaseURL+"/api/v1/users/import", wrapper.ImportUsersFromAdmin)
 	router.DELETE(options.BaseURL+"/api/v1/users/:userid", wrapper.DeleteUser)
 	router.GET(options.BaseURL+"/api/v1/users/:userid", wrapper.GetUserByID)

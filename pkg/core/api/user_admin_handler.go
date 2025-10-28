@@ -205,7 +205,7 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 	c.Status(http.StatusNoContent)
 }
 
-// FindUserByID implements openapi.ServerInterface.
+// GetUserByID implements openapi.ServerInterface.
 func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
 	if !exists {

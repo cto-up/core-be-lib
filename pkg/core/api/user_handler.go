@@ -433,3 +433,20 @@ func (uh *UserHandler) GetMyEmailVerificationStatus(c *gin.Context) {
 		"email_verified": isVerified,
 	})
 }
+
+// GetUserByEmail implements openapi.ServerInterface.
+func (uh *UserHandler) GetUserByEmail(c *gin.Context, email string) {
+	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
+
+	user, err := uh.userService.GetUserByEmail(c, tenantID.(string), email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}

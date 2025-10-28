@@ -246,6 +246,26 @@ func (uh *UserService) GetUserByID(c *gin.Context, baseAuthClient BaseAuthClient
 	}, nil
 }
 
+func (uh *UserService) GetUserByEmail(c *gin.Context, tenantId string, email string) (core.User, error) {
+	fullUser := core.User{}
+	dbUser, err := uh.store.GetUserByEmail(c, repository.GetUserByEmailParams{
+		Email:    email,
+		TenantID: tenantId,
+	})
+	if err != nil {
+		return fullUser, err
+	}
+
+	user := core.User{
+		Id:        dbUser.ID,
+		Name:      dbUser.Profile.Name,
+		Email:     dbUser.Email.String,
+		Roles:     convertToRoleDTOs(dbUser.Roles),
+		CreatedAt: &dbUser.CreatedAt,
+	}
+	return user, nil
+}
+
 func (uh *UserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
 	dbUsers, err := uh.store.ListUsers(c, repository.ListUsersParams{
 		Limit:    pagingSql.PageSize,
