@@ -66,7 +66,7 @@ func setupHealthCheck(router *gin.Engine, defaultChecks ...checks.Check) {
 }
 
 func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gin.HandlerFunc, additionalChecks ...checks.Check) *ServerConfig {
-	coreStore := db.NewStore(connPool)
+	coreStore := db.NewStore(connPool, true)
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterCustomTypeFunc(helpers.CustomTypeUUID, uuid.UUID{})
