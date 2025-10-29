@@ -219,7 +219,6 @@ func (store Store) SimilaritySearch(ctx context.Context, searchString string, nu
 	}
 
 	rows, err := store.pool.Query(ctx, query, pgv.NewVector(vector))
-
 	if err != nil {
 		return nil, err
 	}
@@ -230,6 +229,7 @@ func (store Store) SimilaritySearch(ctx context.Context, searchString string, nu
 	doc := schema.Document{}
 
 	for rows.Next() {
+		// Format: [text_data, metadata1, metadata2, ..., similarity_score]
 		vals, err := rows.Values()
 
 		if err != nil {
@@ -238,12 +238,12 @@ func (store Store) SimilaritySearch(ctx context.Context, searchString string, nu
 
 		doc.PageContent = vals[0].(string)
 
-		score := vals[1].(float64)
+		score := vals[len(vals)-1].(float64)
 		doc.Score = float32(score)
 
 		metadata := make(map[string]any)
-		for i := 2; i <= len(vals)-1; i++ {
-			metadata[store.QueryAttributes[i-2]] = vals[i]
+		for i := 1; i < len(vals)-1; i++ {
+			metadata[store.QueryAttributes[i-1]] = vals[i]
 		}
 
 		doc.Metadata = metadata
@@ -265,18 +265,15 @@ ORDER BY similarity_score DESC LIMIT %d`
 
 func (store Store) generateSelectQuery(numDocuments int, threshold float32, tenantID string, roles []string, tags []string) (string, error) {
 	var queryBuilder strings.Builder
-	var selectedColumns string
 
 	// Ensure required fields are set
 	if store.textColumnName == "" || store.embeddingStoreColumnName == "" || store.tableName == "" {
 		return "", errors.New("missing essential store fields")
 	}
 
-	// Define selected columns based on presence of QueryAttributes
-	if len(store.QueryAttributes) > 0 {
-		selectedColumns = fmt.Sprintf("%s, %s", store.textColumnName, strings.Join(store.QueryAttributes, ", "))
-	} else {
-		selectedColumns = store.textColumnName
+	selectedColumns := store.textColumnName
+	for _, col := range store.QueryAttributes {
+		selectedColumns += fmt.Sprintf(", docu_documents.%s", col)
 	}
 
 	tagsString := strings.Join(tags, "','")
@@ -297,5 +294,6 @@ func (store Store) generateSelectQuery(numDocuments int, threshold float32, tena
 		tenantID,                       // Tenant ID
 		numDocuments,                   // Limit on results
 	)
+
 	return queryBuilder.String(), nil
 }
