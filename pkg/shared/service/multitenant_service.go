@@ -41,7 +41,9 @@ func (uh *MultitenantService) GetFirebaseTenantID(ctx context.Context, subdomain
 
 	tenantMap := GetTenantMap()
 
+	tenantMap.RLock()
 	tenantID, exists := tenantMap.data[subdomain]
+	tenantMap.RUnlock()
 
 	// If the subdomain is not found in the map, return an error
 	if !exists {
@@ -51,9 +53,9 @@ func (uh *MultitenantService) GetFirebaseTenantID(ctx context.Context, subdomain
 		}
 
 		tenantID = tenant.TenantID
-		tenantMap.RLock()
+		tenantMap.Lock()
 		tenantMap.data[tenant.Subdomain] = tenantID
-		tenantMap.RUnlock()
+		tenantMap.Unlock()
 	}
 	return tenantID, nil
 }
