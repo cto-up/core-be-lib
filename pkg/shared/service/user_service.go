@@ -23,9 +23,32 @@ type FullUser struct {
 	core.User
 }
 
+// UserCreatedCallback is an optional callback function that is called after a user is successfully created.
+// It receives the context, tenant ID, and the created user.
+type UserCreatedCallback func(ctx context.Context, tenantID string, user repository.CoreUser)
+
+// UserEventInitFunc is a function that initializes the user event callback in a UserService
+type UserEventInitFunc func(userService *UserService)
+
+var (
+	userEventInitFunc UserEventInitFunc
+)
+
+// SetUserEventInitFunc sets a global function that will be called when a UserService is created
+// This allows external modules (like realtime) to register their event callbacks
+func SetUserEventInitFunc(fn UserEventInitFunc) {
+	userEventInitFunc = fn
+}
+
+// GetUserEventInitFunc returns the global user event init function
+func GetUserEventInitFunc() UserEventInitFunc {
+	return userEventInitFunc
+}
+
 type UserService struct {
 	store          *db.Store
 	authClientPool *FirebaseTenantClientConnectionPool
+	onUserCreated  UserCreatedCallback
 }
 
 func IsCustomerAdmin(c *gin.Context) bool {
@@ -58,6 +81,16 @@ func NewUserService(store *db.Store, authClientPool *FirebaseTenantClientConnect
 	userService := &UserService{store: store,
 		authClientPool: authClientPool}
 	return userService
+}
+
+// SetUserCreatedCallback sets an optional callback function that will be called after a user is successfully created.
+func (uh *UserService) SetUserCreatedCallback(callback UserCreatedCallback) {
+	uh.onUserCreated = callback
+}
+
+// GetStore returns the database store (for use in callbacks that need to access tenant data)
+func (uh *UserService) GetStore() *db.Store {
+	return uh.store
 }
 
 func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
@@ -111,6 +144,15 @@ func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient,
 		return user, err
 	}
 	err = tx.Commit(c)
+	if err != nil {
+		return user, err
+	}
+
+	// Call the optional callback if it's set
+	if uh.onUserCreated != nil {
+		uh.onUserCreated(c, tenantId, user)
+	}
+
 	return user, err
 }
 

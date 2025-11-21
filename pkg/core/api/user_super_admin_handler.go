@@ -283,6 +283,13 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 
 func NewUserSuperAdminHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserSuperAdminHandler {
 	userService := access.NewUserService(store, authClientPool)
+
+	// Try to initialize user event callback if available
+	// This allows the realtime module to set up the callback for user creation events
+	if initFunc := access.GetUserEventInitFunc(); initFunc != nil {
+		initFunc(userService)
+	}
+
 	handler := &UserSuperAdminHandler{store: store,
 		authClientPool: authClientPool,
 		userService:    userService}

@@ -33,6 +33,13 @@ type UserHandler struct {
 
 func NewUserHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserHandler {
 	userService := access.NewUserService(store, authClientPool)
+
+	// Try to initialize user event callback if available
+	// This allows the realtime module to set up the callback for user creation events
+	if initFunc := access.GetUserEventInitFunc(); initFunc != nil {
+		initFunc(userService)
+	}
+
 	emailVerificationService := service.NewEmailVerificationService(store, authClientPool)
 	fileService := fileservice.NewFileService()
 	handler := &UserHandler{
