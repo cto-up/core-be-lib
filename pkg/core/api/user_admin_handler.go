@@ -35,6 +35,13 @@ type UserAdminHandler struct {
 
 func NewUserAdminHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserAdminHandler {
 	userService := access.NewUserService(store, authClientPool)
+
+	// Try to initialize user event callback if available
+	// This allows the realtime module to set up the callback for user creation events
+	if initFunc := access.GetUserEventInitFunc(); initFunc != nil {
+		initFunc(userService)
+	}
+
 	handler := &UserAdminHandler{store: store,
 		authClientPool: authClientPool,
 		userService:    userService}
