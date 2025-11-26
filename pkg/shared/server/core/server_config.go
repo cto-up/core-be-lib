@@ -78,14 +78,12 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	// to be removed when https://github.com/jackc/pgx/pull/1718 can inclide sql
 	db, err := sql.Open("postgres", dbConnection)
 	if err != nil {
-		log.Info().Msg("Open failed")
-		log.Info().Msg(err.Error())
+		log.Err(err).Msg("Open failed")
 	}
 
 	err = db.Ping()
 	if err != nil {
-		log.Info().Msg("Ping DB failed")
-		log.Info().Msg(err.Error())
+		log.Err(err).Msg("Ping DB failed")
 	}
 
 	defer db.Close()
