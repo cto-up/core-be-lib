@@ -34,12 +34,11 @@ import (
 )
 
 type ServerConfig struct {
-	Router                 *gin.Engine
-	TenantClientPool       *service.FirebaseTenantClientConnectionPool
-	FirebaseAuthMiddleware *service.FirebaseAuthMiddleware
-	TenantMiddleware       *service.TenantMiddleware
-	AuthMiddleware         *service.AuthMiddleware
-	APIOptions             core.GinServerOptions
+	Router           *gin.Engine
+	TenantClientPool *service.FirebaseTenantClientConnectionPool
+	TenantMiddleware *service.TenantMiddleware
+	AuthMiddleware   *service.AuthMiddleware
+	APIOptions       core.GinServerOptions
 }
 
 var (
@@ -99,13 +98,15 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create NewFirebaseTenantClientConnectionPool!")
 	}
-	firebaseAuthMiddleWare := service.NewFirebaseMiddleware(nil, firebaseTenantClientPool, multiTenantService)
+	// Create Firebase auth provider (can be swapped with KratosAuthProvider or custom implementation)
+	firebaseAuthProvider := service.NewFirebaseAuthProvider(firebaseTenantClientPool, multiTenantService)
+
 	tenantMiddleWare := service.NewTenantMiddleware(nil, multiTenantService)
 	clientAppService := service.NewClientApplicationService(coreStore)
 
-	// Create the combined auth middleware
+	// Create the combined auth middleware with pluggable auth provider
 	authMiddleware := service.NewAuthMiddleware(
-		firebaseAuthMiddleWare,
+		firebaseAuthProvider, // Can be replaced with service.NewKratosAuthProvider(kratosURL)
 		clientAppService,
 	)
 
@@ -128,11 +129,10 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	core.RegisterHandlersWithOptions(router, handlers, apiOptions)
 
 	return &ServerConfig{
-		Router:                 router,
-		TenantClientPool:       firebaseTenantClientPool,
-		FirebaseAuthMiddleware: firebaseAuthMiddleWare,
-		TenantMiddleware:       tenantMiddleWare,
-		AuthMiddleware:         authMiddleware,
-		APIOptions:             apiOptions,
+		Router:           router,
+		TenantClientPool: firebaseTenantClientPool,
+		TenantMiddleware: tenantMiddleWare,
+		AuthMiddleware:   authMiddleware,
+		APIOptions:       apiOptions,
 	}
 }

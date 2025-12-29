@@ -6,26 +6,32 @@ import (
 
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
 const (
 	// Header key for API tokens
 	XApiKeyHeader = "X-Api-Key"
+
+	// Context keys for authenticated user info
+	AUTH_EMAIL   = "auth_email"
+	AUTH_USER_ID = "auth_user_id"
+	AUTH_CLAIMS  = "auth_claims"
 )
 
-// AuthMiddleware combines both API token and Firebase authentication
+// AuthMiddleware combines both API token and provider-based authentication
 type AuthMiddleware struct {
-	firebaseAuth *FirebaseAuthMiddleware
+	authProvider AuthProvider
 	apiToken     *ClientApplicationService
 }
 
 // NewAuthMiddleware creates a new combined authentication middleware
 func NewAuthMiddleware(
-	firebaseAuth *FirebaseAuthMiddleware,
+	authProvider AuthProvider,
 	apiToken *ClientApplicationService,
 ) *AuthMiddleware {
 	return &AuthMiddleware{
-		firebaseAuth: firebaseAuth,
+		authProvider: authProvider,
 		apiToken:     apiToken,
 	}
 }
@@ -68,9 +74,10 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					return
 				}
 			} else {
-				_, failed := am.firebaseAuth.verifyToken(c)
-				if failed {
-					// No API token and Firebase auth failed
+				// Try provider-based authentication
+				user, err := am.authProvider.VerifyToken(c)
+				if err != nil {
+					log.Error().Err(err).Str("provider", am.authProvider.GetProviderName()).Msg("authentication failed")
 					c.JSON(http.StatusUnauthorized, gin.H{
 						"status":  http.StatusUnauthorized,
 						"message": "Authentication required",
@@ -78,54 +85,107 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					c.Abort()
 					return
 				}
+
+				// Store authenticated user info in context
+				am.setAuthenticatedUser(c, user)
 			}
 		} else {
-			idToken, failed := am.firebaseAuth.verifyToken(c)
-			if failed {
-				abort(am.firebaseAuth, c)
+			// Use provider-based authentication
+			user, err := am.authProvider.VerifyToken(c)
+			if err != nil {
+				log.Error().Err(err).Str("provider", am.authProvider.GetProviderName()).Msg("authentication failed")
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"status":  http.StatusUnauthorized,
+					"message": http.StatusText(http.StatusUnauthorized),
+				})
+				c.Abort()
 				return
-			} else {
-				// Only admin users can alter users
-				if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
-					util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
-
-					if idToken.Claims["SUPER_ADMIN"] == true || idToken.Claims["ADMIN"] == true || idToken.Claims["CUSTOMER_ADMIN"] == true {
-						// OK
-					} else {
-						c.JSON(http.StatusForbidden, gin.H{
-							"status":  http.StatusForbidden,
-							"message": "Need to be an ADMIN to perform such operation",
-						})
-						c.Abort()
-						return
-					}
-				}
-				if strings.HasPrefix(c.Request.URL.Path, "/admin-api") {
-					if idToken.Claims["SUPER_ADMIN"] == true || idToken.Claims["ADMIN"] == true {
-						// OK
-					} else {
-						c.JSON(http.StatusForbidden, gin.H{
-							"status":  http.StatusForbidden,
-							"message": "Need to be an ADMIN or SUPER_ADMIN to perform such operation",
-						})
-						c.Abort()
-						return
-					}
-				}
-				if strings.HasPrefix(c.Request.URL.Path, "/superadmin-api") {
-					if idToken.Claims["SUPER_ADMIN"] == true {
-						// OK
-					} else {
-						c.JSON(http.StatusForbidden, gin.H{
-							"status":  http.StatusForbidden,
-							"message": "Need to be a SUPER_ADMIN to perform such operation",
-						})
-						c.Abort()
-						return
-					}
-				}
-				c.Next()
 			}
+
+			// Store authenticated user info in context
+			am.setAuthenticatedUser(c, user)
+
+			// Check role-based permissions
+			if !am.checkPermissions(c, user) {
+				return
+			}
+
+			c.Next()
 		}
+	}
+}
+
+// setAuthenticatedUser stores user info in gin context
+func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *AuthenticatedUser) {
+	c.Set(AUTH_EMAIL, user.Email)
+	c.Set(AUTH_USER_ID, user.UserID)
+	c.Set(AUTH_CLAIMS, user.Claims)
+}
+
+// checkPermissions validates role-based access control
+func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *AuthenticatedUser) bool {
+	claims := user.Claims
+
+	// Only admin users can alter users
+	if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
+		util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
+
+		if claims["SUPER_ADMIN"] == true || claims["ADMIN"] == true || claims["CUSTOMER_ADMIN"] == true {
+			return true
+		}
+		c.JSON(http.StatusForbidden, gin.H{
+			"status":  http.StatusForbidden,
+			"message": "Need to be an ADMIN to perform such operation",
+		})
+		c.Abort()
+		return false
+	}
+
+	// Admin API access
+	if strings.HasPrefix(c.Request.URL.Path, "/admin-api") {
+		if claims["SUPER_ADMIN"] == true || claims["ADMIN"] == true {
+			return true
+		}
+		c.JSON(http.StatusForbidden, gin.H{
+			"status":  http.StatusForbidden,
+			"message": "Need to be an ADMIN or SUPER_ADMIN to perform such operation",
+		})
+		c.Abort()
+		return false
+	}
+
+	// Super admin API access
+	if strings.HasPrefix(c.Request.URL.Path, "/superadmin-api") {
+		if claims["SUPER_ADMIN"] == true {
+			return true
+		}
+		c.JSON(http.StatusForbidden, gin.H{
+			"status":  http.StatusForbidden,
+			"message": "Need to be a SUPER_ADMIN to perform such operation",
+		})
+		c.Abort()
+		return false
+	}
+
+	return true
+}
+
+// GetAuthenticatedUser retrieves the authenticated user from context
+func GetAuthenticatedUser(c *gin.Context) *AuthenticatedUser {
+	email, _ := c.Get(AUTH_EMAIL)
+	userID, _ := c.Get(AUTH_USER_ID)
+	claims, _ := c.Get(AUTH_CLAIMS)
+
+	emailStr, _ := email.(string)
+	userIDStr, _ := userID.(string)
+	claimsMap, _ := claims.(map[string]interface{})
+
+	customClaims := util.FilterMapToArray(claimsMap, util.UppercaseOnly)
+
+	return &AuthenticatedUser{
+		UserID:       userIDStr,
+		Email:        emailStr,
+		Claims:       claimsMap,
+		CustomClaims: customClaims,
 	}
 }
