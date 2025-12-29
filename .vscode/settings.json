@@ -2,5 +2,6 @@
   "editor.formatOnSave": true,
   "makefile.configureOnOpen": false,
   "go.testTags": "testutils",
-  "go.buildTags": "testutils"
+  "go.buildTags": "testutils",
+  "kiroAgent.configureMCP": "Disabled"
 }
