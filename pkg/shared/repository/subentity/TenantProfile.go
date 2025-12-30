@@ -1,21 +1,10 @@
 package subentity
 
-type TenantProfile struct {
-	DisplayName string `json:"displayName"`
-	Values      string `json:"values"`
-	LightColors Colors `json:"lightColors"`
-	DarkColors  Colors `json:"darkColors"`
-}
+import "ctoup.com/coreapp/api/openapi/core"
 
-type Colors struct {
-	Background string `json:"background"`
-	Primary    string `json:"primary"`
-	Secondary  string `json:"secondary"`
-	Tertiary   string `json:"tertiary"`
-	Accent     string `json:"accent"`
-	Positive   string `json:"positive"`
-	Negative   string `json:"negative"`
-	Info       string `json:"info"`
-	Warning    string `json:"warning"`
-	Text       string `json:"text"`
+type TenantProfile struct {
+	DisplayName string           `json:"displayName"`
+	Values      string           `json:"values"`
+	LightColors core.ColorSchema `json:"lightColors"`
+	DarkColors  core.ColorSchema `json:"darkColors"`
 }
