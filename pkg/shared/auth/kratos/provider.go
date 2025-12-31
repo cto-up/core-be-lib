@@ -91,15 +91,20 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 	}
 
 	// Roles in Kratos are often in traits as company_role (per ORY_KRATOS.md)
-	role, _ := token.Claims["company_role"].(string)
+	// We also support flattened boolean flags for SUPER_ADMIN, etc.
 	customClaims := []string{}
-	if role != "" {
+	if role, ok := token.Claims["company_role"].(string); ok && role != "" {
 		customClaims = append(customClaims, role)
 	}
 
-	// Map Kratos session to AuthenticatedUser
-	traits, _ := token.Claims["traits"].(map[string]interface{})
-	email, _ := traits["email"].(string)
+	// Add boolean roles to customClaims if they are true
+	for _, r := range []string{"SUPER_ADMIN", "ADMIN", "CUSTOMER_ADMIN"} {
+		if val, ok := token.Claims[r].(bool); ok && val {
+			customClaims = append(customClaims, r)
+		}
+	}
+
+	email, _ := token.Claims["email"].(string)
 
 	return &auth.AuthenticatedUser{
 		UserID:        token.UID,
@@ -142,7 +147,17 @@ func (k *KratosAuthClient) CreateUser(ctx context.Context, user *auth.UserToCrea
 
 	// Create identity
 	identBody := *ory.NewCreateIdentityBody("default", traits)
-	// If OrganizationId exists on the struct in this version, it's typically a NullableString
+
+	if password := user.GetPassword(); password != nil {
+		identBody.Credentials = &ory.IdentityWithCredentials{
+			Password: &ory.IdentityWithCredentialsPassword{
+				Config: &ory.IdentityWithCredentialsPasswordConfig{
+					Password: password,
+				},
+			},
+		}
+	}
+
 	if k.organizationID != nil {
 		identBody.OrganizationId = *ory.NewNullableString(k.organizationID)
 	}
@@ -175,6 +190,17 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 	if k.organizationID != nil {
 		// UpdateIdentityBody might not have OrganizationId in this version according to Error 3
 		// Check if it's actually there or not. If Error 3 said undefined, we skip it.
+	}
+
+	if password := user.GetPassword(); password != nil {
+		// In Kratos, updating password via identity update requires credentials
+		updateBody.Credentials = &ory.IdentityWithCredentials{
+			Password: &ory.IdentityWithCredentialsPassword{
+				Config: &ory.IdentityWithCredentialsPasswordConfig{
+					Password: password,
+				},
+			},
+		}
 	}
 
 	updated, _, err := k.adminClient.IdentityAPI.UpdateIdentity(ctx, uid).UpdateIdentityBody(updateBody).Execute()
