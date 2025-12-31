@@ -1,15 +1,19 @@
 package core
 
 import (
+	"fmt"
 	"net/http"
 
 	"ctoup.com/coreapp/api/helpers"
+	"ctoup.com/coreapp/api/openapi/core"
 	api "ctoup.com/coreapp/api/openapi/core"
+	"firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	sharedauth "ctoup.com/coreapp/pkg/shared/auth"
 	fileservice "ctoup.com/coreapp/pkg/shared/fileservice"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	"ctoup.com/coreapp/pkg/shared/service"
@@ -22,7 +26,7 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type TenantHandler struct {
-	authClientPool     *service.FirebaseTenantClientConnectionPool
+	authClientPool     *sharedauth.AuthProviderAdapter
 	multiTenantService *service.MultitenantService
 	FileService        *fileservice.FileService
 	store              *db.Store
@@ -43,8 +47,8 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 			Features:  subentity.TenantFeatures{},
 			Profile: subentity.TenantProfile{
 				DisplayName: "Administration",
-				LightColors: subentity.Colors{},
-				DarkColors:  subentity.Colors{},
+				LightColors: core.ColorSchema{},
+				DarkColors:  core.ColorSchema{},
 			},
 		})
 		return
@@ -82,7 +86,16 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 		return
 	}
 
-	firebaseTenant, err := service.CreateTenant(c, exh.authClientPool.GetClient(), req)
+	// Get the Firebase client for tenant operations
+	client := exh.authClientPool.GetClient()
+	firebaseClient, ok := client.(*auth.Client)
+	if !ok {
+		log.Error().Msg("Failed to get Firebase client for tenant operations")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("tenant operations require Firebase client")))
+		return
+	}
+
+	firebaseTenant, err := service.CreateTenant(c, firebaseClient, req)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -106,15 +119,15 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 			AllowSignUp:           req.AllowSignUp,
 		})
 	if err != nil {
-		service.DeleteTenant(c, exh.authClientPool.GetClient(), firebaseTenant.ID)
+		service.DeleteTenant(c, firebaseClient, firebaseTenant.ID)
 		log.Error().Err(err).Msg("Failed to create tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	profile := subentity.TenantProfile{
 		DisplayName: req.Name,
-		LightColors: subentity.Colors{},
-		DarkColors:  subentity.Colors{},
+		LightColors: core.ColorSchema{},
+		DarkColors:  core.ColorSchema{},
 	}
 
 	_, err = exh.store.UpdateTenantProfile(c, repository.UpdateTenantProfileParams{
@@ -135,7 +148,17 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-	_, err := service.UpdateTenant(c, exh.authClientPool.GetClient(), req.TenantId, req)
+
+	// Get the Firebase client for tenant operations
+	client := exh.authClientPool.GetClient()
+	firebaseClient, ok := client.(*auth.Client)
+	if !ok {
+		log.Error().Msg("Failed to get Firebase client for tenant operations")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("tenant operations require Firebase client")))
+		return
+	}
+
+	_, err := service.UpdateTenant(c, firebaseClient, req.TenantId, req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -164,7 +187,17 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	err = service.DeleteTenant(c, exh.authClientPool.GetClient(), tenant.TenantID)
+
+	// Get the Firebase client for tenant operations
+	client := exh.authClientPool.GetClient()
+	firebaseClient, ok := client.(*auth.Client)
+	if !ok {
+		log.Error().Msg("Failed to get Firebase client for tenant operations")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("tenant operations require Firebase client")))
+		return
+	}
+
+	err = service.DeleteTenant(c, firebaseClient, tenant.TenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -229,7 +262,7 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 	c.JSON(http.StatusOK, tenants)
 }
 
-func NewTenantHandler(store *db.Store, authClientPool *service.FirebaseTenantClientConnectionPool, multiTenantService *service.MultitenantService) *TenantHandler {
+func NewTenantHandler(store *db.Store, authClientPool *sharedauth.AuthProviderAdapter, multiTenantService *service.MultitenantService) *TenantHandler {
 	fileService := fileservice.NewFileService()
 	return &TenantHandler{
 		store:              store,

@@ -74,9 +74,6 @@ const (
 
 // APIToken defines model for APIToken.
 type APIToken struct {
-	// ApplicationName Name of the client application
-	ApplicationName string `json:"applicationName"`
-
 	// ClientApplicationId ID of the client application this token belongs to
 	ClientApplicationId openapi_types.UUID `json:"clientApplicationId"`
 
@@ -298,9 +295,6 @@ type Migration struct {
 
 // NewAPIToken defines model for NewAPIToken.
 type NewAPIToken struct {
-	// ApplicationName Name of the client application
-	ApplicationName string `json:"applicationName"`
-
 	// ClientApplicationId ID of the client application this token belongs to
 	ClientApplicationId openapi_types.UUID `json:"clientApplicationId"`
 	Description         *string            `json:"description,omitempty"`

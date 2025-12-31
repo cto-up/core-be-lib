@@ -7,6 +7,7 @@ import (
 	core "ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"ctoup.com/coreapp/pkg/shared/util"
@@ -18,7 +19,7 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type GlobalConfigHandler struct {
-	authClientPool *access.FirebaseTenantClientConnectionPool
+	authClientPool *auth.AuthProviderAdapter
 	store          *db.Store
 }
 
@@ -146,7 +147,7 @@ func (exh *GlobalConfigHandler) ListGlobalConfigs(c *gin.Context, params core.Li
 	}
 }
 
-func NewGlobalConfigHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *GlobalConfigHandler {
+func NewGlobalConfigHandler(store *db.Store, authClientPool *auth.AuthProviderAdapter) *GlobalConfigHandler {
 	return &GlobalConfigHandler{
 		store:          store,
 		authClientPool: authClientPool,
