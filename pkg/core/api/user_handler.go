@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/rs/zerolog/log"
 
@@ -25,13 +26,13 @@ import (
 
 type UserHandler struct {
 	store                    *db.Store
-	authClientPool           *access.FirebaseTenantClientConnectionPool
+	authClientPool           *auth.AuthProviderAdapter
 	userService              *access.UserService
 	emailVerificationService *service.EmailVerificationService
 	fileService              *fileservice.FileService
 }
 
-func NewUserHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserHandler {
+func NewUserHandler(store *db.Store, authClientPool *auth.AuthProviderAdapter) *UserHandler {
 	userService := access.NewUserService(store, authClientPool)
 
 	// Try to initialize user event callback if available

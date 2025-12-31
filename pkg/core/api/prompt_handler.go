@@ -16,6 +16,7 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/core/service"
 	"ctoup.com/coreapp/pkg/core/service/gochains"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/event"
 	"ctoup.com/coreapp/pkg/shared/llmmodels"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
@@ -28,7 +29,7 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type PromptHandler struct {
-	authClientPool *access.FirebaseTenantClientConnectionPool
+	authClientPool *auth.AuthProviderAdapter
 	store          *db.Store
 }
 
@@ -517,7 +518,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	})
 }
 
-func NewPromptHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *PromptHandler {
+func NewPromptHandler(store *db.Store, authClientPool *auth.AuthProviderAdapter) *PromptHandler {
 	return &PromptHandler{
 		store:          store,
 		authClientPool: authClientPool,

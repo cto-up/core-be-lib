@@ -18,6 +18,7 @@ import (
 	core "ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	sharedauth "ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/event"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	access "ctoup.com/coreapp/pkg/shared/service"
@@ -29,11 +30,11 @@ import (
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type UserAdminHandler struct {
 	store          *db.Store
-	authClientPool *access.FirebaseTenantClientConnectionPool
+	authClientPool *sharedauth.AuthProviderAdapter
 	userService    *access.UserService
 }
 
-func NewUserAdminHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserAdminHandler {
+func NewUserAdminHandler(store *db.Store, authClientPool *sharedauth.AuthProviderAdapter) *UserAdminHandler {
 	userService := access.NewUserService(store, authClientPool)
 
 	// Try to initialize user event callback if available

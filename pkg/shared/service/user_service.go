@@ -45,9 +45,17 @@ func GetUserEventInitFunc() UserEventInitFunc {
 	return userEventInitFunc
 }
 
+// AuthClientPool interface for dependency injection
+// This allows UserService to work with any auth provider
+// It uses the BaseAuthClient interface from firebase_clients_map.go
+type AuthClientPool interface {
+	GetBaseAuthClient(ctx context.Context, subdomain string) (BaseAuthClient, error)
+	GetBaseAuthClientForTenant(tenantID string) (BaseAuthClient, error)
+}
+
 type UserService struct {
 	store          *db.Store
-	authClientPool *FirebaseTenantClientConnectionPool
+	authClientPool AuthClientPool
 	onUserCreated  UserCreatedCallback
 }
 
@@ -77,7 +85,7 @@ func IsSuperAdmin(c *gin.Context) bool {
 	return isSuperAdmin
 }
 
-func NewUserService(store *db.Store, authClientPool *FirebaseTenantClientConnectionPool) *UserService {
+func NewUserService(store *db.Store, authClientPool AuthClientPool) *UserService {
 	userService := &UserService{store: store,
 		authClientPool: authClientPool}
 	return userService

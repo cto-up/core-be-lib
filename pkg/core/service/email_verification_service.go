@@ -9,10 +9,10 @@ import (
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/emailservice"
-	access "ctoup.com/coreapp/pkg/shared/service"
 	utils "ctoup.com/coreapp/pkg/shared/util"
-	"firebase.google.com/go/auth"
+	firebaseauth "firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
@@ -26,10 +26,10 @@ const (
 
 type EmailVerificationService struct {
 	store          *db.Store
-	authClientPool *access.FirebaseTenantClientConnectionPool
+	authClientPool *auth.AuthProviderAdapter
 }
 
-func NewEmailVerificationService(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *EmailVerificationService {
+func NewEmailVerificationService(store *db.Store, authClientPool *auth.AuthProviderAdapter) *EmailVerificationService {
 	return &EmailVerificationService{
 		store:          store,
 		authClientPool: authClientPool,
@@ -109,7 +109,7 @@ func (s *EmailVerificationService) VerifyEmailToken(ctx *gin.Context, token stri
 	}
 
 	// Update user's email verification status in Firebase
-	userUpdate := (&auth.UserToUpdate{}).EmailVerified(true)
+	userUpdate := (&firebaseauth.UserToUpdate{}).EmailVerified(true)
 	if _, err := authClient.UpdateUser(ctx, tokenRecord.UserID, userUpdate); err != nil {
 		return fmt.Errorf("failed to update user email verification status in Firebase: %w", err)
 	}

@@ -9,15 +9,17 @@ import (
 	"slices"
 
 	"ctoup.com/coreapp/api/helpers"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/service"
+	firebaseauth "firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 )
 
 type SuperAdminHandler struct {
-	authClientPool *service.FirebaseTenantClientConnectionPool
+	authClientPool *auth.AuthProviderAdapter
 }
 
-func NewSuperAdminHandler(authClientPool *service.FirebaseTenantClientConnectionPool) *SuperAdminHandler {
+func NewSuperAdminHandler(authClientPool *auth.AuthProviderAdapter) *SuperAdminHandler {
 	return &SuperAdminHandler{
 		authClientPool: authClientPool,
 	}
@@ -45,7 +47,14 @@ func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
 	}
 
 	// Call the AuthorizeDomains function
-	err := service.SDKAddAuthorizedDomains(c, exh.authClientPool.GetClient(), req.Domains)
+	client := exh.authClientPool.GetClient()
+	firebaseClient, ok := client.(*firebaseauth.Client)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(errors.New("requires Firebase auth provider")))
+		return
+	}
+
+	err := service.SDKAddAuthorizedDomains(c, firebaseClient, req.Domains)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -77,7 +86,14 @@ func (exh *SuperAdminHandler) RemoveAuthorizedDomains(c *gin.Context) {
 	}
 
 	// Call the AuthorizeDomains function
-	err := service.SDKRemoveAuthorizedDomains(c, exh.authClientPool.GetClient(), req.Domains)
+	client := exh.authClientPool.GetClient()
+	firebaseClient, ok := client.(*firebaseauth.Client)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(errors.New("requires Firebase auth provider")))
+		return
+	}
+
+	err := service.SDKRemoveAuthorizedDomains(c, firebaseClient, req.Domains)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

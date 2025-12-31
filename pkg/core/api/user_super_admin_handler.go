@@ -9,6 +9,7 @@ import (
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
+	sharedauth "ctoup.com/coreapp/pkg/shared/auth"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -20,7 +21,7 @@ import (
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type UserSuperAdminHandler struct {
 	store          *db.Store
-	authClientPool *access.FirebaseTenantClientConnectionPool
+	authClientPool *sharedauth.AuthProviderAdapter
 	userService    *access.UserService
 }
 
@@ -281,7 +282,7 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
 }
 
-func NewUserSuperAdminHandler(store *db.Store, authClientPool *access.FirebaseTenantClientConnectionPool) *UserSuperAdminHandler {
+func NewUserSuperAdminHandler(store *db.Store, authClientPool *sharedauth.AuthProviderAdapter) *UserSuperAdminHandler {
 	userService := access.NewUserService(store, authClientPool)
 
 	// Try to initialize user event callback if available

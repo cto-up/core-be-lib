@@ -9,6 +9,7 @@ import (
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	access "ctoup.com/coreapp/pkg/shared/service"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -58,8 +59,8 @@ func toAPIToken(token repository.ListAPITokensRow) core.APIToken {
 	result := core.APIToken{
 		Id:                  token.ID,
 		ClientApplicationId: token.ClientApplicationID,
-		ApplicationName:     token.ApplicationName,
 		Name:                token.Name,
+		Description:         util.FromNullableText(token.Description),
 		TokenPrefix:         token.TokenPrefix,
 		ExpiresAt:           token.ExpiresAt,
 		Revoked:             token.Revoked,
@@ -476,6 +477,7 @@ func (h *ClientApplicationHandler) CreateAPIToken(c *gin.Context, id uuid.UUID) 
 	// Parse request body
 	var req core.CreateAPITokenJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error().Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to bind JSON for API token creation")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}

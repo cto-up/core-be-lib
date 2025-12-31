@@ -13,6 +13,7 @@ import (
 
 	// [DO NOT REMOVE COMMENT - Import]
 	"ctoup.com/coreapp/pkg/core/db"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/service"
 
 	"ctoup.com/coreapp/pkg/shared/seedservice"
@@ -98,15 +99,25 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create NewFirebaseTenantClientConnectionPool!")
 	}
-	// Create Firebase auth provider (can be swapped with KratosAuthProvider or custom implementation)
-	firebaseAuthProvider := service.NewFirebaseAuthProvider(firebaseTenantClientPool, multiTenantService)
+
+	// Get the base Firebase auth client
+	baseFirebaseClient := firebaseTenantClientPool.GetClient()
+
+	// Create Firebase auth provider using the new abstraction (can be swapped with KratosAuthProvider or custom implementation)
+	firebaseAuthProvider := auth.NewFirebaseAuthProvider(context.Background(), baseFirebaseClient, multiTenantService)
+
+	// Create the auth provider adapter for backward compatibility with handlers
+	authProviderAdapter := auth.NewAuthProviderAdapter(firebaseAuthProvider, multiTenantService)
+
+	// Create the old-style service auth provider for middleware (temporary during migration)
+	serviceAuthProvider := service.NewFirebaseAuthProvider(firebaseTenantClientPool, multiTenantService)
 
 	tenantMiddleWare := service.NewTenantMiddleware(nil, multiTenantService)
 	clientAppService := service.NewClientApplicationService(coreStore)
 
 	// Create the combined auth middleware with pluggable auth provider
 	authMiddleware := service.NewAuthMiddleware(
-		firebaseAuthProvider, // Can be replaced with service.NewKratosAuthProvider(kratosURL)
+		serviceAuthProvider, // Can be replaced with service.NewKratosAuthProvider(kratosURL)
 		clientAppService,
 	)
 
@@ -124,7 +135,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	seedService := seedservice.NewSeedService(coreStore, firebaseTenantClientPool)
 	seedService.Seed()
 
-	handlers := handlers.CreateCoreHandlers(connPool, firebaseTenantClientPool, multiTenantService, clientAppService)
+	handlers := handlers.CreateCoreHandlers(connPool, authProviderAdapter, multiTenantService, clientAppService)
 
 	core.RegisterHandlersWithOptions(router, handlers, apiOptions)
 
