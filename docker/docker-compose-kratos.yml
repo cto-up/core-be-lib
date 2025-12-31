@@ -3,7 +3,7 @@ services:
   kratos-migrate:
     image: oryd/kratos:v25.4.0
     environment:
-      - DSN=postgres://alpha:alpha@alpha-postgresql-vector:5432/alpha?sslmode=disable&max_conns=20&max_idle_conns=4
+      - DSN=postgres://alpha:alpha@host.docker.internal:5432/alpha?sslmode=disable&max_conns=20&max_idle_conns=4
     volumes:
       - type: bind
         source: ./config
@@ -12,9 +12,8 @@ services:
     restart: on-failure
     networks:
       - intranet
-    depends_on:
-      - alpha-postgresql-vector
-
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   kratos-selfservice-ui-node:
     image: oryd/kratos-selfservice-ui-node:v25.4.0
     environment:
@@ -30,14 +29,13 @@ services:
   kratos:
     depends_on:
       - kratos-migrate
-      - alpha-postgresql-vector
     image: oryd/kratos:v25.4.0
     ports:
       - '4433:4433' # public
       - '4434:4434' # admin
     restart: unless-stopped
     environment:
-      - DSN=postgres://alpha:alpha@alpha-postgresql-vector:5432/alpha?sslmode=disable&max_conns=20&max_idle_conns=4
+      - DSN=postgres://alpha:alpha@host.docker.internal:5432/alpha?sslmode=disable&max_conns=20&max_idle_conns=4
       - LOG_LEVEL=trace
     command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
     volumes:
@@ -46,7 +44,8 @@ services:
         target: /etc/config/kratos
     networks:
       - intranet
-
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   mailslurper:
     image: oryd/mailslurper:latest-smtps
     ports:
@@ -55,22 +54,5 @@ services:
     networks:
       - intranet
 
-  alpha-postgresql-vector:
-    image: pgvector/pgvector:pg17
-    environment:
-      - POSTGRES_USER=alpha
-      - POSTGRES_PASSWORD=alpha
-      - POSTGRES_DB=alpha
-      - POSTGRES_HOST_AUTH_METHOD=trust
-    volumes:
-      - pgdatalocal:/var/lib/postgresql/data
-    ports:
-      - 127.0.0.1:5432:5432
-    networks:
-      - intranet
-
 networks:
   intranet:
-
-volumes:
-  pgdatalocal:
