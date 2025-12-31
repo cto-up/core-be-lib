@@ -2,8 +2,28 @@ package auth
 
 import (
 	"context"
+	"sync"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
+
+const (
+	// Context keys for authenticated user info
+	AUTH_EMAIL         = "auth_email"
+	AUTH_USER_ID       = "auth_user_id"
+	AUTH_CLAIMS        = "auth_claims"
+	AUTH_TENANT_ID_KEY = "auth_tenant_id"
+)
+
+// AuthenticatedUser represents the user info extracted from a token
+type AuthenticatedUser struct {
+	UserID        string                 `json:"user_id"`
+	Email         string                 `json:"email"`
+	EmailVerified bool                   `json:"email_verified"`
+	Claims        map[string]interface{} `json:"claims"`
+	CustomClaims  []string               `json:"custom_claims"`
+}
 
 // UserRecord represents a user in the authentication system
 type UserRecord struct {
@@ -15,6 +35,11 @@ type UserRecord struct {
 	Disabled      bool
 	CreatedAt     time.Time
 	CustomClaims  map[string]interface{}
+}
+
+// MultitenantService interface for getting tenant information
+type MultitenantService interface {
+	GetFirebaseTenantID(ctx context.Context, subdomain string) (string, error)
 }
 
 // UserToCreate represents parameters for creating a new user
@@ -189,6 +214,9 @@ type Tenant struct {
 // AuthProvider defines the top-level interface for authentication providers
 // Implementations: FirebaseAuthProvider, KratosAuthProvider
 type AuthProvider interface {
+	// Token Verification (Middleware use)
+	VerifyToken(c *gin.Context) (*AuthenticatedUser, error)
+
 	// Get the base auth client (for non-tenant operations)
 	GetAuthClient() AuthClient
 
@@ -203,6 +231,29 @@ type AuthProvider interface {
 
 	// Provider metadata
 	GetProviderName() string
+}
+
+// AuthClientPool is an alias for AuthProvider to clarify its role in services
+type AuthClientPool = AuthProvider
+
+var (
+	providersMu sync.RWMutex
+	providers   = make(map[ProviderType]func(ctx context.Context, config ProviderConfig) (AuthProvider, error))
+)
+
+// RegisterProvider registers a provider factory function
+func RegisterProvider(providerType ProviderType, factory func(ctx context.Context, config ProviderConfig) (AuthProvider, error)) {
+	providersMu.Lock()
+	defer providersMu.Unlock()
+	providers[providerType] = factory
+}
+
+// GetProviderFactory returns a provider factory function
+func GetProviderFactory(providerType ProviderType) (func(ctx context.Context, config ProviderConfig) (AuthProvider, error), bool) {
+	providersMu.RLock()
+	defer providersMu.RUnlock()
+	f, ok := providers[providerType]
+	return f, ok
 }
 
 // AuthProviderFactory creates auth providers based on configuration

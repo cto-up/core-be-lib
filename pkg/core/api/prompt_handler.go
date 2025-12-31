@@ -20,7 +20,6 @@ import (
 	"ctoup.com/coreapp/pkg/shared/event"
 	"ctoup.com/coreapp/pkg/shared/llmmodels"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
-	access "ctoup.com/coreapp/pkg/shared/service"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -29,13 +28,13 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type PromptHandler struct {
-	authClientPool *auth.AuthProviderAdapter
-	store          *db.Store
+	authProvider auth.AuthProvider
+	store        *db.Store
 }
 
 // AddPrompt implements api.ServerInterface.
 func (exh *PromptHandler) AddPrompt(c *gin.Context) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -45,7 +44,7 @@ func (exh *PromptHandler) AddPrompt(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-	userID, exist := c.Get(access.AUTH_USER_ID)
+	userID, exist := c.Get(auth.AUTH_USER_ID)
 	if !exist {
 		// should not happen as the middleware ensures that the user is authenticated
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
@@ -72,7 +71,7 @@ func (exh *PromptHandler) AddPrompt(c *gin.Context) {
 
 // UpdatePrompt implements api.ServerInterface.
 func (exh *PromptHandler) UpdatePrompt(c *gin.Context, id uuid.UUID) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -103,7 +102,7 @@ func (exh *PromptHandler) UpdatePrompt(c *gin.Context, id uuid.UUID) {
 
 // DeletePrompt implements api.ServerInterface.
 func (exh *PromptHandler) DeletePrompt(c *gin.Context, id uuid.UUID) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -121,7 +120,7 @@ func (exh *PromptHandler) DeletePrompt(c *gin.Context, id uuid.UUID) {
 
 // FindPromptByID implements api.ServerInterface.
 func (exh *PromptHandler) GetPromptByID(c *gin.Context, id uuid.UUID) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -157,7 +156,7 @@ func (exh *PromptHandler) GetPromptByID(c *gin.Context, id uuid.UUID) {
 
 // ListPrompts implements api.ServerInterface.
 func (exh *PromptHandler) ListPrompts(c *gin.Context, params api.ListPromptsParams) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -236,7 +235,7 @@ func (exh *PromptHandler) ListPrompts(c *gin.Context, params api.ListPromptsPara
 
 // ExecutePrompt implements api.ServerInterface.
 func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptParams) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -319,7 +318,7 @@ func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptPara
 
 // ExecutePrompt implements api.ServerInterface.
 func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePromptParams) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -518,9 +517,9 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	})
 }
 
-func NewPromptHandler(store *db.Store, authClientPool *auth.AuthProviderAdapter) *PromptHandler {
+func NewPromptHandler(store *db.Store, authProvider auth.AuthProvider) *PromptHandler {
 	return &PromptHandler{
-		store:          store,
-		authClientPool: authClientPool,
+		store:        store,
+		authProvider: authProvider,
 	}
 }

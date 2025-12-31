@@ -6,9 +6,8 @@ A flexible, provider-agnostic authentication layer that supports multiple authen
 
 - 🔄 **Swappable Providers**: Switch between Firebase, Kratos, or custom providers
 - 🔌 **Plugin Architecture**: Easy to add new authentication providers
-- 🔙 **Backward Compatible**: Works with existing Firebase-based code via adapter
-- 🧪 **Testable**: Mock providers for easy unit testing
 - 🏢 **Multi-tenant**: Built-in support for multi-tenant applications
+- 🧪 **Testable**: Mock providers for easy unit testing
 - ⚡ **Performance**: Connection pooling and caching for optimal performance
 
 ## Quick Start
@@ -25,13 +24,13 @@ go get ctoup.com/coreapp/pkg/shared/auth
 import "ctoup.com/coreapp/pkg/shared/auth"
 
 // Initialize from environment (reads AUTH_PROVIDER env var)
-adapter, err := auth.InitializeAuthProvider(ctx, multitenantService)
+provider, err := auth.InitializeAuthProvider(ctx, multitenantService)
 if err != nil {
     log.Fatal(err)
 }
 
-// Get auth client for a tenant
-authClient, err := adapter.GetBaseAuthClient(ctx, "tenant-subdomain")
+// Get auth client for a subdomain
+authClient, err := provider.GetAuthClientForSubdomain(ctx, "tenant-subdomain")
 if err != nil {
     log.Fatal(err)
 }
@@ -278,7 +277,7 @@ import "ctoup.com/coreapp/pkg/shared/auth"
 authClientPool *service.FirebaseTenantClientConnectionPool
 
 // After
-authClientPool *auth.AuthProviderAdapter
+authProvider auth.AuthProvider
 ```
 
 3. Update initialization:
@@ -288,10 +287,18 @@ authClientPool *auth.AuthProviderAdapter
 authClientPool, err := service.NewFirebaseTenantClientConnectionPool(ctx, multitenantService)
 
 // After
-authAdapter, err := auth.InitializeAuthProvider(ctx, multitenantService)
+authProvider, err := auth.InitializeAuthProvider(ctx, multitenantService)
 ```
 
-4. Handler code remains unchanged!
+4. Use direct methods:
+
+```go
+// Before
+authClient, err := authClientPool.GetBaseAuthClient(ctx, subdomain)
+
+// After
+authClient, err := authProvider.GetAuthClientForSubdomain(ctx, subdomain)
+```
 
 ## Performance
 

@@ -1,33 +1,61 @@
-package auth
+package firebase
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
-	"firebase.google.com/go/auth"
+	"ctoup.com/coreapp/pkg/shared/auth"
+	"ctoup.com/coreapp/pkg/shared/util"
+	firebase "firebase.google.com/go"
+	fbauth "firebase.google.com/go/auth"
+	"github.com/gin-gonic/gin"
+	"google.golang.org/api/option"
 )
 
-// MultitenantService interface for getting tenant information
-type MultitenantService interface {
-	GetFirebaseTenantID(ctx context.Context, subdomain string) (string, error)
+func init() {
+	auth.RegisterProvider(auth.ProviderTypeFirebase, func(ctx context.Context, config auth.ProviderConfig) (auth.AuthProvider, error) {
+		// Extract information from config
+		// This logic comes from the old factory.go
+
+		multitenantService, ok := config.Options["multitenantService"].(auth.MultitenantService)
+		if !ok {
+			return nil, fmt.Errorf("multitenantService not provided in config options")
+		}
+
+		// Check for credentials in options first
+		if client, ok := config.Credentials.(*fbauth.Client); ok {
+			return NewFirebaseAuthProvider(ctx, client, multitenantService), nil
+		}
+
+		// Initialize Firebase client from FIREBASE_CONFIG environment variable
+		client, err := initializeFirebaseClient(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize firebase client: %w", err)
+		}
+
+		return NewFirebaseAuthProvider(ctx, client, multitenantService), nil
+	})
 }
 
 // FirebaseAuthProvider implements AuthProvider for Firebase Authentication
 type FirebaseAuthProvider struct {
-	client             *auth.Client
+	client             *fbauth.Client
 	tenantManager      *FirebaseTenantManager
-	multitenantService MultitenantService
-	tenantClients      map[string]*auth.TenantClient
+	multitenantService auth.MultitenantService
+	tenantClients      map[string]*fbauth.TenantClient
 	mu                 sync.RWMutex
 }
 
 // NewFirebaseAuthProvider creates a new Firebase auth provider
-func NewFirebaseAuthProvider(ctx context.Context, client *auth.Client, multitenantService MultitenantService) *FirebaseAuthProvider {
+func NewFirebaseAuthProvider(ctx context.Context, client *fbauth.Client, multitenantService auth.MultitenantService) *FirebaseAuthProvider {
 	provider := &FirebaseAuthProvider{
 		client:             client,
 		multitenantService: multitenantService,
-		tenantClients:      make(map[string]*auth.TenantClient),
+		tenantClients:      make(map[string]*fbauth.TenantClient),
 	}
 	provider.tenantManager = &FirebaseTenantManager{
 		client:   client,
@@ -36,15 +64,63 @@ func NewFirebaseAuthProvider(ctx context.Context, client *auth.Client, multitena
 	return provider
 }
 
-func (f *FirebaseAuthProvider) GetAuthClient() AuthClient {
+func (f *FirebaseAuthProvider) GetAuthClient() auth.AuthClient {
 	return &FirebaseAuthClient{client: f.client}
 }
 
-func (f *FirebaseAuthProvider) GetTenantManager() TenantManager {
+func (f *FirebaseAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUser, error) {
+	// Extract token from Authorization header or Token header
+	authHeader := c.Request.Header.Get("Authorization")
+	token := strings.Replace(authHeader, "Bearer ", "", 1)
+
+	if token == "" {
+		token = c.Request.Header.Get("Token")
+	}
+
+	if token == "" {
+		return nil, fmt.Errorf("missing token")
+	}
+
+	// Get subdomain for tenant-aware authentication
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get tenant-specific auth client
+	authClient, err := f.GetAuthClientForSubdomain(c, subdomain)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the ID token
+	idToken, err := authClient.VerifyIDToken(c.Request.Context(), token)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract user information
+	email, _ := idToken.Claims["email"].(string)
+	emailVerified, _ := idToken.Claims["email_verified"].(bool)
+	userID := idToken.UID
+
+	// Extract custom claims (uppercase only)
+	customClaims := util.FilterMapToArray(idToken.Claims, util.UppercaseOnly)
+
+	return &auth.AuthenticatedUser{
+		UserID:        userID,
+		Email:         email,
+		EmailVerified: emailVerified,
+		Claims:        idToken.Claims,
+		CustomClaims:  customClaims,
+	}, nil
+}
+
+func (f *FirebaseAuthProvider) GetTenantManager() auth.TenantManager {
 	return f.tenantManager
 }
 
-func (f *FirebaseAuthProvider) GetAuthClientForSubdomain(ctx context.Context, subdomain string) (AuthClient, error) {
+func (f *FirebaseAuthProvider) GetAuthClientForSubdomain(ctx context.Context, subdomain string) (auth.AuthClient, error) {
 	tenantID, err := f.multitenantService.GetFirebaseTenantID(ctx, subdomain)
 	if err != nil {
 		return nil, err
@@ -52,7 +128,7 @@ func (f *FirebaseAuthProvider) GetAuthClientForSubdomain(ctx context.Context, su
 	return f.GetAuthClientForTenant(ctx, tenantID)
 }
 
-func (f *FirebaseAuthProvider) GetAuthClientForTenant(ctx context.Context, tenantID string) (AuthClient, error) {
+func (f *FirebaseAuthProvider) GetAuthClientForTenant(ctx context.Context, tenantID string) (auth.AuthClient, error) {
 	if tenantID == "" {
 		return f.GetAuthClient(), nil
 	}
@@ -76,8 +152,8 @@ func (f *FirebaseAuthProvider) GetAuthClientForTenant(ctx context.Context, tenan
 	// Create new tenant client
 	tenantClient, err := f.client.TenantManager.AuthForTenant(tenantID)
 	if err != nil {
-		return nil, &AuthError{
-			Code:    ErrorCodeTenantNotFound,
+		return nil, &auth.AuthError{
+			Code:    auth.ErrorCodeTenantNotFound,
 			Message: "failed to get tenant auth client",
 			Err:     err,
 		}
@@ -96,24 +172,28 @@ type FirebaseAuthClient struct {
 	client firebaseAuthClientInterface
 }
 
+func (f *FirebaseAuthClient) GetUnderlyingClient() interface{} {
+	return f.client
+}
+
 // firebaseAuthClientInterface abstracts both *auth.Client and *auth.TenantClient
 type firebaseAuthClientInterface interface {
-	CreateUser(ctx context.Context, user *auth.UserToCreate) (*auth.UserRecord, error)
-	UpdateUser(ctx context.Context, uid string, user *auth.UserToUpdate) (*auth.UserRecord, error)
+	CreateUser(ctx context.Context, user *fbauth.UserToCreate) (*fbauth.UserRecord, error)
+	UpdateUser(ctx context.Context, uid string, user *fbauth.UserToUpdate) (*fbauth.UserRecord, error)
 	DeleteUser(ctx context.Context, uid string) error
-	GetUser(ctx context.Context, uid string) (*auth.UserRecord, error)
-	GetUserByEmail(ctx context.Context, email string) (*auth.UserRecord, error)
+	GetUser(ctx context.Context, uid string) (*fbauth.UserRecord, error)
+	GetUserByEmail(ctx context.Context, email string) (*fbauth.UserRecord, error)
 	SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error
 	EmailVerificationLink(ctx context.Context, email string) (string, error)
 	PasswordResetLink(ctx context.Context, email string) (string, error)
-	EmailVerificationLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error)
-	PasswordResetLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error)
-	EmailSignInLink(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error)
-	VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error)
+	EmailVerificationLinkWithSettings(ctx context.Context, email string, settings *fbauth.ActionCodeSettings) (string, error)
+	PasswordResetLinkWithSettings(ctx context.Context, email string, settings *fbauth.ActionCodeSettings) (string, error)
+	EmailSignInLink(ctx context.Context, email string, settings *fbauth.ActionCodeSettings) (string, error)
+	VerifyIDToken(ctx context.Context, idToken string) (*fbauth.Token, error)
 }
 
-func (f *FirebaseAuthClient) CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error) {
-	fbUser := (&auth.UserToCreate{}).
+func (f *FirebaseAuthClient) CreateUser(ctx context.Context, user *auth.UserToCreate) (*auth.UserRecord, error) {
+	fbUser := (&fbauth.UserToCreate{}).
 		Email(user.GetEmail()).
 		EmailVerified(user.GetEmailVerified()).
 		DisplayName(user.GetDisplayName()).
@@ -132,8 +212,8 @@ func (f *FirebaseAuthClient) CreateUser(ctx context.Context, user *UserToCreate)
 	return convertFirebaseUserRecord(record), nil
 }
 
-func (f *FirebaseAuthClient) UpdateUser(ctx context.Context, uid string, user *UserToUpdate) (*UserRecord, error) {
-	fbUser := &auth.UserToUpdate{}
+func (f *FirebaseAuthClient) UpdateUser(ctx context.Context, uid string, user *auth.UserToUpdate) (*auth.UserRecord, error) {
+	fbUser := &fbauth.UserToUpdate{}
 
 	if email := user.GetEmail(); email != nil {
 		fbUser = fbUser.Email(*email)
@@ -170,7 +250,7 @@ func (f *FirebaseAuthClient) DeleteUser(ctx context.Context, uid string) error {
 	return nil
 }
 
-func (f *FirebaseAuthClient) GetUser(ctx context.Context, uid string) (*UserRecord, error) {
+func (f *FirebaseAuthClient) GetUser(ctx context.Context, uid string) (*auth.UserRecord, error) {
 	record, err := f.client.GetUser(ctx, uid)
 	if err != nil {
 		return nil, convertFirebaseError(err)
@@ -178,7 +258,7 @@ func (f *FirebaseAuthClient) GetUser(ctx context.Context, uid string) (*UserReco
 	return convertFirebaseUserRecord(record), nil
 }
 
-func (f *FirebaseAuthClient) GetUserByEmail(ctx context.Context, email string) (*UserRecord, error) {
+func (f *FirebaseAuthClient) GetUserByEmail(ctx context.Context, email string) (*auth.UserRecord, error) {
 	record, err := f.client.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, convertFirebaseError(err)
@@ -210,7 +290,7 @@ func (f *FirebaseAuthClient) PasswordResetLink(ctx context.Context, email string
 	return link, nil
 }
 
-func (f *FirebaseAuthClient) EmailVerificationLinkWithSettings(ctx context.Context, email string, settings *ActionCodeSettings) (string, error) {
+func (f *FirebaseAuthClient) EmailVerificationLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
 	fbSettings := convertToFirebaseActionCodeSettings(settings)
 	link, err := f.client.EmailVerificationLinkWithSettings(ctx, email, fbSettings)
 	if err != nil {
@@ -219,7 +299,7 @@ func (f *FirebaseAuthClient) EmailVerificationLinkWithSettings(ctx context.Conte
 	return link, nil
 }
 
-func (f *FirebaseAuthClient) PasswordResetLinkWithSettings(ctx context.Context, email string, settings *ActionCodeSettings) (string, error) {
+func (f *FirebaseAuthClient) PasswordResetLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
 	fbSettings := convertToFirebaseActionCodeSettings(settings)
 	link, err := f.client.PasswordResetLinkWithSettings(ctx, email, fbSettings)
 	if err != nil {
@@ -228,7 +308,7 @@ func (f *FirebaseAuthClient) PasswordResetLinkWithSettings(ctx context.Context, 
 	return link, nil
 }
 
-func (f *FirebaseAuthClient) EmailSignInLink(ctx context.Context, email string, settings *ActionCodeSettings) (string, error) {
+func (f *FirebaseAuthClient) EmailSignInLink(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
 	fbSettings := convertToFirebaseActionCodeSettings(settings)
 	link, err := f.client.EmailSignInLink(ctx, email, fbSettings)
 	if err != nil {
@@ -237,12 +317,12 @@ func (f *FirebaseAuthClient) EmailSignInLink(ctx context.Context, email string, 
 	return link, nil
 }
 
-func (f *FirebaseAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*Token, error) {
+func (f *FirebaseAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error) {
 	token, err := f.client.VerifyIDToken(ctx, idToken)
 	if err != nil {
 		return nil, convertFirebaseError(err)
 	}
-	return &Token{
+	return &auth.Token{
 		UID:    token.UID,
 		Claims: token.Claims,
 	}, nil
@@ -250,27 +330,24 @@ func (f *FirebaseAuthClient) VerifyIDToken(ctx context.Context, idToken string) 
 
 // FirebaseTenantManager implements TenantManager for Firebase
 type FirebaseTenantManager struct {
-	client   *auth.Client
+	client   *fbauth.Client
 	provider *FirebaseAuthProvider
 }
 
-func (f *FirebaseTenantManager) CreateTenant(ctx context.Context, config *TenantConfig) (*Tenant, error) {
-	tenantConfig := (&auth.TenantToCreate{}).
+func (f *FirebaseTenantManager) CreateTenant(ctx context.Context, config *auth.TenantConfig) (*auth.Tenant, error) {
+	tenantConfig := (&fbauth.TenantToCreate{}).
 		DisplayName(config.DisplayName)
-
-	// Note: Firebase SDK methods may vary - adjust based on your version
-	// These are placeholder implementations
 
 	fbTenant, err := f.client.TenantManager.CreateTenant(ctx, tenantConfig)
 	if err != nil {
-		return nil, &AuthError{
+		return nil, &auth.AuthError{
 			Code:    "tenant-creation-failed",
 			Message: "failed to create tenant",
 			Err:     err,
 		}
 	}
 
-	return &Tenant{
+	return &auth.Tenant{
 		ID:                    fbTenant.ID,
 		DisplayName:           fbTenant.DisplayName,
 		EnableEmailLinkSignIn: config.EnableEmailLinkSignIn,
@@ -278,20 +355,20 @@ func (f *FirebaseTenantManager) CreateTenant(ctx context.Context, config *Tenant
 	}, nil
 }
 
-func (f *FirebaseTenantManager) UpdateTenant(ctx context.Context, tenantID string, config *TenantConfig) (*Tenant, error) {
-	tenantConfig := (&auth.TenantToUpdate{}).
+func (f *FirebaseTenantManager) UpdateTenant(ctx context.Context, tenantID string, config *auth.TenantConfig) (*auth.Tenant, error) {
+	tenantConfig := (&fbauth.TenantToUpdate{}).
 		DisplayName(config.DisplayName)
 
 	fbTenant, err := f.client.TenantManager.UpdateTenant(ctx, tenantID, tenantConfig)
 	if err != nil {
-		return nil, &AuthError{
+		return nil, &auth.AuthError{
 			Code:    "tenant-update-failed",
 			Message: "failed to update tenant",
 			Err:     err,
 		}
 	}
 
-	return &Tenant{
+	return &auth.Tenant{
 		ID:                    fbTenant.ID,
 		DisplayName:           fbTenant.DisplayName,
 		EnableEmailLinkSignIn: config.EnableEmailLinkSignIn,
@@ -302,14 +379,13 @@ func (f *FirebaseTenantManager) UpdateTenant(ctx context.Context, tenantID strin
 func (f *FirebaseTenantManager) DeleteTenant(ctx context.Context, tenantID string) error {
 	err := f.client.TenantManager.DeleteTenant(ctx, tenantID)
 	if err != nil {
-		return &AuthError{
+		return &auth.AuthError{
 			Code:    "tenant-deletion-failed",
 			Message: "failed to delete tenant",
 			Err:     err,
 		}
 	}
 
-	// Remove from cache
 	f.provider.mu.Lock()
 	delete(f.provider.tenantClients, tenantID)
 	f.provider.mu.Unlock()
@@ -317,32 +393,32 @@ func (f *FirebaseTenantManager) DeleteTenant(ctx context.Context, tenantID strin
 	return nil
 }
 
-func (f *FirebaseTenantManager) GetTenant(ctx context.Context, tenantID string) (*Tenant, error) {
+func (f *FirebaseTenantManager) GetTenant(ctx context.Context, tenantID string) (*auth.Tenant, error) {
 	fbTenant, err := f.client.TenantManager.Tenant(ctx, tenantID)
 	if err != nil {
-		return nil, &AuthError{
-			Code:    ErrorCodeTenantNotFound,
+		return nil, &auth.AuthError{
+			Code:    auth.ErrorCodeTenantNotFound,
 			Message: "failed to get tenant",
 			Err:     err,
 		}
 	}
 
-	return &Tenant{
+	return &auth.Tenant{
 		ID:                    fbTenant.ID,
 		DisplayName:           fbTenant.DisplayName,
-		EnableEmailLinkSignIn: false, // Firebase tenant doesn't expose this
-		AllowPasswordSignUp:   true,  // Firebase tenant doesn't expose this
+		EnableEmailLinkSignIn: false,
+		AllowPasswordSignUp:   true,
 	}, nil
 }
 
-func (f *FirebaseTenantManager) AuthForTenant(ctx context.Context, tenantID string) (AuthClient, error) {
+func (f *FirebaseTenantManager) AuthForTenant(ctx context.Context, tenantID string) (auth.AuthClient, error) {
 	return f.provider.GetAuthClientForTenant(ctx, tenantID)
 }
 
 // Helper functions
 
-func convertFirebaseUserRecord(fbUser *auth.UserRecord) *UserRecord {
-	return &UserRecord{
+func convertFirebaseUserRecord(fbUser *fbauth.UserRecord) *auth.UserRecord {
+	return &auth.UserRecord{
 		UID:           fbUser.UID,
 		Email:         fbUser.Email,
 		EmailVerified: fbUser.EmailVerified,
@@ -354,11 +430,11 @@ func convertFirebaseUserRecord(fbUser *auth.UserRecord) *UserRecord {
 	}
 }
 
-func convertToFirebaseActionCodeSettings(settings *ActionCodeSettings) *auth.ActionCodeSettings {
+func convertToFirebaseActionCodeSettings(settings *auth.ActionCodeSettings) *fbauth.ActionCodeSettings {
 	if settings == nil {
 		return nil
 	}
-	return &auth.ActionCodeSettings{
+	return &fbauth.ActionCodeSettings{
 		URL:                   settings.URL,
 		HandleCodeInApp:       settings.HandleCodeInApp,
 		DynamicLinkDomain:     settings.DynamicLinkDomain,
@@ -374,26 +450,47 @@ func convertFirebaseError(err error) error {
 		return nil
 	}
 
-	// Check for specific Firebase errors
-	if auth.IsUserNotFound(err) {
-		return &AuthError{
-			Code:    ErrorCodeUserNotFound,
+	if fbauth.IsUserNotFound(err) {
+		return &auth.AuthError{
+			Code:    auth.ErrorCodeUserNotFound,
 			Message: "user not found",
 			Err:     err,
 		}
 	}
-	if auth.IsEmailAlreadyExists(err) {
-		return &AuthError{
-			Code:    ErrorCodeEmailAlreadyExists,
+	if fbauth.IsEmailAlreadyExists(err) {
+		return &auth.AuthError{
+			Code:    auth.ErrorCodeEmailAlreadyExists,
 			Message: "email already exists",
 			Err:     err,
 		}
 	}
 
-	// Generic error
-	return &AuthError{
+	return &auth.AuthError{
 		Code:    "unknown",
 		Message: "authentication error",
 		Err:     err,
 	}
+}
+
+// initializeFirebaseClient initializes Firebase client from FIREBASE_CONFIG environment variable
+func initializeFirebaseClient(ctx context.Context) (*fbauth.Client, error) {
+	firebaseConfig := os.Getenv("FIREBASE_CONFIG")
+	if firebaseConfig == "" {
+		return nil, fmt.Errorf("FIREBASE_CONFIG environment variable is not set")
+	}
+
+	// Initialize Firebase app with credentials from JSON string
+	opt := option.WithCredentialsJSON([]byte(firebaseConfig))
+	app, err := firebase.NewApp(ctx, nil, opt)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing firebase app: %w", err)
+	}
+
+	// Get Auth client
+	client, err := app.Auth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting firebase auth client: %w", err)
+	}
+
+	return client, nil
 }

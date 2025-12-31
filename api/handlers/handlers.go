@@ -25,7 +25,7 @@ type Handlers struct {
 	*core.MigrationHandler
 }
 
-func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool *auth.AuthProviderAdapter, multiTenantService *access.MultitenantService, clientAppService *access.ClientApplicationService) Handlers {
+func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool auth.AuthProvider, multiTenantService *access.MultitenantService, clientAppService *access.ClientApplicationService) Handlers {
 	store := db.NewStore(connPool)
 	handlers := Handlers{
 		GlobalConfigHandler:      config.NewGlobalConfigHandler(store, authClientPool),

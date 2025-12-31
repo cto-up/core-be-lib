@@ -3,13 +3,14 @@ package service
 import (
 	"net/http"
 
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
 
 // NewWSAuthMiddlewareWithQueryParams creates WebSocket auth middleware that extracts token from query params
 // This is useful for mobile apps and browsers that can't send custom headers in WebSocket connections
-func NewWSAuthMiddlewareWithQueryParams(authProvider AuthProvider) gin.HandlerFunc {
+func NewWSAuthMiddlewareWithQueryParams(authProvider auth.AuthProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract token from query parameter
 		token := c.Query("token")
@@ -45,9 +46,9 @@ func NewWSAuthMiddlewareWithQueryParams(authProvider AuthProvider) gin.HandlerFu
 		}
 
 		// Store authenticated user info in context
-		c.Set(AUTH_EMAIL, user.Email)
-		c.Set(AUTH_USER_ID, user.UserID)
-		c.Set(AUTH_CLAIMS, user.Claims)
+		c.Set(auth.AUTH_EMAIL, user.Email)
+		c.Set(auth.AUTH_USER_ID, user.UserID)
+		c.Set(auth.AUTH_CLAIMS, user.Claims)
 
 		c.Next()
 	}
@@ -55,7 +56,7 @@ func NewWSAuthMiddlewareWithQueryParams(authProvider AuthProvider) gin.HandlerFu
 
 // NewWSAuthMiddlewareWithHeaderFallback creates WebSocket auth middleware that tries header first, then query params
 // This provides flexibility for different client types
-func NewWSAuthMiddlewareWithHeaderFallback(authProvider AuthProvider) gin.HandlerFunc {
+func NewWSAuthMiddlewareWithHeaderFallback(authProvider auth.AuthProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Try to get token from Authorization header first
 		authHeader := c.GetHeader("Authorization")
@@ -96,9 +97,9 @@ func NewWSAuthMiddlewareWithHeaderFallback(authProvider AuthProvider) gin.Handle
 		}
 
 		// Store authenticated user info in context
-		c.Set(AUTH_EMAIL, user.Email)
-		c.Set(AUTH_USER_ID, user.UserID)
-		c.Set(AUTH_CLAIMS, user.Claims)
+		c.Set(auth.AUTH_EMAIL, user.Email)
+		c.Set(auth.AUTH_USER_ID, user.UserID)
+		c.Set(auth.AUTH_CLAIMS, user.Claims)
 
 		c.Next()
 	}

@@ -10,20 +10,19 @@ import (
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
-	access "ctoup.com/coreapp/pkg/shared/service"
-	"firebase.google.com/go/auth"
 )
 
 type SeedService struct {
 	store  *db.Store
-	client *auth.Client
+	client auth.AuthClient
 }
 
-func NewSeedService(store *db.Store, pool *access.FirebaseTenantClientConnectionPool) *SeedService {
+func NewSeedService(store *db.Store, authProvider auth.AuthProvider) *SeedService {
 	return &SeedService{
 		store:  store,
-		client: pool.GetClient(),
+		client: authProvider.GetAuthClient(),
 	}
 }
 

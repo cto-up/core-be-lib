@@ -9,6 +9,7 @@ import (
 
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	access "ctoup.com/coreapp/pkg/shared/service"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,7 @@ func getTenantPictureFilePath(tenantID string, pictureType string) string {
 // getTenantPicture is a generic function to get a tenant picture
 func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
 	// Get tenant ID from context
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -38,7 +39,7 @@ func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
 // uploadTenantPicture is a generic function to upload a tenant picture
 func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) {
 	// Get tenant ID from context
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return

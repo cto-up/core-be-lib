@@ -12,6 +12,7 @@ import (
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -546,7 +547,7 @@ func APITokenMiddleware(clientAppService *ClientApplicationService) gin.HandlerF
 
 		// If token has a tenant ID, set it for the tenant middleware
 		if apiToken.TenantID.Valid {
-			c.Set(AUTH_TENANT_ID_KEY, apiToken.TenantID.String)
+			c.Set(auth.AUTH_TENANT_ID_KEY, apiToken.TenantID.String)
 		}
 
 		c.Next()

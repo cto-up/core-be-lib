@@ -10,7 +10,6 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
-	access "ctoup.com/coreapp/pkg/shared/service"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -20,13 +19,13 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type TenantConfigHandler struct {
-	authClientPool *auth.AuthProviderAdapter
-	store          *db.Store
+	authProvider auth.AuthProvider
+	store        *db.Store
 }
 
 // AddTenantConfig implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) AddTenantConfig(c *gin.Context) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -36,7 +35,7 @@ func (exh *TenantConfigHandler) AddTenantConfig(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-	userID, exist := c.Get(access.AUTH_USER_ID)
+	userID, exist := c.Get(auth.AUTH_USER_ID)
 	if !exist {
 		// should not happen as the middleware ensures that the user is authenticated
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
@@ -58,7 +57,7 @@ func (exh *TenantConfigHandler) AddTenantConfig(c *gin.Context) {
 
 // UpdateTenantConfig implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) UpdateTenantConfig(c *gin.Context, id uuid.UUID) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -84,7 +83,7 @@ func (exh *TenantConfigHandler) UpdateTenantConfig(c *gin.Context, id uuid.UUID)
 
 // DeleteTenantConfig implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) DeleteTenantConfig(c *gin.Context, id uuid.UUID) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -102,7 +101,7 @@ func (exh *TenantConfigHandler) DeleteTenantConfig(c *gin.Context, id uuid.UUID)
 
 // FindTenantConfigByID implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) GetTenantConfigByID(c *gin.Context, id uuid.UUID) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -124,7 +123,7 @@ func (exh *TenantConfigHandler) GetTenantConfigByID(c *gin.Context, id uuid.UUID
 
 // ListTenantConfigs implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) ListTenantConfigs(c *gin.Context, params core.ListTenantConfigsParams) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -182,9 +181,9 @@ func (exh *TenantConfigHandler) ListTenantConfigs(c *gin.Context, params core.Li
 	}
 }
 
-func NewTenantConfigHandler(store *db.Store, authClientPool *auth.AuthProviderAdapter) *TenantConfigHandler {
+func NewTenantConfigHandler(store *db.Store, authProvider auth.AuthProvider) *TenantConfigHandler {
 	return &TenantConfigHandler{
-		store:          store,
-		authClientPool: authClientPool,
+		store:        store,
+		authProvider: authProvider,
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"firebase.google.com/go/auth"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,16 +63,8 @@ func TestAddAuthorizeDomains(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock auth client
-			authClient := &auth.Client{}
-
-			// Call the function
-			// initialize Firebase Auth client
 			ctx := context.Background()
-			authClient, err := newFirebaseClient(ctx)
-			require.NoError(t, err)
-
-			err = SDKAddAuthorizedDomains(ctx, authClient, tt.domains)
+			err := SDKAddAuthorizedDomains(ctx, tt.domains)
 
 			// Check results
 			if tt.expectedError != "" {
@@ -106,16 +97,8 @@ func TestDeleteAuthorizeDomains(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock auth client
-			authClient := &auth.Client{}
-
-			// Call the function
-			// initialize Firebase Auth client
 			ctx := context.Background()
-			authClient, err := newFirebaseClient(ctx)
-			require.NoError(t, err)
-
-			err = SDKRemoveAuthorizedDomains(ctx, authClient, tt.domains)
+			err := SDKRemoveAuthorizedDomains(ctx, tt.domains)
 
 			// Check results
 			if tt.expectedError != "" {

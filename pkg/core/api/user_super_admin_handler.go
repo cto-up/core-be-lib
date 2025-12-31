@@ -20,9 +20,9 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type UserSuperAdminHandler struct {
-	store          *db.Store
-	authClientPool *sharedauth.AuthProviderAdapter
-	userService    *access.UserService
+	store        *db.Store
+	authProvider sharedauth.AuthProvider
+	userService  *access.UserService
 }
 
 // AddUser implements openapi.ServerInterface.
@@ -38,7 +38,7 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClientForTenant(tenant.TenantID)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -74,7 +74,7 @@ func (uh *UserSuperAdminHandler) UpdateUserFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClientForTenant(tenant.TenantID)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -94,7 +94,7 @@ func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClientForTenant(tenant.TenantID)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -115,7 +115,7 @@ func (uh *UserSuperAdminHandler) GetUserByIDFromSuperAdmin(c *gin.Context, tenan
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClientForTenant(tenant.TenantID)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -174,7 +174,7 @@ func (uh *UserSuperAdminHandler) AssignRoleFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClientForTenant(tenant.TenantID)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -196,7 +196,7 @@ func (uh *UserSuperAdminHandler) UnassignRoleFromSuperAdmin(c *gin.Context, tena
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClientForTenant(tenant.TenantID)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -223,7 +223,7 @@ func (uh *UserSuperAdminHandler) UpdateUserStatusFromSuperAdmin(c *gin.Context, 
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClientForTenant(tenant.TenantID)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
@@ -269,9 +269,9 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 
 	url := fmt.Sprintf("%s/signin?from=/", hostUrl)
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, tenant.Subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, tenant.Subdomain)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get auth client"})
 		return
 	}
 	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
@@ -282,8 +282,8 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
 }
 
-func NewUserSuperAdminHandler(store *db.Store, authClientPool *sharedauth.AuthProviderAdapter) *UserSuperAdminHandler {
-	userService := access.NewUserService(store, authClientPool)
+func NewUserSuperAdminHandler(store *db.Store, authProvider sharedauth.AuthProvider) *UserSuperAdminHandler {
+	userService := access.NewUserService(store, authProvider)
 
 	// Try to initialize user event callback if available
 	// This allows the realtime module to set up the callback for user creation events
@@ -292,7 +292,7 @@ func NewUserSuperAdminHandler(store *db.Store, authClientPool *sharedauth.AuthPr
 	}
 
 	handler := &UserSuperAdminHandler{store: store,
-		authClientPool: authClientPool,
-		userService:    userService}
+		authProvider: authProvider,
+		userService:  userService}
 	return handler
 }

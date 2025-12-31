@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -12,22 +13,17 @@ import (
 const (
 	// Header key for API tokens
 	XApiKeyHeader = "X-Api-Key"
-
-	// Context keys for authenticated user info
-	AUTH_EMAIL   = "auth_email"
-	AUTH_USER_ID = "auth_user_id"
-	AUTH_CLAIMS  = "auth_claims"
 )
 
 // AuthMiddleware combines both API token and provider-based authentication
 type AuthMiddleware struct {
-	authProvider AuthProvider
+	authProvider auth.AuthProvider
 	apiToken     *ClientApplicationService
 }
 
 // NewAuthMiddleware creates a new combined authentication middleware
 func NewAuthMiddleware(
-	authProvider AuthProvider,
+	authProvider auth.AuthProvider,
 	apiToken *ClientApplicationService,
 ) *AuthMiddleware {
 	return &AuthMiddleware{
@@ -59,9 +55,9 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					// API token is valid, store info and continue
 					c.Set("api_token", tokenRow)
 					c.Set("api_token_scopes", tokenRow.Scopes)
-					// c.Set(AUTH_EMAIL,)
-					// c.Set(AUTH_CLAIMS, idToken.Claims)
-					c.Set(AUTH_USER_ID, tokenRow.CreatedBy)
+					// c.Set(auth.AUTH_EMAIL,)
+					// c.Set(auth.AUTH_CLAIMS, idToken.Claims)
+					c.Set(auth.AUTH_USER_ID, tokenRow.CreatedBy)
 					c.Next()
 					return
 				} else {
@@ -116,14 +112,14 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 }
 
 // setAuthenticatedUser stores user info in gin context
-func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *AuthenticatedUser) {
-	c.Set(AUTH_EMAIL, user.Email)
-	c.Set(AUTH_USER_ID, user.UserID)
-	c.Set(AUTH_CLAIMS, user.Claims)
+func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *auth.AuthenticatedUser) {
+	c.Set(auth.AUTH_EMAIL, user.Email)
+	c.Set(auth.AUTH_USER_ID, user.UserID)
+	c.Set(auth.AUTH_CLAIMS, user.Claims)
 }
 
 // checkPermissions validates role-based access control
-func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *AuthenticatedUser) bool {
+func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.AuthenticatedUser) bool {
 	claims := user.Claims
 
 	// Only admin users can alter users
@@ -171,10 +167,10 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *AuthenticatedUs
 }
 
 // GetAuthenticatedUser retrieves the authenticated user from context
-func GetAuthenticatedUser(c *gin.Context) *AuthenticatedUser {
-	email, _ := c.Get(AUTH_EMAIL)
-	userID, _ := c.Get(AUTH_USER_ID)
-	claims, _ := c.Get(AUTH_CLAIMS)
+func GetAuthenticatedUser(c *gin.Context) *auth.AuthenticatedUser {
+	email, _ := c.Get(auth.AUTH_EMAIL)
+	userID, _ := c.Get(auth.AUTH_USER_ID)
+	claims, _ := c.Get(auth.AUTH_CLAIMS)
 
 	emailStr, _ := email.(string)
 	userIDStr, _ := userID.(string)
@@ -182,7 +178,7 @@ func GetAuthenticatedUser(c *gin.Context) *AuthenticatedUser {
 
 	customClaims := util.FilterMapToArray(claimsMap, util.UppercaseOnly)
 
-	return &AuthenticatedUser{
+	return &auth.AuthenticatedUser{
 		UserID:       userIDStr,
 		Email:        emailStr,
 		Claims:       claimsMap,
