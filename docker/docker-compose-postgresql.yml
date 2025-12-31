@@ -1,0 +1,17 @@
+# This configuration is intended for development purpose, it's **your** responsibility to harden it for production
+services:
+  alpha-postgresql-vector:
+    image: pgvector/pgvector:pg17
+    environment:
+      - POSTGRES_USER=alpha
+      - POSTGRES_PASSWORD=alpha
+      - POSTGRES_DB=alpha
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    # If you want to expose these ports outside your dev PC,
+    # remove the "127.0.0.1:" prefix
+    volumes:
+      - pgdatalocal:/var/lib/postgresql/data
+    ports:
+      - 127.0.0.1:5432:5432
+volumes:
+  pgdatalocal:
