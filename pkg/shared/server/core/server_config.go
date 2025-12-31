@@ -14,6 +14,8 @@ import (
 	// [DO NOT REMOVE COMMENT - Import]
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/shared/auth"
+	_ "ctoup.com/coreapp/pkg/shared/auth/firebase"
+	_ "ctoup.com/coreapp/pkg/shared/auth/kratos"
 	"ctoup.com/coreapp/pkg/shared/service"
 
 	"ctoup.com/coreapp/pkg/shared/seedservice"
@@ -36,7 +38,7 @@ import (
 
 type ServerConfig struct {
 	Router           *gin.Engine
-	TenantClientPool *service.FirebaseTenantClientConnectionPool
+	AuthProvider     auth.AuthProvider
 	TenantMiddleware *service.TenantMiddleware
 	AuthMiddleware   *service.AuthMiddleware
 	APIOptions       core.GinServerOptions
@@ -95,29 +97,18 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 
 	multiTenantService := service.NewMultitenantService(coreStore)
 
-	firebaseTenantClientPool, err := service.NewFirebaseTenantClientConnectionPool(context.Background(), multiTenantService)
+	// Initialize the auth provider based on environment (Firebase or Kratos)
+	authProvider, err := auth.InitializeAuthProvider(context.Background(), multiTenantService)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Cannot create NewFirebaseTenantClientConnectionPool!")
+		log.Fatal().Err(err).Msg("Failed to initialize auth provider")
 	}
-
-	// Get the base Firebase auth client
-	baseFirebaseClient := firebaseTenantClientPool.GetClient()
-
-	// Create Firebase auth provider using the new abstraction (can be swapped with KratosAuthProvider or custom implementation)
-	firebaseAuthProvider := auth.NewFirebaseAuthProvider(context.Background(), baseFirebaseClient, multiTenantService)
-
-	// Create the auth provider adapter for backward compatibility with handlers
-	authProviderAdapter := auth.NewAuthProviderAdapter(firebaseAuthProvider, multiTenantService)
-
-	// Create the old-style service auth provider for middleware (temporary during migration)
-	serviceAuthProvider := service.NewFirebaseAuthProvider(firebaseTenantClientPool, multiTenantService)
 
 	tenantMiddleWare := service.NewTenantMiddleware(nil, multiTenantService)
 	clientAppService := service.NewClientApplicationService(coreStore)
 
-	// Create the combined auth middleware with pluggable auth provider
+	// Create the combined auth middleware with the generic auth provider
 	authMiddleware := service.NewAuthMiddleware(
-		serviceAuthProvider, // Can be replaced with service.NewKratosAuthProvider(kratosURL)
+		authProvider,
 		clientAppService,
 	)
 
@@ -132,16 +123,16 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	}
 
 	// Seed
-	seedService := seedservice.NewSeedService(coreStore, firebaseTenantClientPool)
+	seedService := seedservice.NewSeedService(coreStore, authProvider)
 	seedService.Seed()
 
-	handlers := handlers.CreateCoreHandlers(connPool, authProviderAdapter, multiTenantService, clientAppService)
+	handlers := handlers.CreateCoreHandlers(connPool, authProvider, multiTenantService, clientAppService)
 
 	core.RegisterHandlersWithOptions(router, handlers, apiOptions)
 
 	return &ServerConfig{
 		Router:           router,
-		TenantClientPool: firebaseTenantClientPool,
+		AuthProvider:     authProvider,
 		TenantMiddleware: tenantMiddleWare,
 		AuthMiddleware:   authMiddleware,
 		APIOptions:       apiOptions,

@@ -9,7 +9,6 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
-	access "ctoup.com/coreapp/pkg/shared/service"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,8 +18,8 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type GlobalConfigHandler struct {
-	authClientPool *auth.AuthProviderAdapter
-	store          *db.Store
+	authProvider auth.AuthProvider
+	store        *db.Store
 }
 
 // AddGlobalConfig implements openapi.ServerInterface.
@@ -30,7 +29,7 @@ func (exh *GlobalConfigHandler) AddGlobalConfig(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-	userID, exist := c.Get(access.AUTH_USER_ID)
+	userID, exist := c.Get(auth.AUTH_USER_ID)
 	if !exist {
 		// should not happen as the middleware ensures that the user is authenticated
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
@@ -147,9 +146,9 @@ func (exh *GlobalConfigHandler) ListGlobalConfigs(c *gin.Context, params core.Li
 	}
 }
 
-func NewGlobalConfigHandler(store *db.Store, authClientPool *auth.AuthProviderAdapter) *GlobalConfigHandler {
+func NewGlobalConfigHandler(store *db.Store, authProvider auth.AuthProvider) *GlobalConfigHandler {
 	return &GlobalConfigHandler{
-		store:          store,
-		authClientPool: authClientPool,
+		store:        store,
+		authProvider: authProvider,
 	}
 }

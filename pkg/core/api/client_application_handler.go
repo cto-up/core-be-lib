@@ -8,6 +8,7 @@ import (
 	core "ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
@@ -195,7 +196,7 @@ func toAPIAuditLog(log repository.CoreApiTokenAuditLog) core.APITokenAuditLog {
 func (h *ClientApplicationHandler) ListClientApplications(c *gin.Context, params core.ListClientApplicationsParams) {
 	// Only super admins can access this endpoint
 	// The middleware should already check for SUPER_ADMIN role
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -258,7 +259,7 @@ func (h *ClientApplicationHandler) ListClientApplications(c *gin.Context, params
 // CreateClientApplication creates a new client application
 func (h *ClientApplicationHandler) CreateClientApplication(c *gin.Context) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -294,7 +295,7 @@ func (h *ClientApplicationHandler) CreateClientApplication(c *gin.Context) {
 // GetClientApplicationById returns a client application by ID
 func (h *ClientApplicationHandler) GetClientApplicationById(c *gin.Context, id uuid.UUID) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -318,7 +319,7 @@ func (h *ClientApplicationHandler) GetClientApplicationById(c *gin.Context, id u
 // UpdateClientApplication updates a client application
 func (h *ClientApplicationHandler) UpdateClientApplication(c *gin.Context, id uuid.UUID) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -367,7 +368,7 @@ func (h *ClientApplicationHandler) UpdateClientApplication(c *gin.Context, id uu
 // DeleteClientApplication deletes a client application
 func (h *ClientApplicationHandler) DeleteClientApplication(c *gin.Context, id uuid.UUID) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -386,7 +387,7 @@ func (h *ClientApplicationHandler) DeleteClientApplication(c *gin.Context, id uu
 // DeactivateClientApplication deactivates a client application
 func (h *ClientApplicationHandler) DeactivateClientApplication(c *gin.Context, id uuid.UUID) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -406,7 +407,7 @@ func (h *ClientApplicationHandler) DeactivateClientApplication(c *gin.Context, i
 // ListAPITokens lists API tokens for a client application
 func (h *ClientApplicationHandler) ListAPITokens(c *gin.Context, id uuid.UUID, params core.ListAPITokensParams) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -468,7 +469,7 @@ func (h *ClientApplicationHandler) ListAPITokens(c *gin.Context, id uuid.UUID, p
 // CreateAPIToken creates a new API token for a client application
 func (h *ClientApplicationHandler) CreateAPIToken(c *gin.Context, id uuid.UUID) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -524,7 +525,7 @@ func (h *ClientApplicationHandler) CreateAPIToken(c *gin.Context, id uuid.UUID) 
 // GetAPITokenById retrieves an API token by ID
 func (h *ClientApplicationHandler) GetAPITokenById(c *gin.Context, id uuid.UUID, tokenId uuid.UUID) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -553,7 +554,7 @@ func (h *ClientApplicationHandler) GetAPITokenById(c *gin.Context, id uuid.UUID,
 // DeleteAPIToken deletes an API token
 func (h *ClientApplicationHandler) DeleteAPIToken(c *gin.Context, id uuid.UUID, tokenId uuid.UUID) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -589,7 +590,7 @@ func (h *ClientApplicationHandler) DeleteAPIToken(c *gin.Context, id uuid.UUID, 
 // RevokeAPIToken revokes an API token
 func (h *ClientApplicationHandler) RevokeAPIToken(c *gin.Context, id uuid.UUID, tokenId uuid.UUID) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -669,7 +670,7 @@ func (h *ClientApplicationHandler) RevokeAPIToken(c *gin.Context, id uuid.UUID, 
 // GetAPITokenAuditLogs retrieves audit logs for an API token
 func (h *ClientApplicationHandler) GetAPITokenAuditLogs(c *gin.Context, id uuid.UUID, tokenId uuid.UUID, params core.GetAPITokenAuditLogsParams) {
 	// Only super admins can access this endpoint
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return

@@ -6,8 +6,8 @@ import (
 
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
-	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 
@@ -37,7 +37,7 @@ func (s *TenantHandler) GetTenantProfile(ctx *gin.Context) {
 }
 
 func (s *TenantHandler) UpdateTenantProfile(ctx *gin.Context) {
-	tenantID, exists := ctx.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := ctx.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		ctx.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return

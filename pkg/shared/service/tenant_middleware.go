@@ -3,11 +3,10 @@ package service
 import (
 	"net/http"
 
+	"ctoup.com/coreapp/pkg/shared/auth"
 	utils "ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 )
-
-const AUTH_TENANT_ID_KEY = "auth_tenant_id"
 
 // TenantMiddleware is middleware for Firebase Authentication
 type TenantMiddleware struct {
@@ -41,7 +40,7 @@ func (fam *TenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			ctx.Abort()
 			return
 		}
-		ctx.Set(AUTH_TENANT_ID_KEY, tenantID)
+		ctx.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
 		ctx.Next()
 	}
 }

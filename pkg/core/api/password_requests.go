@@ -5,9 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/emailservice"
-	"ctoup.com/coreapp/pkg/shared/service"
-	"firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
@@ -40,7 +39,7 @@ func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 	return url, nil
 }
 
-func resetPasswordRequest(c *gin.Context, baseAuthClient service.BaseAuthClient, url, toEmail string) error {
+func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail string) error {
 	fromEmail := os.Getenv("SYSTEM_EMAIL")
 	if fromEmail == "" {
 		fromEmail = "noreply@ctoup.com"
@@ -95,7 +94,7 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient service.BaseAuthClient,
 	return nil
 }
 
-func sendWelcomeEmail(c *gin.Context, baseAuthClient service.BaseAuthClient, url, toEmail string) error {
+func sendWelcomeEmail(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail string) error {
 	fromEmail := os.Getenv("SYSTEM_EMAIL")
 	if fromEmail == "" {
 		fromEmail = "noreply@ctoup.com"

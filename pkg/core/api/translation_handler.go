@@ -6,7 +6,7 @@ import (
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
-	access "ctoup.com/coreapp/pkg/shared/service"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -19,7 +19,7 @@ import (
 
 // CreateTranslation implements core.ServerInterface.
 func (h *TranslationHandler) CreateTranslation(c *gin.Context) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -49,7 +49,7 @@ func (h *TranslationHandler) CreateTranslation(c *gin.Context) {
 
 // DeleteTranslation implements core.ServerInterface.
 func (h *TranslationHandler) DeleteTranslation(c *gin.Context, id types.UUID) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -69,7 +69,7 @@ func (h *TranslationHandler) DeleteTranslation(c *gin.Context, id types.UUID) {
 
 // GetTranslationByID implements core.ServerInterface.
 func (h *TranslationHandler) GetTranslationByID(c *gin.Context, id types.UUID, params api.GetTranslationByIDParams) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -92,7 +92,7 @@ func (h *TranslationHandler) GetTranslationByID(c *gin.Context, id types.UUID, p
 }
 
 func (h *TranslationHandler) GetTranslation(c *gin.Context, params api.GetTranslationParams) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -119,7 +119,7 @@ func (h *TranslationHandler) GetTranslation(c *gin.Context, params api.GetTransl
 
 // ListTranslations implements core.ServerInterface.
 func (h *TranslationHandler) ListTranslations(c *gin.Context, params api.ListTranslationsParams) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -166,7 +166,7 @@ func (h *TranslationHandler) ListTranslations(c *gin.Context, params api.ListTra
 
 // UpdateTranslation implements core.ServerInterface.
 func (h *TranslationHandler) UpdateTranslation(c *gin.Context, id types.UUID) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return

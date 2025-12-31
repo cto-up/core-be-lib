@@ -26,14 +26,14 @@ import (
 
 type UserHandler struct {
 	store                    *db.Store
-	authClientPool           *auth.AuthProviderAdapter
+	authProvider             auth.AuthProvider
 	userService              *access.UserService
 	emailVerificationService *service.EmailVerificationService
 	fileService              *fileservice.FileService
 }
 
-func NewUserHandler(store *db.Store, authClientPool *auth.AuthProviderAdapter) *UserHandler {
-	userService := access.NewUserService(store, authClientPool)
+func NewUserHandler(store *db.Store, authProvider auth.AuthProvider) *UserHandler {
+	userService := access.NewUserService(store, authProvider)
 
 	// Try to initialize user event callback if available
 	// This allows the realtime module to set up the callback for user creation events
@@ -41,11 +41,11 @@ func NewUserHandler(store *db.Store, authClientPool *auth.AuthProviderAdapter) *
 		initFunc(userService)
 	}
 
-	emailVerificationService := service.NewEmailVerificationService(store, authClientPool)
+	emailVerificationService := service.NewEmailVerificationService(store, authProvider)
 	fileService := fileservice.NewFileService()
 	handler := &UserHandler{
 		store:                    store,
-		authClientPool:           authClientPool,
+		authProvider:             authProvider,
 		userService:              userService,
 		fileService:              fileService,
 		emailVerificationService: emailVerificationService,
@@ -69,13 +69,13 @@ func getProfilePictureFilePath(tenantId string, userId any) string {
 * in case user was created in firebase but not in the store
  */
 func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
-	userID, exist := ctx.Get(access.AUTH_USER_ID)
+	userID, exist := ctx.Get(auth.AUTH_USER_ID)
 	if !exist {
 		ctx.JSON(http.StatusBadRequest, "Need to be authenticated")
 		return
 	}
 
-	userEmail, exist := ctx.Get(access.AUTH_EMAIL)
+	userEmail, exist := ctx.Get(auth.AUTH_EMAIL)
 	if !exist {
 		ctx.JSON(http.StatusBadRequest, "Need to be authenticated")
 		return
@@ -94,12 +94,12 @@ func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
 }
 
 func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
-	tenantID, exists := ctx.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := ctx.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		ctx.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
-	authUserID, exists := ctx.Get(access.AUTH_USER_ID)
+	authUserID, exists := ctx.Get(auth.AUTH_USER_ID)
 	if !exists {
 		ctx.JSON(http.StatusBadRequest, "Not Authenticated")
 		return
@@ -129,7 +129,7 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 
 func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {
 
-	authUserID, exists := ctx.Get(access.AUTH_USER_ID)
+	authUserID, exists := ctx.Get(auth.AUTH_USER_ID)
 	if !exists {
 		ctx.JSON(http.StatusBadRequest, "Not Authenticated")
 		return
@@ -144,7 +144,7 @@ func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {
 	_, err := s.store.UpdateProfile(ctx, repository.UpdateProfileParams{
 		ID:       authUserID.(string),
 		Profile:  req,
-		TenantID: ctx.GetString(access.AUTH_TENANT_ID_KEY),
+		TenantID: ctx.GetString(auth.AUTH_TENANT_ID_KEY),
 	})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -181,14 +181,14 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 	//extension := filepath.Ext(file.Filename)
 	// Generate random file name for the new uploaded file so it doesn't override the old file with same name
 	//newFileName := uuid.New().String() + extension
-	userId, exist := c.Get(access.AUTH_USER_ID)
+	userId, exist := c.Get(auth.AUTH_USER_ID)
 	if !exist {
 		if err != nil {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 	}
-	tenantId, _ := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantId, _ := c.Get(auth.AUTH_TENANT_ID_KEY)
 	newFilePath := getProfilePictureFilePath(tenantId.(string), userId)
 
 	fileContent, err := file.Open()
@@ -219,7 +219,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 }
 
 func (s *UserHandler) GetProfilePicture(c *gin.Context, userId string, params core.GetProfilePictureParams) {
-	tenantId, _ := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantId, _ := c.Get(auth.AUTH_TENANT_ID_KEY)
 	filePath := getProfilePictureFilePath(tenantId.(string), userId)
 
 	s.fileService.GetFile(c, filePath)
@@ -240,7 +240,7 @@ func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
 		return
@@ -260,7 +260,7 @@ func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
 }
 
 func (uh *UserHandler) Signup(c *gin.Context) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -288,7 +288,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -331,7 +331,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 
 // VerifyEmail handles email verification using token
 func (uh *UserHandler) VerifyEmail(c *gin.Context) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -357,19 +357,19 @@ func (uh *UserHandler) VerifyEmail(c *gin.Context) {
 
 // ResendEmailVerification resends verification email to authenticated user
 func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
 		return
 	}
 
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "TenantID not found"})
 		return
 	}
 
-	userEmail, exists := c.Get(access.AUTH_EMAIL)
+	userEmail, exists := c.Get(auth.AUTH_EMAIL)
 	if !exists {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User email not found"})
 		return
@@ -411,19 +411,19 @@ func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
 
 // GetMyEmailVerificationStatus returns current user's email verification status
 func (uh *UserHandler) GetMyEmailVerificationStatus(c *gin.Context) {
-	userID, exists := c.Get(access.AUTH_USER_ID)
+	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
 		return
 	}
 
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "TenantID not found"})
 		return
 	}
 
-	userEmail, exists := c.Get(access.AUTH_EMAIL)
+	userEmail, exists := c.Get(auth.AUTH_EMAIL)
 	if !exists {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User email not found"})
 		return
@@ -444,7 +444,7 @@ func (uh *UserHandler) GetMyEmailVerificationStatus(c *gin.Context) {
 
 // GetUserByEmail implements openapi.ServerInterface.
 func (uh *UserHandler) GetUserByEmail(c *gin.Context, email string) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return

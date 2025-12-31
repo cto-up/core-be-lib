@@ -1,17 +1,18 @@
 package service
 
 import (
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"github.com/gin-gonic/gin"
 )
 
 // WSAuthMiddleware is middleware for WebSocket Authentication
 // Can work with any AuthProvider implementation
 type WSAuthMiddleware struct {
-	authProvider AuthProvider
+	authProvider auth.AuthProvider
 }
 
 // NewWSAuthMiddleware creates a new WebSocket auth middleware with any auth provider
-func NewWSAuthMiddleware(authProvider AuthProvider) *WSAuthMiddleware {
+func NewWSAuthMiddleware(authProvider auth.AuthProvider) *WSAuthMiddleware {
 	return &WSAuthMiddleware{
 		authProvider: authProvider,
 	}
@@ -31,9 +32,9 @@ func (wam *WSAuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		}
 
 		// Store authenticated user info in context
-		c.Set(AUTH_EMAIL, user.Email)
-		c.Set(AUTH_USER_ID, user.UserID)
-		c.Set(AUTH_CLAIMS, user.Claims)
+		c.Set(auth.AUTH_EMAIL, user.Email)
+		c.Set(auth.AUTH_USER_ID, user.UserID)
+		c.Set(auth.AUTH_CLAIMS, user.Claims)
 		c.Next()
 	}
 }

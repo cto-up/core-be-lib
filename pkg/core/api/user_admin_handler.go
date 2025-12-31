@@ -11,14 +11,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"firebase.google.com/go/auth"
 	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/api/helpers"
 	core "ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
-	sharedauth "ctoup.com/coreapp/pkg/shared/auth"
+	auth "ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/event"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	access "ctoup.com/coreapp/pkg/shared/service"
@@ -29,13 +28,13 @@ import (
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
 type UserAdminHandler struct {
-	store          *db.Store
-	authClientPool *sharedauth.AuthProviderAdapter
-	userService    *access.UserService
+	store        *db.Store
+	authProvider auth.AuthProvider
+	userService  *access.UserService
 }
 
-func NewUserAdminHandler(store *db.Store, authClientPool *sharedauth.AuthProviderAdapter) *UserAdminHandler {
-	userService := access.NewUserService(store, authClientPool)
+func NewUserAdminHandler(store *db.Store, authProvider auth.AuthProvider) *UserAdminHandler {
+	userService := access.NewUserService(store, authProvider)
 
 	// Try to initialize user event callback if available
 	// This allows the realtime module to set up the callback for user creation events
@@ -44,8 +43,8 @@ func NewUserAdminHandler(store *db.Store, authClientPool *sharedauth.AuthProvide
 	}
 
 	handler := &UserAdminHandler{store: store,
-		authClientPool: authClientPool,
-		userService:    userService}
+		authProvider: authProvider,
+		userService:  userService}
 	return handler
 }
 func checkAuthorizedRoles(c *gin.Context, roles []core.Role) error {
@@ -67,7 +66,7 @@ func checkAuthorizedRoles(c *gin.Context, roles []core.Role) error {
 // AddUser implements openapi.ServerInterface.
 func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -89,7 +88,7 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -115,7 +114,7 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 
 // (PUT /api/v1/users/{userid})
 func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -136,7 +135,7 @@ func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -152,14 +151,14 @@ func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
 
 // DeleteUser implements openapi.ServerInterface.
 func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
 	// check if user is deleting self
-	if userid == c.GetString(access.AUTH_USER_ID) {
+	if userid == c.GetString(auth.AUTH_USER_ID) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete self"})
 		return
 	}
@@ -199,7 +198,7 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -215,7 +214,7 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 
 // GetUserByID implements openapi.ServerInterface.
 func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -227,7 +226,7 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err)
 		return
@@ -244,7 +243,7 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 
 // GetUsers implements openapi.ServerInterface.
 func (u *UserAdminHandler) ListUsers(c *gin.Context, params core.ListUsersParams) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -293,7 +292,7 @@ func (u *UserAdminHandler) ListUsers(c *gin.Context, params core.ListUsersParams
 
 // AssignRole implements openopenapi.ServerInterface.
 func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, role core.Role) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -305,7 +304,7 @@ func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, role core.
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -322,7 +321,7 @@ func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, role core.
 
 // UnassignRole implements openopenapi.ServerInterface.
 func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, role core.Role) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -334,7 +333,7 @@ func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, role cor
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -352,7 +351,7 @@ func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, role cor
 
 // UpdateUserStatus implements openopenapi.ServerInterface.
 func (uh *UserAdminHandler) UpdateUserStatus(c *gin.Context, userID string) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -370,7 +369,7 @@ func (uh *UserAdminHandler) UpdateUserStatus(c *gin.Context, userID string) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
@@ -402,7 +401,7 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 
 	user, err := uh.store.GetUserByID(c, repository.GetUserByIDParams{
 		ID:       userID,
-		TenantID: c.GetString(access.AUTH_TENANT_ID_KEY),
+		TenantID: c.GetString(auth.AUTH_TENANT_ID_KEY),
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -426,9 +425,9 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get auth client"})
 		return
 	}
 
@@ -443,7 +442,7 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 
 // ImportUsersFromAdmin implements the CSV import functionality
 func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
-	tenantID, exists := c.Get(access.AUTH_TENANT_ID_KEY)
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
@@ -456,7 +455,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 		return
 	}
 
-	baseAuthClient, err := uh.authClientPool.GetBaseAuthClient(c, subdomain)
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

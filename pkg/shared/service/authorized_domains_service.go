@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"firebase.google.com/go/auth"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/identitytoolkit/v2"
 	"google.golang.org/api/option"
@@ -48,7 +47,7 @@ func createIdentityToolkitService(ctx context.Context) (*identitytoolkit.Service
 }
 
 // SDKAddAuthorizedDomains adds domains using the SDK with proper field masking
-func SDKAddAuthorizedDomains(ctx context.Context, authClient *auth.Client, domainsToAdd []string) error {
+func SDKAddAuthorizedDomains(ctx context.Context, domainsToAdd []string) error {
 	service, projectID, err := createIdentityToolkitService(ctx)
 	if err != nil {
 		return err
@@ -105,7 +104,7 @@ func GetFirebaseConfig(ctx context.Context, projectID string, service *identityt
 }
 
 // SDKRemoveAuthorizedDomains removes domains using the SDK with proper field masking
-func SDKRemoveAuthorizedDomains(ctx context.Context, authClient *auth.Client, domainsToRemove []string) error {
+func SDKRemoveAuthorizedDomains(ctx context.Context, domainsToRemove []string) error {
 	service, projectID, err := createIdentityToolkitService(ctx)
 	if err != nil {
 		return err

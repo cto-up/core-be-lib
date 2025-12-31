@@ -7,8 +7,8 @@ import (
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
-	"firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/rs/zerolog/log"
@@ -47,11 +47,7 @@ func GetUserEventInitFunc() UserEventInitFunc {
 
 // AuthClientPool interface for dependency injection
 // This allows UserService to work with any auth provider
-// It uses the BaseAuthClient interface from firebase_clients_map.go
-type AuthClientPool interface {
-	GetBaseAuthClient(ctx context.Context, subdomain string) (BaseAuthClient, error)
-	GetBaseAuthClientForTenant(tenantID string) (BaseAuthClient, error)
-}
+type AuthClientPool = auth.AuthClientPool
 
 type UserService struct {
 	store          *db.Store
@@ -60,7 +56,7 @@ type UserService struct {
 }
 
 func IsCustomerAdmin(c *gin.Context) bool {
-	claims, exist := c.Get(AUTH_CLAIMS)
+	claims, exist := c.Get(auth.AUTH_CLAIMS)
 	if !exist {
 		return false
 	}
@@ -69,7 +65,7 @@ func IsCustomerAdmin(c *gin.Context) bool {
 }
 
 func IsAdmin(c *gin.Context) bool {
-	claims, exist := c.Get(AUTH_CLAIMS)
+	claims, exist := c.Get(auth.AUTH_CLAIMS)
 	if !exist {
 		return false
 	}
@@ -77,7 +73,7 @@ func IsAdmin(c *gin.Context) bool {
 	return isAdmin
 }
 func IsSuperAdmin(c *gin.Context) bool {
-	claims, exist := c.Get(AUTH_CLAIMS)
+	claims, exist := c.Get(auth.AUTH_CLAIMS)
 	if !exist {
 		return false
 	}
@@ -101,7 +97,7 @@ func (uh *UserService) GetStore() *db.Store {
 	return uh.store
 }
 
-func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
+func (uh *UserService) AddUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
 
 	user := repository.CoreUser{}
 	tx, err := uh.store.ConnPool.Begin(c)
@@ -122,7 +118,7 @@ func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient,
 		params = params.Password(*password)
 	}
 
-	userRecord, err := baseAuthClient.CreateUser(c, params)
+	userRecord, err := authClient.CreateUser(c, params)
 	if err != nil {
 		return user, err
 	}
@@ -132,7 +128,7 @@ func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient,
 		claims[string(role)] = true
 	}
 	if len(req.Roles) > 0 {
-		err = baseAuthClient.SetCustomUserClaims(c, userRecord.UID, claims)
+		err = authClient.SetCustomUserClaims(c, userRecord.UID, claims)
 		if err != nil {
 			return user, err
 		}
@@ -164,7 +160,7 @@ func (uh *UserService) AddUser(c context.Context, baseAuthClient BaseAuthClient,
 	return user, err
 }
 
-func (uh *UserService) UpdateUser(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userId string, req core.UpdateUserJSONRequestBody) error {
+func (uh *UserService) UpdateUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string, req core.UpdateUserJSONRequestBody) error {
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
 		return err
@@ -179,7 +175,7 @@ func (uh *UserService) UpdateUser(c *gin.Context, baseAuthClient BaseAuthClient,
 		PhotoURL("/images/avatar-1.jpeg").
 		Disabled(false)
 
-	_, err = baseAuthClient.UpdateUser(c, userId, params)
+	_, err = authClient.UpdateUser(c, userId, params)
 	if err != nil {
 		return err
 	}
@@ -188,7 +184,7 @@ func (uh *UserService) UpdateUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	for _, role := range req.Roles {
 		claims[string(role)] = true
 	}
-	err = baseAuthClient.SetCustomUserClaims(c, userId, claims)
+	err = authClient.SetCustomUserClaims(c, userId, claims)
 	if err != nil {
 		return err
 	}
@@ -209,17 +205,7 @@ func (uh *UserService) UpdateUser(c *gin.Context, baseAuthClient BaseAuthClient,
 	return err
 }
 
-/**
- * DeleteUser deletes a user from the database and from firebase
- * If the user does not exist in firebase,
- * it will log an error but will still delete the user from the database.
- * @param c
- * @param baseAuthClient
- * @param tenantId
- * @param userId
- * @return error
- */
-func (uh *UserService) DeleteUser(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userId string) error {
+func (uh *UserService) DeleteUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error {
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
 		return err
@@ -236,7 +222,7 @@ func (uh *UserService) DeleteUser(c *gin.Context, baseAuthClient BaseAuthClient,
 		return err
 	}
 
-	err = baseAuthClient.DeleteUser(c, userId)
+	err = authClient.DeleteUser(c, userId)
 
 	if err != nil {
 		if auth.IsUserNotFound(err) {
@@ -266,7 +252,7 @@ func convertToRoles(roles []core.Role) []string {
 	return dbRoles
 }
 
-func (uh *UserService) GetUserByID(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, id string) (FullUser, error) {
+func (uh *UserService) GetUserByID(c *gin.Context, authClient auth.AuthClient, tenantId string, id string) (FullUser, error) {
 	fullUser := FullUser{}
 	dbUser, err := uh.store.GetUserByID(c, repository.GetUserByIDParams{
 		ID:       id,
@@ -284,14 +270,14 @@ func (uh *UserService) GetUserByID(c *gin.Context, baseAuthClient BaseAuthClient
 		CreatedAt: &dbUser.CreatedAt,
 	}
 
-	userFirebase, err := baseAuthClient.GetUser(c, id)
+	userAuth, err := authClient.GetUser(c, id)
 	if err != nil {
 		return fullUser, err
 	}
 	return FullUser{
-		Disabled:      userFirebase.Disabled,
-		EmailVerified: userFirebase.EmailVerified,
-		Email:         userFirebase.Email,
+		Disabled:      userAuth.Disabled,
+		EmailVerified: userAuth.EmailVerified,
+		Email:         userAuth.Email,
 		User:          user,
 	}, nil
 }
@@ -345,7 +331,7 @@ func (uh *UserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqls
 	return users, nil
 }
 
-func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, role core.Role) error {
+func (uh *UserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
 	if !IsAdmin(c) || !IsSuperAdmin(c) {
 		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
 	}
@@ -376,7 +362,7 @@ func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient,
 	}
 
 	// Lookup the user associated with the specified uid.
-	user, err := baseAuthClient.GetUser(c, userID)
+	user, err := authClient.GetUser(c, userID)
 	if err != nil {
 		return err
 	}
@@ -389,7 +375,7 @@ func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient,
 	}
 
 	claims[string(role)] = true
-	err = baseAuthClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
+	err = authClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
 	if err != nil {
 		return err
 	}
@@ -401,7 +387,7 @@ func (uh *UserService) AssignRole(c *gin.Context, baseAuthClient BaseAuthClient,
 	return nil
 }
 
-func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, role core.Role) error {
+func (uh *UserService) UnassignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
 	if !IsAdmin(c) && !IsSuperAdmin(c) && !IsCustomerAdmin(c) {
 		return errors.New("must be an CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN to perform such operation")
 	}
@@ -412,7 +398,7 @@ func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClien
 	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
 		return errors.New("must be an SUPER_ADMIN to perform such operation")
 	}
-	tenant_id, exists := c.Get(AUTH_TENANT_ID_KEY)
+	tenant_id, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		return errors.New("user email not found in context")
 	}
@@ -434,14 +420,14 @@ func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClien
 	}
 
 	// Lookup the user associated with the specified uid.
-	user, err := baseAuthClient.GetUser(c, userID)
+	user, err := authClient.GetUser(c, userID)
 	if err != nil {
 		return err
 	}
 
 	claims := user.CustomClaims
 	claims[string(role)] = false
-	err = baseAuthClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
+	err = authClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
 	if err != nil {
 		return err
 	}
@@ -452,7 +438,7 @@ func (uh *UserService) UnassignRole(c *gin.Context, baseAuthClient BaseAuthClien
 	}
 	return nil
 }
-func (uh *UserService) UpdateUserStatus(c *gin.Context, baseAuthClient BaseAuthClient, tenantId string, userID string, requestName string, requestValue bool) error {
+func (uh *UserService) UpdateUserStatus(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, requestName string, requestValue bool) error {
 	// Lookup the user associated with the specified uid.
 	params := (&auth.UserToUpdate{})
 	switch requestName {
@@ -461,6 +447,6 @@ func (uh *UserService) UpdateUserStatus(c *gin.Context, baseAuthClient BaseAuthC
 	case "DISABLED":
 		params = params.Disabled(requestValue)
 	}
-	_, err := baseAuthClient.UpdateUser(c, userID, params)
+	_, err := authClient.UpdateUser(c, userID, params)
 	return err
 }

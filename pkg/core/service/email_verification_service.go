@@ -12,7 +12,6 @@ import (
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/emailservice"
 	utils "ctoup.com/coreapp/pkg/shared/util"
-	firebaseauth "firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
@@ -25,14 +24,14 @@ const (
 )
 
 type EmailVerificationService struct {
-	store          *db.Store
-	authClientPool *auth.AuthProviderAdapter
+	store        *db.Store
+	authProvider auth.AuthProvider
 }
 
-func NewEmailVerificationService(store *db.Store, authClientPool *auth.AuthProviderAdapter) *EmailVerificationService {
+func NewEmailVerificationService(store *db.Store, authProvider auth.AuthProvider) *EmailVerificationService {
 	return &EmailVerificationService{
-		store:          store,
-		authClientPool: authClientPool,
+		store:        store,
+		authProvider: authProvider,
 	}
 }
 
@@ -102,16 +101,16 @@ func (s *EmailVerificationService) VerifyEmailToken(ctx *gin.Context, token stri
 		return err
 	}
 
-	// Get Firebase auth client for the tenant
-	authClient, err := s.authClientPool.GetBaseAuthClient(ctx, subdomain)
+	// Get auth client for the tenant
+	authClient, err := s.authProvider.GetAuthClientForSubdomain(ctx, subdomain)
 	if err != nil {
-		return fmt.Errorf("failed to get Firebase auth client: %w", err)
+		return fmt.Errorf("failed to get auth client: %w", err)
 	}
 
-	// Update user's email verification status in Firebase
-	userUpdate := (&firebaseauth.UserToUpdate{}).EmailVerified(true)
+	// Update user's email verification status
+	userUpdate := (&auth.UserToUpdate{}).EmailVerified(true)
 	if _, err := authClient.UpdateUser(ctx, tokenRecord.UserID, userUpdate); err != nil {
-		return fmt.Errorf("failed to update user email verification status in Firebase: %w", err)
+		return fmt.Errorf("failed to update user email verification status: %w", err)
 	}
 
 	// Mark token as used
@@ -180,18 +179,18 @@ func (s *EmailVerificationService) ResendVerificationEmail(ctx *gin.Context, use
 	return nil
 }
 
-// GetUserVerificationStatus returns the email verification status of a user from Firebase
+// GetUserVerificationStatus returns the email verification status of a user
 func (s *EmailVerificationService) GetUserVerificationStatus(ctx *gin.Context, userID, tenantID string) (bool, error) {
-	// Get Firebase auth client for the tenant
-	authClient, err := s.authClientPool.GetBaseAuthClientForTenant(tenantID)
+	// Get auth client for the tenant
+	authClient, err := s.authProvider.GetAuthClientForTenant(ctx, tenantID)
 	if err != nil {
-		return false, fmt.Errorf("failed to get Firebase auth client: %w", err)
+		return false, fmt.Errorf("failed to get auth client: %w", err)
 	}
 
-	// Get user record from Firebase
+	// Get user record
 	userRecord, err := authClient.GetUser(ctx, userID)
 	if err != nil {
-		return false, fmt.Errorf("failed to get user from Firebase: %w", err)
+		return false, fmt.Errorf("failed to get user: %w", err)
 	}
 
 	return userRecord.EmailVerified, nil
