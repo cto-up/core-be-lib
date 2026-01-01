@@ -2,6 +2,7 @@ package kratos
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,6 +13,8 @@ import (
 	ory "github.com/ory/kratos-client-go"
 	"github.com/rs/zerolog/log"
 )
+
+var roles = []string{"SUPER_ADMIN", "ADMIN", "CUSTOMER_ADMIN", "USER"}
 
 func init() {
 	auth.RegisterProvider(auth.ProviderTypeKratos, func(ctx context.Context, config auth.ProviderConfig) (auth.AuthProvider, error) {
@@ -98,7 +101,7 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 	}
 
 	// Add boolean roles to customClaims if they are true
-	for _, r := range []string{"SUPER_ADMIN", "ADMIN", "CUSTOMER_ADMIN"} {
+	for _, r := range roles {
 		if val, ok := token.Claims[r].(bool); ok && val {
 			customClaims = append(customClaims, r)
 		}
@@ -249,10 +252,25 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 		return convertKratosError(err)
 	}
 
-	traits := existing.Traits.(map[string]interface{})
-	// Assuming roles are stored in traits
+	traits, ok := existing.Traits.(map[string]interface{})
+	if !ok {
+		traits = make(map[string]interface{})
+	}
+
+	// 3. CLEANUP: Remove any existing keys that are in our rolesList
+	// This ensures that roles not provided in customClaims are deleted
+	for _, roleKey := range roles {
+		delete(traits, roleKey)
+	}
+
+	// 4. UPDATE: Add the new roles from customClaims
+	// Only if the key is one of our recognized roles
 	for key, val := range customClaims {
-		traits[key] = val
+		for _, allowed := range roles {
+			if key == allowed {
+				traits[key] = val
+			}
+		}
 	}
 
 	state := ""
@@ -367,7 +385,47 @@ func convertKratosError(err error) error {
 	if err == nil {
 		return nil
 	}
-	// TODO: Map Ory Kratos error codes to auth.AuthError
+
+	message := ""
+	var apiErr *ory.GenericOpenAPIError
+
+	if !errors.As(err, &apiErr) {
+		message = err.Error()
+		return &auth.AuthError{
+			Code:    "unknown-error",
+			Message: message,
+			Err:     err,
+		}
+	}
+
+	// HTTP status
+	fmt.Println("HTTP:", apiErr.Error())
+
+	// ✅ CALL Model() to get the error model
+	model := apiErr.Model()
+	if model == nil {
+		fmt.Println("No model in error")
+		return &auth.AuthError{
+			Code:    "unknown-error",
+			Message: err.Error(),
+			Err:     err,
+		}
+	}
+
+	// Kratos standard error payload
+	if eg, ok := model.(ory.ErrorGeneric); ok {
+		message = eg.Error.Message
+		if eg.Error.Reason != nil {
+			message += " reason: " + *eg.Error.Reason
+		}
+
+		return &auth.AuthError{
+			Code:    "kratos-error",
+			Message: message,
+			Err:     err,
+		}
+	}
+
 	return &auth.AuthError{
 		Code:    "kratos-error",
 		Message: err.Error(),
