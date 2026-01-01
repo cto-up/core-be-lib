@@ -246,7 +246,6 @@ func (k *KratosAuthClient) GetUserByEmail(ctx context.Context, email string) (*a
 }
 
 func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error {
-	// In Kratos, we use traits for roles
 	existing, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
 		return convertKratosError(err)
@@ -257,55 +256,82 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 		traits = make(map[string]interface{})
 	}
 
-	// 3. CLEANUP: Remove any existing keys that are in our rolesList
-	// This ensures that roles not provided in customClaims are deleted
-	for _, roleKey := range roles {
-		delete(traits, roleKey)
-	}
-
-	// 4. UPDATE: Add the new roles from customClaims
-	// Only if the key is one of our recognized roles
-	for key, val := range customClaims {
-		for _, allowed := range roles {
-			if key == allowed {
-				traits[key] = val
+	// 1. Process roles into a single string slice
+	// We extract any key from customClaims that matches our master roles list
+	var rolesToSet []string
+	for _, roleName := range roles {
+		if val, exists := customClaims[roleName]; exists {
+			// If the claim is present and true (or present in a list), add it
+			if boolVal, ok := val.(bool); ok && boolVal {
+				rolesToSet = append(rolesToSet, roleName)
 			}
 		}
 	}
+
+	// 2. Update the "roles" key (matches the new Schema requirement)
+	// This overwrites the old array, effectively removing roles not in customClaims
+	// while preserving traits like "email" or "company"
+	traits["roles"] = rolesToSet
 
 	state := ""
 	if existing.State != nil {
 		state = string(*existing.State)
 	}
+
 	updateBody := *ory.NewUpdateIdentityBody(existing.SchemaId, state, traits)
 	_, _, err = k.adminClient.IdentityAPI.UpdateIdentity(ctx, uid).UpdateIdentityBody(updateBody).Execute()
 	return convertKratosError(err)
 }
 
 func (k *KratosAuthClient) EmailVerificationLink(ctx context.Context, email string) (string, error) {
-	log.Warn().Msg("EmailVerificationLink not fully implemented for Kratos")
-	return "", &auth.AuthError{Code: "not-implemented", Message: "use Kratos self-service flows"}
+	// Create a verification flow for browser clients
+	flow, _, err := k.publicClient.FrontendAPI.CreateBrowserVerificationFlow(ctx).Execute()
+	if err != nil {
+		return "", convertKratosError(err)
+	}
+
+	// Submit the verification flow with the email
+	_, _, err = k.publicClient.FrontendAPI.UpdateVerificationFlow(ctx).
+		Flow(flow.Id).
+		UpdateVerificationFlowBody(ory.UpdateVerificationFlowWithCodeMethodAsUpdateVerificationFlowBody(&ory.UpdateVerificationFlowWithCodeMethod{
+			Email:  &email,
+			Method: "code", // or "link" depending on your Kratos config
+		})).
+		Execute()
+
+	if err != nil {
+		return "", convertKratosError(err)
+	}
+
+	log.Info().Str("email", email).Msg("Verification flow initiated. Check Kratos Courier logs.")
+	return flow.Ui.Action, nil
 }
 
 func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) (string, error) {
-	log.Warn().Msg("PasswordResetLink not fully implemented for Kratos")
-	return "", &auth.AuthError{Code: "not-implemented", Message: "use Kratos self-service flows"}
-}
+	// Create a recovery flow for browser clients
+	flow, _, err := k.publicClient.FrontendAPI.CreateBrowserRecoveryFlow(ctx).Execute()
+	if err != nil {
+		return "", convertKratosError(err)
+	}
 
-func (k *KratosAuthClient) EmailVerificationLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
-	return k.EmailVerificationLink(ctx, email)
-}
+	// Submit the recovery flow with the email
+	_, _, err = k.publicClient.FrontendAPI.UpdateRecoveryFlow(ctx).
+		Flow(flow.Id).
+		UpdateRecoveryFlowBody(ory.UpdateRecoveryFlowWithCodeMethodAsUpdateRecoveryFlowBody(&ory.UpdateRecoveryFlowWithCodeMethod{
+			Email:  &email,
+			Method: "code", // or "link" depending on your Kratos config
+		})).
+		Execute()
 
-func (k *KratosAuthClient) PasswordResetLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
-	return k.PasswordResetLink(ctx, email)
-}
+	if err != nil {
+		return "", convertKratosError(err)
+	}
 
-func (k *KratosAuthClient) EmailSignInLink(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
-	return "", &auth.AuthError{Code: "not-implemented"}
+	log.Info().Str("email", email).Msg("Recovery flow initiated via: " + flow.Ui.Action)
+	return flow.Ui.Action, nil
 }
 
 func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error) {
-	// In Kratos, idToken would be the session token
 	session, _, err := k.publicClient.FrontendAPI.ToSession(ctx).XSessionToken(idToken).Execute()
 	if err != nil {
 		return nil, convertKratosError(err)
@@ -318,12 +344,19 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*
 	claims := make(map[string]interface{})
 	if session.Identity != nil {
 		if traits, ok := session.Identity.Traits.(map[string]interface{}); ok {
-			for k, v := range traits {
-				claims[k] = v
+			for key, v := range traits {
+				// Flatten roles back into the claims map for compatibility with your existing VerifyToken logic
+				if key == "roles" {
+					if rolesArr, ok := v.([]interface{}); ok {
+						for _, r := range rolesArr {
+							if rStr, ok := r.(string); ok {
+								claims[rStr] = true
+							}
+						}
+					}
+				}
+				claims[key] = v
 			}
-		}
-		if session.Identity.OrganizationId.IsSet() {
-			claims["organization_id"] = session.Identity.OrganizationId.Get()
 		}
 	}
 
@@ -331,6 +364,18 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*
 		UID:    session.Identity.Id,
 		Claims: claims,
 	}, nil
+}
+
+func (k *KratosAuthClient) EmailVerificationLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
+	return k.EmailVerificationLink(ctx, email)
+}
+
+func (k *KratosAuthClient) PasswordResetLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
+	return k.PasswordResetLink(ctx, email)
+}
+
+func (k *KratosAuthClient) EmailSignInLink(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
+	return "", &auth.AuthError{Code: "not-implemented"}
 }
 
 // KratosTenantManager implements TenantManager for Kratos
