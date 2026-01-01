@@ -26,6 +26,10 @@
             }
           }
         },
+        "roles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "name": {
           "type": "object",
           "properties": {
