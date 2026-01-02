@@ -14,7 +14,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var roles = []string{"SUPER_ADMIN", "ADMIN", "CUSTOMER_ADMIN", "USER"}
+// Global roles stored in Kratos metadata_public
+// Tenant-specific roles (OWNER, ADMIN, USER) are stored in core_user_tenant_memberships table
+var globalRoles = []string{"SUPER_ADMIN"}
 
 func init() {
 	auth.RegisterProvider(auth.ProviderTypeKratos, func(ctx context.Context, config auth.ProviderConfig) (auth.AuthProvider, error) {
@@ -109,20 +111,19 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 
 	customClaims := []string{}
 
-	// Add boolean roles to customClaims if they are true
-	for _, r := range roles {
-		if val, ok := token.Claims[r].(bool); ok && val {
-			customClaims = append(customClaims, r)
-		}
-	}
-
-	// Also check roles array from metadata
-	if rolesArr, ok := token.Claims["roles"].([]interface{}); ok {
-		for _, role := range rolesArr {
+	// Extract global roles from metadata_public
+	// Note: Tenant-specific roles are NOT in claims - they must be fetched from database
+	if globalRolesArr, ok := token.Claims["global_roles"].([]interface{}); ok {
+		for _, role := range globalRolesArr {
 			if roleStr, ok := role.(string); ok {
 				customClaims = append(customClaims, roleStr)
 			}
 		}
+	}
+
+	// Legacy: Also check for boolean SUPER_ADMIN claim
+	if val, ok := token.Claims["SUPER_ADMIN"].(bool); ok && val {
+		customClaims = append(customClaims, "SUPER_ADMIN")
 	}
 
 	email, _ := token.Claims["email"].(string)
@@ -150,7 +151,7 @@ func (k *KratosAuthProvider) GetAuthClientForSubdomain(ctx context.Context, subd
 }
 
 func (k *KratosAuthProvider) GetAuthClientForTenant(ctx context.Context, tenantID string) (auth.AuthClient, error) {
-	return &KratosAuthClient{adminClient: k.adminClient, publicClient: k.publicClient, organizationID: &tenantID}, nil
+	return &KratosAuthClient{adminClient: k.adminClient, publicClient: k.publicClient}, nil
 }
 
 func (k *KratosAuthProvider) GetProviderName() string {
@@ -159,9 +160,8 @@ func (k *KratosAuthProvider) GetProviderName() string {
 
 // KratosAuthClient implements AuthClient for Ory Kratos
 type KratosAuthClient struct {
-	adminClient    *ory.APIClient
-	publicClient   *ory.APIClient
-	organizationID *string
+	adminClient  *ory.APIClient
+	publicClient *ory.APIClient
 }
 
 // GetAdminClient returns the admin API client
@@ -192,10 +192,6 @@ func (k *KratosAuthClient) CreateUser(ctx context.Context, user *auth.UserToCrea
 		}
 	}
 
-	if k.organizationID != nil {
-		identBody.OrganizationId = *ory.NewNullableString(k.organizationID)
-	}
-
 	created, _, err := k.adminClient.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(identBody).Execute()
 	if err != nil {
 		return nil, convertKratosError(err)
@@ -221,10 +217,6 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 		state = string(*existing.State)
 	}
 	updateBody := *ory.NewUpdateIdentityBody(existing.SchemaId, state, traits)
-	if k.organizationID != nil {
-		// UpdateIdentityBody might not have OrganizationId in this version according to Error 3
-		// Check if it's actually there or not. If Error 3 said undefined, we skip it.
-	}
 
 	if password := user.GetPassword(); password != nil {
 		// In Kratos, updating password via identity update requires credentials
@@ -282,27 +274,33 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 		return convertKratosError(err)
 	}
 
+	// Get existing traits (don't modify them for roles)
 	traits, ok := existing.Traits.(map[string]interface{})
 	if !ok {
 		traits = make(map[string]interface{})
 	}
 
-	// 1. Process roles into a single string slice
-	// We extract any key from customClaims that matches our master roles list
-	var rolesToSet []string
-	for _, roleName := range roles {
+	// Get or create metadata_public
+	metadataPublic, ok := existing.MetadataPublic.(map[string]interface{})
+	if !ok {
+		metadataPublic = make(map[string]interface{})
+	}
+
+	// Process ONLY global roles (SUPER_ADMIN)
+	// Tenant-specific roles (OWNER, ADMIN, USER) should be managed via core_user_tenant_memberships table
+	var globalRolesToSet []string
+	for _, roleName := range globalRoles {
 		if val, exists := customClaims[roleName]; exists {
-			// If the claim is present and true (or present in a list), add it
+			// If the claim is present and true, add it
 			if boolVal, ok := val.(bool); ok && boolVal {
-				rolesToSet = append(rolesToSet, roleName)
+				globalRolesToSet = append(globalRolesToSet, roleName)
 			}
 		}
 	}
 
-	// 2. Update the "roles" key (matches the new Schema requirement)
-	// This overwrites the old array, effectively removing roles not in customClaims
-	// while preserving traits like "email" or "company"
-	traits["roles"] = rolesToSet
+	// Update the "global_roles" key in metadata_public
+	// This only stores SUPER_ADMIN and other global system roles
+	metadataPublic["global_roles"] = globalRolesToSet
 
 	state := ""
 	if existing.State != nil {
@@ -310,6 +308,8 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 	}
 
 	updateBody := *ory.NewUpdateIdentityBody(existing.SchemaId, state, traits)
+	updateBody.MetadataPublic = metadataPublic
+
 	_, _, err = k.adminClient.IdentityAPI.UpdateIdentity(ctx, uid).UpdateIdentityBody(updateBody).Execute()
 	return convertKratosError(err)
 }
@@ -384,21 +384,11 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*
 	if session.Identity != nil {
 		if traits, ok := session.Identity.Traits.(map[string]interface{}); ok {
 			for key, v := range traits {
-				// Flatten roles back into the claims map for compatibility with your existing VerifyToken logic
-				if key == "roles" {
-					if rolesArr, ok := v.([]interface{}); ok {
-						for _, r := range rolesArr {
-							if rStr, ok := r.(string); ok {
-								claims[rStr] = true
-							}
-						}
-					}
-				}
 				claims[key] = v
 			}
 		}
 
-		// Extract tenant memberships from metadata_public
+		// Extract tenant and role information from metadata_public
 		if metadataPublic, ok := session.Identity.MetadataPublic.(map[string]interface{}); ok {
 			// Add tenant_memberships to claims
 			if tenantMemberships, ok := metadataPublic["tenant_memberships"].([]interface{}); ok {
@@ -416,6 +406,16 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*
 			}
 			if subdomain, ok := metadataPublic["subdomain"].(string); ok {
 				claims["subdomain"] = subdomain
+			}
+
+			// Extract global roles and flatten them as boolean claims for backward compatibility
+			if globalRolesArr, ok := metadataPublic["global_roles"].([]interface{}); ok {
+				claims["global_roles"] = globalRolesArr
+				for _, role := range globalRolesArr {
+					if roleStr, ok := role.(string); ok {
+						claims[roleStr] = true // e.g., claims["SUPER_ADMIN"] = true
+					}
+				}
 			}
 		}
 	}
