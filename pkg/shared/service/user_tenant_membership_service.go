@@ -26,12 +26,12 @@ func NewUserTenantMembershipService(store *db.Store, authProvider auth.AuthProvi
 	}
 }
 
-// AddUserToTenant adds a user to a tenant with a specific role
+// AddUserToTenant adds a user to a tenant with specific roles
 func (s *UserTenantMembershipService) AddUserToTenant(
 	ctx context.Context,
 	userID string,
 	tenantID string,
-	role string,
+	roles []string,
 	invitedBy string,
 ) error {
 	now := time.Now()
@@ -40,7 +40,7 @@ func (s *UserTenantMembershipService) AddUserToTenant(
 	_, err := s.store.CreateUserTenantMembership(ctx, repository.CreateUserTenantMembershipParams{
 		UserID:   userID,
 		TenantID: tenantID,
-		Role:     role,
+		Roles:    roles,
 		Status:   "active",
 		InvitedBy: pgtype.Text{
 			String: invitedBy,
@@ -70,7 +70,7 @@ func (s *UserTenantMembershipService) AddUserToTenant(
 	log.Info().
 		Str("user_id", userID).
 		Str("tenant_id", tenantID).
-		Str("role", role).
+		Strs("roles", roles).
 		Msg("User added to tenant")
 
 	return nil
@@ -156,12 +156,128 @@ func (s *UserTenantMembershipService) CheckUserTenantAccess(
 	return result, nil
 }
 
+// GetUserTenantRoles returns the user's roles in a specific tenant
+func (s *UserTenantMembershipService) GetUserTenantRoles(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+) ([]string, error) {
+	roles, err := s.store.GetUserTenantRoles(ctx, repository.GetUserTenantRolesParams{
+		UserID:   userID,
+		TenantID: tenantID,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user tenant roles: %w", err)
+	}
+
+	return roles, nil
+}
+
+// CheckUserHasRole checks if user has a specific role in a tenant
+func (s *UserTenantMembershipService) CheckUserHasRole(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+	role string,
+) (bool, error) {
+	hasRole, err := s.store.CheckUserHasTenantRole(ctx, repository.CheckUserHasTenantRoleParams{
+		UserID:   userID,
+		TenantID: tenantID,
+		Role:     role,
+	})
+
+	if err != nil {
+		return false, fmt.Errorf("failed to check user role: %w", err)
+	}
+
+	return hasRole, nil
+}
+
+// UpdateMemberRoles updates a member's roles in a tenant
+func (s *UserTenantMembershipService) UpdateMemberRoles(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+	roles []string,
+) error {
+	_, err := s.store.UpdateUserTenantMembershipRoles(ctx, repository.UpdateUserTenantMembershipRolesParams{
+		UserID:   userID,
+		TenantID: tenantID,
+		Roles:    roles,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to update roles: %w", err)
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Str("tenant_id", tenantID).
+		Strs("roles", roles).
+		Msg("Member roles updated")
+
+	return nil
+}
+
+// AddRoleToMember adds a single role to a member's existing roles
+func (s *UserTenantMembershipService) AddRoleToMember(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+	role string,
+) error {
+	_, err := s.store.AddRoleToUserTenantMembership(ctx, repository.AddRoleToUserTenantMembershipParams{
+		UserID:   userID,
+		TenantID: tenantID,
+		Role:     role,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to add role: %w", err)
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Str("tenant_id", tenantID).
+		Str("role", role).
+		Msg("Role added to member")
+
+	return nil
+}
+
+// RemoveRoleFromMember removes a single role from a member's roles
+func (s *UserTenantMembershipService) RemoveRoleFromMember(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+	role string,
+) error {
+	_, err := s.store.RemoveRoleFromUserTenantMembership(ctx, repository.RemoveRoleFromUserTenantMembershipParams{
+		UserID:   userID,
+		TenantID: tenantID,
+		Role:     role,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to remove role: %w", err)
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Str("tenant_id", tenantID).
+		Str("role", role).
+		Msg("Role removed from member")
+
+	return nil
+}
+
 // InviteUserToTenant creates a pending membership invitation
 func (s *UserTenantMembershipService) InviteUserToTenant(
 	ctx context.Context,
 	email string,
 	tenantID string,
-	role string,
+	roles []string,
 	invitedBy string,
 ) error {
 	// Check if user exists
@@ -180,7 +296,7 @@ func (s *UserTenantMembershipService) InviteUserToTenant(
 	_, err = s.store.CreateUserTenantMembership(ctx, repository.CreateUserTenantMembershipParams{
 		UserID:   user.UID,
 		TenantID: tenantID,
-		Role:     role,
+		Roles:    roles,
 		Status:   "pending",
 		InvitedBy: pgtype.Text{
 			String: invitedBy,
@@ -203,6 +319,7 @@ func (s *UserTenantMembershipService) InviteUserToTenant(
 		Str("email", email).
 		Str("user_id", user.UID).
 		Str("tenant_id", tenantID).
+		Strs("roles", roles).
 		Msg("User invited to tenant")
 
 	return nil
@@ -268,30 +385,15 @@ func (s *UserTenantMembershipService) RejectTenantInvitation(
 	return nil
 }
 
-// UpdateMemberRole updates a member's role in a tenant
+// UpdateMemberRole updates a member's role in a tenant (deprecated - use UpdateMemberRoles)
 func (s *UserTenantMembershipService) UpdateMemberRole(
 	ctx context.Context,
 	userID string,
 	tenantID string,
 	role string,
 ) error {
-	_, err := s.store.UpdateUserTenantMembershipRole(ctx, repository.UpdateUserTenantMembershipRoleParams{
-		UserID:   userID,
-		TenantID: tenantID,
-		Role:     role,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to update role: %w", err)
-	}
-
-	log.Info().
-		Str("user_id", userID).
-		Str("tenant_id", tenantID).
-		Str("role", role).
-		Msg("Member role updated")
-
-	return nil
+	// Convert single role to array for backward compatibility
+	return s.UpdateMemberRoles(ctx, userID, tenantID, []string{role})
 }
 
 // updateKratosTenantMemberships updates the user's Kratos metadata with current tenant memberships

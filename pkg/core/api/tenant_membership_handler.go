@@ -182,8 +182,8 @@ func (h *TenantMembershipHandler) InviteUserToTenant(c *gin.Context) {
 	}
 
 	var req struct {
-		Email string `json:"email" binding:"required,email"`
-		Role  string `json:"role" binding:"required,oneof=USER ADMIN"`
+		Email string   `json:"email" binding:"required,email"`
+		Roles []string `json:"roles" binding:"required,min=1,dive,oneof=USER ADMIN OWNER"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -191,7 +191,7 @@ func (h *TenantMembershipHandler) InviteUserToTenant(c *gin.Context) {
 		return
 	}
 
-	err := h.membershipService.InviteUserToTenant(c, req.Email, tenantID, req.Role, inviterID)
+	err := h.membershipService.InviteUserToTenant(c, req.Email, tenantID, req.Roles, inviterID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to invite user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))

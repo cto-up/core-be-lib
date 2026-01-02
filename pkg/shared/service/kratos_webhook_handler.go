@@ -76,13 +76,13 @@ func (kwh *KratosWebhookHandler) HandleRegistrationWebhook(c *gin.Context) {
 				Str("subdomain", payload.Identity.Traits.Subdomain).
 				Msg("Failed to get tenant ID from subdomain")
 		} else {
-			// Create membership entry
+			// Create membership entry with default USER role
 			err = kwh.membershipService.AddUserToTenant(
 				c.Request.Context(),
 				payload.Identity.ID,
 				tenantID,
-				"USER",   // Default role
-				"system", // System-initiated during registration
+				[]string{"USER"}, // Default role as array
+				"system",         // System-initiated during registration
 			)
 
 			if err != nil {
