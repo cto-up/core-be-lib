@@ -368,7 +368,15 @@ func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) 
 }
 
 func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error) {
-	session, _, err := k.publicClient.FrontendAPI.ToSession(ctx).XSessionToken(idToken).Execute()
+	// Construct the cookie string manually
+	cookieString := fmt.Sprintf("ory_kratos_session=%s", idToken)
+
+	// Use the SDK but inject the Cookie header into the context
+	// This keeps your code clean and leverages the SDK's built-in types
+	session, _, err := k.publicClient.FrontendAPI.ToSession(ctx).
+		Cookie(cookieString). // The SDK has a .Cookie() method for this!
+		Execute()
+
 	if err != nil {
 		return nil, convertKratosError(err)
 	}
