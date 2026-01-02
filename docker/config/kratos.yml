@@ -8,12 +8,10 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - http://*.ctoup.localhost:5173
         - http://*.localhost:5173
-        - http://localhost:5173
-        - http://localhost:4455
-        - http://*.localhost:19006
-        - exp://*.localhost:8081
+        - http://*.moncto.localhost:5173
+        - http://*.ctoup.localhost:5173
+        - http://*.localhost:4455
       allowed_methods:
         - POST
         - GET
@@ -25,23 +23,27 @@ serve:
         - Authorization
         - Content-Type
         - X-Session-Token
+        - Cookie
       exposed_headers:
         - Content-Type
         - Set-Cookie
       allow_credentials: true
+      debug: true
   admin:
     base_url: http://kratos:4434/
 
-cookies:
-  domain: localhost
-  path: /
-  same_site: Lax
+# Don't set cookie domain - let Kratos set it based on the request origin
+# This allows cookies to work with any subdomain (moncto.localhost, ctoup.localhost, etc.)
+# cookies:
+#   domain: localhost
+#   path: /
+#   same_site: Lax
 
-session:
-  cookie:
-    domain: localhost
-    path: /
-    same_site: Lax
+# session:
+#   cookie:
+#     domain: localhost
+#     path: /
+#     same_site: Lax
 
 selfservice:
   default_browser_return_url: http://localhost:4455/welcome
