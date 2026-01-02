@@ -12,6 +12,7 @@ import (
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
 type SuperAdminHandler struct {
@@ -47,6 +48,7 @@ func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
 
 	err := service.SDKAddAuthorizedDomains(c, req.Domains)
 	if err != nil {
+		log.Error().Err(err).Msg("Error adding authorized domains")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -78,6 +80,7 @@ func (exh *SuperAdminHandler) RemoveAuthorizedDomains(c *gin.Context) {
 
 	err := service.SDKRemoveAuthorizedDomains(c, req.Domains)
 	if err != nil {
+		log.Error().Err(err).Msg("Error removing authorized domains")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

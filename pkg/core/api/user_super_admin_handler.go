@@ -29,33 +29,39 @@ type UserSuperAdminHandler struct {
 func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId uuid.UUID) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	var req core.AddUserJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error().Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	user, err := uh.userService.AddUser(c, baseAuthClient, tenant.TenantID, req, nil)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to add user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	url, err := getResetPasswordURL(c, tenant.Subdomain)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get reset password URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to send welcome email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -66,21 +72,25 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 func (uh *UserSuperAdminHandler) UpdateUserFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userid string) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	var req core.UpdateUserJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error().Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	err = uh.userService.UpdateUser(c, baseAuthClient, tenant.TenantID, userid, req)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to update user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -91,16 +101,19 @@ func (uh *UserSuperAdminHandler) UpdateUserFromSuperAdmin(c *gin.Context, tenant
 func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userid string) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	err = uh.userService.DeleteUser(c, baseAuthClient, tenant.TenantID, userid)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to delete user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -111,18 +124,21 @@ func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenant
 func (uh *UserSuperAdminHandler) GetUserByIDFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, id string) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	user, err := uh.userService.GetUserByID(c, baseAuthClient, tenant.TenantID, id)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get user by ID")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -133,6 +149,7 @@ func (uh *UserSuperAdminHandler) GetUserByIDFromSuperAdmin(c *gin.Context, tenan
 func (uh *UserSuperAdminHandler) ListUsersFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, params core.ListUsersFromSuperAdminParams) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -160,6 +177,7 @@ func (uh *UserSuperAdminHandler) ListUsersFromSuperAdmin(c *gin.Context, tenantI
 
 	users, err := uh.userService.ListUsers(c, tenant.TenantID, pagingSql, like)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to list users")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -171,17 +189,19 @@ func (uh *UserSuperAdminHandler) ListUsersFromSuperAdmin(c *gin.Context, tenantI
 func (uh *UserSuperAdminHandler) AssignRoleFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userID string, role core.Role) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	err = uh.userService.AssignRole(c, baseAuthClient, tenant.TenantID, userID, role)
 	if err != nil {
-		log.Printf("error %v\n", err)
+		log.Error().Err(err).Msg("Failed to assign role to user")
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -192,18 +212,20 @@ func (uh *UserSuperAdminHandler) AssignRoleFromSuperAdmin(c *gin.Context, tenant
 func (uh *UserSuperAdminHandler) UnassignRoleFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userID string, role core.Role) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	err = uh.userService.UnassignRole(c, baseAuthClient, tenant.TenantID, userID, role)
 	if err != nil {
-		log.Printf("error %v\n", err)
+		log.Error().Err(err).Msg("Failed to unassign role from user")
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -214,17 +236,20 @@ func (uh *UserSuperAdminHandler) UnassignRoleFromSuperAdmin(c *gin.Context, tena
 func (uh *UserSuperAdminHandler) UpdateUserStatusFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userID string) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	var req core.UpdateUserStatusJSONBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error().Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -232,6 +257,7 @@ func (uh *UserSuperAdminHandler) UpdateUserStatusFromSuperAdmin(c *gin.Context, 
 	err = uh.userService.UpdateUserStatus(c, baseAuthClient, tenant.TenantID, userID, (string)(req.Name), req.Value)
 
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to update user status")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -243,24 +269,28 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 		Email string `json:"email"`
 	}
 	if err := c.BindJSON(&req); err != nil {
+		log.Error().Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	host, err := util.GetHost(c)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get host")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	domain, err := util.GetDomain(c)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get domain")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -271,11 +301,13 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, tenant.Subdomain)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get auth client"})
 		return
 	}
 	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to send password reset email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

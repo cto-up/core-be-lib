@@ -439,25 +439,49 @@ func (k *KratosAuthClient) EmailSignInLink(ctx context.Context, email string, se
 }
 
 // KratosTenantManager implements TenantManager for Kratos
+// Note: Kratos doesn't have built-in tenant management like Firebase.
+// These methods are no-ops that return success to maintain interface compatibility.
+// Actual tenant data is managed in the database (core_tenants table).
 type KratosTenantManager struct {
 	provider *KratosAuthProvider
 }
 
 func (k *KratosTenantManager) CreateTenant(ctx context.Context, config *auth.TenantConfig) (*auth.Tenant, error) {
-	// Ory Kratos B2B/Organizations are not supported in the current SDK version
-	return nil, &auth.AuthError{Code: "not-implemented", Message: "Kratos Organizations not supported in this SDK version"}
+	// Kratos doesn't manage tenants - they're database-only
+	// Return a tenant with generated ID so the handler can proceed
+	tenantID := fmt.Sprintf("tenant_%d", time.Now().UnixNano())
+
+	return &auth.Tenant{
+		ID:                    tenantID,
+		DisplayName:           config.DisplayName,
+		EnableEmailLinkSignIn: config.EnableEmailLinkSignIn,
+		AllowPasswordSignUp:   config.AllowPasswordSignUp,
+	}, nil
 }
 
 func (k *KratosTenantManager) UpdateTenant(ctx context.Context, tenantID string, config *auth.TenantConfig) (*auth.Tenant, error) {
-	return nil, &auth.AuthError{Code: "not-implemented", Message: "Kratos Organizations not supported in this SDK version"}
+	// Kratos doesn't manage tenants - return success
+	// The handler will update the database
+	return &auth.Tenant{
+		ID:                    tenantID,
+		DisplayName:           config.DisplayName,
+		EnableEmailLinkSignIn: config.EnableEmailLinkSignIn,
+		AllowPasswordSignUp:   config.AllowPasswordSignUp,
+	}, nil
 }
 
 func (k *KratosTenantManager) DeleteTenant(ctx context.Context, tenantID string) error {
-	return &auth.AuthError{Code: "not-implemented", Message: "Kratos Organizations not supported in this SDK version"}
+	// Kratos doesn't manage tenants - return success
+	// The handler will delete from database
+	return nil
 }
 
 func (k *KratosTenantManager) GetTenant(ctx context.Context, tenantID string) (*auth.Tenant, error) {
-	return nil, &auth.AuthError{Code: "not-implemented", Message: "Kratos Organizations not supported in this SDK version"}
+	// Kratos doesn't manage tenants - return minimal tenant
+	// The handler should get full details from database
+	return &auth.Tenant{
+		ID: tenantID,
+	}, nil
 }
 
 func (k *KratosTenantManager) AuthForTenant(ctx context.Context, tenantID string) (auth.AuthClient, error) {

@@ -53,7 +53,7 @@ func NewFileService() *FileService {
 		}
 		err := createGCSBucketIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Err(err).Msg("Failed to create GCS bucket")
+			log.Error().Err(err).Msg("Failed to create GCS bucket")
 		}
 	case "s3":
 		bucketName = os.Getenv("S3_BUCKET_NAME")
@@ -62,7 +62,7 @@ func NewFileService() *FileService {
 		}
 		err := createS3BucketIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Err(err).Msg("Failed to create S3 bucket")
+			log.Error().Err(err).Msg("Failed to create S3 bucket")
 		}
 	case "azure":
 		bucketName = os.Getenv("AZURE_STORAGE_CONTAINER_NAME")
@@ -71,7 +71,7 @@ func NewFileService() *FileService {
 		}
 		err := createAzureContainerIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Err(err).Msg("Failed to create Azure container")
+			log.Error().Err(err).Msg("Failed to create Azure container")
 		}
 	case "file":
 	}
@@ -94,7 +94,7 @@ func NewFileService() *FileService {
 	// Open the bucket once and store the client
 	b, err := blob.OpenBucket(context.Background(), bucketURL)
 	if err != nil {
-		log.Err(err).Msgf("Failed to open bucket at URL: %s", bucketURL)
+		log.Error().Err(err).Msgf("Failed to open bucket at URL: %s", bucketURL)
 	}
 
 	return &FileService{
