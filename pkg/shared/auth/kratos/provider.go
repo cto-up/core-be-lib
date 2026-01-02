@@ -315,51 +315,78 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 }
 
 func (k *KratosAuthClient) EmailVerificationLink(ctx context.Context, email string) (string, error) {
-	// Create a verification flow for browser clients
-	flow, _, err := k.publicClient.FrontendAPI.CreateBrowserVerificationFlow(ctx).Execute()
+	// For Kratos, we need to use the Admin API to create verification links
+	// The browser flow approach doesn't work from backend because it requires CSRF tokens
+
+	// First, get the user by email to get their ID
+	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
 	if err != nil {
 		return "", convertKratosError(err)
 	}
+	if len(idents) == 0 {
+		return "", &auth.AuthError{Code: auth.ErrorCodeUserNotFound, Message: "user not found"}
+	}
 
-	// Submit the verification flow with the email
-	_, _, err = k.publicClient.FrontendAPI.UpdateVerificationFlow(ctx).
-		Flow(flow.Id).
-		UpdateVerificationFlowBody(ory.UpdateVerificationFlowWithCodeMethodAsUpdateVerificationFlowBody(&ory.UpdateVerificationFlowWithCodeMethod{
-			Email:  &email,
-			Method: "code", // or "link" depending on your Kratos config
-		})).
+	identityID := idents[0].Id
+
+	// For email verification, we need to find the verifiable address
+	var addressID string
+	if len(idents[0].VerifiableAddresses) > 0 {
+		for _, addr := range idents[0].VerifiableAddresses {
+			if addr.Value == email && addr.Id != nil {
+				addressID = *addr.Id
+				break
+			}
+		}
+	}
+
+	if addressID == "" {
+		return "", &auth.AuthError{Code: "address-not-found", Message: "verifiable address not found"}
+	}
+
+	// Create verification link using Admin API
+	verificationLink, _, err := k.adminClient.IdentityAPI.CreateRecoveryLinkForIdentity(ctx).
+		CreateRecoveryLinkForIdentityBody(ory.CreateRecoveryLinkForIdentityBody{
+			IdentityId: identityID,
+		}).
 		Execute()
 
 	if err != nil {
 		return "", convertKratosError(err)
 	}
 
-	log.Info().Str("email", email).Msg("Verification flow initiated. Check Kratos Courier logs.")
-	return flow.Ui.Action, nil
+	log.Info().Str("email", email).Str("identity_id", identityID).Msg("Verification link created via Admin API")
+	return verificationLink.RecoveryLink, nil
 }
 
 func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) (string, error) {
-	// Create a recovery flow for browser clients
-	flow, _, err := k.publicClient.FrontendAPI.CreateBrowserRecoveryFlow(ctx).Execute()
+	// For Kratos, we need to use the Admin API to create recovery links
+	// The browser flow approach doesn't work from backend because it requires CSRF tokens
+
+	// First, get the user by email to get their ID
+	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
 	if err != nil {
 		return "", convertKratosError(err)
 	}
+	if len(idents) == 0 {
+		return "", &auth.AuthError{Code: auth.ErrorCodeUserNotFound, Message: "user not found"}
+	}
 
-	// Submit the recovery flow with the email
-	_, _, err = k.publicClient.FrontendAPI.UpdateRecoveryFlow(ctx).
-		Flow(flow.Id).
-		UpdateRecoveryFlowBody(ory.UpdateRecoveryFlowWithCodeMethodAsUpdateRecoveryFlowBody(&ory.UpdateRecoveryFlowWithCodeMethod{
-			Email:  &email,
-			Method: "code", // or "link" depending on your Kratos config
-		})).
+	identityID := idents[0].Id
+
+	// Create recovery link using Admin API
+	recoveryLink, _, err := k.adminClient.IdentityAPI.CreateRecoveryLinkForIdentity(ctx).
+		CreateRecoveryLinkForIdentityBody(ory.CreateRecoveryLinkForIdentityBody{
+			IdentityId: identityID,
+		}).
 		Execute()
 
 	if err != nil {
 		return "", convertKratosError(err)
 	}
 
-	log.Info().Str("email", email).Msg("Recovery flow initiated via: " + flow.Ui.Action)
-	return flow.Ui.Action, nil
+	log.Info().Str("email", email).Str("identity_id", identityID).Msg("Recovery link created via Admin API")
+	return recoveryLink.RecoveryLink, nil
 }
 
 func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error) {
