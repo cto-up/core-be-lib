@@ -74,13 +74,14 @@
           "title": "Primary Tenant ID",
           "description": "User's primary/default tenant"
         },
-        "roles": {
+        "global_roles": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "enum": ["SUPER_ADMIN"]
           },
-          "title": "Global User Roles",
-          "description": "Global roles like SUPER_ADMIN, ADMIN"
+          "title": "Global Roles",
+          "description": "Global system roles (SUPER_ADMIN only). Tenant-specific roles (OWNER, ADMIN, USER) are stored in core_user_tenant_memberships table."
         }
       }
     }
