@@ -64,6 +64,7 @@ const (
 	ADMIN         Role = "ADMIN"
 	CUSTOMERADMIN Role = "CUSTOMER_ADMIN"
 	SUPERADMIN    Role = "SUPER_ADMIN"
+	USER          Role = "USER"
 )
 
 // Defines values for UserActionSchemaName.

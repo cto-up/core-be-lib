@@ -63,6 +63,7 @@ func (exh *PromptHandler) AddPrompt(c *gin.Context) {
 	}
 	prompt, err := exh.store.CreatePrompt(c, params)
 	if err != nil {
+		log.Error().Err(err).Msg("Error creating prompt")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -94,6 +95,7 @@ func (exh *PromptHandler) UpdatePrompt(c *gin.Context, id uuid.UUID) {
 	}
 	_, err := exh.store.UpdatePrompt(c, params)
 	if err != nil {
+		log.Error().Err(err).Msg("Error updating prompt")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -112,6 +114,7 @@ func (exh *PromptHandler) DeletePrompt(c *gin.Context, id uuid.UUID) {
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
+		log.Error().Err(err).Msg("Error deleting prompt")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -214,6 +217,7 @@ func (exh *PromptHandler) ListPrompts(c *gin.Context, params api.ListPromptsPara
 
 	prompts, err := exh.store.ListPrompts(c, query)
 	if err != nil {
+		log.Error().Err(err).Msg("Error listing prompts")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

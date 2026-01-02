@@ -10,6 +10,7 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
 // MigrationHandler handles migration-related API requests
@@ -34,6 +35,7 @@ func (h *MigrationHandler) GetCoreMigration(c *gin.Context) {
 
 	migration, err := h.store.GetCoreMigration(c)
 	if err != nil {
+		log.Error().Err(err).Msg("Error getting core migration")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -63,6 +65,7 @@ func (h *MigrationHandler) UpdateCoreMigration(c *gin.Context) {
 	// Get current migration
 	currentMigration, err := h.store.GetCoreMigration(c)
 	if err != nil {
+		log.Error().Err(err).Msg("Error getting current core migration")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -72,6 +75,7 @@ func (h *MigrationHandler) UpdateCoreMigration(c *gin.Context) {
 		Dirty:   req.Dirty,
 	})
 	if err != nil {
+		log.Error().Err(err).Msg("Error updating core migration")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

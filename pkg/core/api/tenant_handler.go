@@ -33,6 +33,7 @@ type TenantHandler struct {
 func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 	subdomain, err := utils.GetSubdomain(c)
 	if err != nil {
+		log.Error().Err(err).Msg("Error getting subdomain")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -166,6 +167,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 
 	_, err := tenantManager.UpdateTenant(c, req.TenantId, tenantConfig)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to update tenant in auth provider")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -180,6 +182,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 			AllowSignUp:           req.AllowSignUp,
 		})
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to update tenant in database")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -190,6 +193,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 	tenant, err := exh.store.GetTenantByID(c, id)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant by ID")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -203,11 +207,13 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 
 	err = tenantManager.DeleteTenant(c, tenant.TenantID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to delete tenant in auth provider")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	_, err = exh.store.DeleteTenant(c, id)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to delete tenant in database")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -219,6 +225,11 @@ func (exh *TenantHandler) GetTenantByID(c *gin.Context, id uuid.UUID) {
 
 	tenant, err := exh.store.GetTenantByID(c, id)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant by ID")
+		if err.Error() == pgx.ErrNoRows.Error() {
+			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
+			return
+		}
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -260,6 +271,7 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 
 	tenants, err := exh.store.ListTenants(c, query)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to list tenants")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

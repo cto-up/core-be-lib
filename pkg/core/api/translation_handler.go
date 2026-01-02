@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/rs/zerolog/log"
 
 	"github.com/oapi-codegen/runtime/types"
 
@@ -40,6 +41,7 @@ func (h *TranslationHandler) CreateTranslation(c *gin.Context) {
 		Value:      request.Value,
 	})
 	if err != nil {
+		log.Error().Err(err).Msg("Error creating translation")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -60,6 +62,7 @@ func (h *TranslationHandler) DeleteTranslation(c *gin.Context, id types.UUID) {
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
+		log.Error().Err(err).Msg("Error deleting translation")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -157,6 +160,7 @@ func (h *TranslationHandler) ListTranslations(c *gin.Context, params api.ListTra
 		Order:    pagingSql.Order,
 	})
 	if err != nil {
+		log.Error().Err(err).Msg("Error listing translations")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

@@ -205,7 +205,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 
 	// The file is received, so let's save it
 	if err := s.fileService.SaveFile(c, byteContainer, newFilePath); err != nil {
-		log.Err(err).Msg("Failed to save file")
+		log.Error().Err(err).Msg("Failed to save file")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"message": "Unable to save the file",
 		})
@@ -236,23 +236,27 @@ func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get Firebase client")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
 		return
 	}
 	url, err := getResetPasswordURL(c, "")
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get reset password URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to send password reset email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -268,6 +272,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 
 	tenant, err := uh.store.GetTenantByTenantID(c, tenantID.(string))
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -284,12 +289,14 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -302,6 +309,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 
 	user, err := uh.userService.AddUser(c, baseAuthClient, tenantID.(string), newUser, &req.Password)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to create user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -309,18 +317,21 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 	// create email verification token
 	token, err := uh.emailVerificationService.CreateEmailVerificationToken(c, user.ID, tenantID.(string))
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to create email verification token")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	url, err := getConfirmationEmailURL(c)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get confirmation email URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = sendConfirmationEmail(c, url, req.Email, token)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to send confirmation email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -378,11 +389,13 @@ func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
 	// Check if email is already verified
 	isVerified, err := uh.emailVerificationService.GetUserVerificationStatus(c, userID.(string), tenantID.(string))
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to check verification status")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check verification status"})
 		return
 	}
 
 	if isVerified {
+		log.Error().Err(err).Msg("Email already verified")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already verified"})
 		return
 	}
@@ -390,6 +403,7 @@ func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
 	// Get base URL for verification link
 	url, err := getConfirmationEmailURL(c)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to generate verification URL")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification URL"})
 		return
 	}
@@ -432,6 +446,7 @@ func (uh *UserHandler) GetMyEmailVerificationStatus(c *gin.Context) {
 	// Get verification status
 	isVerified, err := uh.emailVerificationService.GetUserVerificationStatus(c, userID.(string), tenantID.(string))
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get verification status")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get verification status"})
 		return
 	}
@@ -452,6 +467,7 @@ func (uh *UserHandler) GetUserByEmail(c *gin.Context, email string) {
 
 	user, err := uh.userService.GetUserByEmail(c, tenantID.(string), email)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get user by email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

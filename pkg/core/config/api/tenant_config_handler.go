@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/rs/zerolog/log"
 )
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
@@ -49,6 +50,7 @@ func (exh *TenantConfigHandler) AddTenantConfig(c *gin.Context) {
 			TenantID: tenantID.(string),
 		})
 	if err != nil {
+		log.Error().Err(err).Msg("Error creating tenant config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -75,6 +77,7 @@ func (exh *TenantConfigHandler) UpdateTenantConfig(c *gin.Context, id uuid.UUID)
 			TenantID: tenantID.(string),
 		})
 	if err != nil {
+		log.Error().Err(err).Msg("Error updating tenant config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -93,6 +96,7 @@ func (exh *TenantConfigHandler) DeleteTenantConfig(c *gin.Context, id uuid.UUID)
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
+		log.Error().Err(err).Msg("Error deleting tenant config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -162,6 +166,7 @@ func (exh *TenantConfigHandler) ListTenantConfigs(c *gin.Context, params core.Li
 
 	tenantConfigs, err := exh.store.ListTenantConfigs(c, query)
 	if err != nil {
+		log.Error().Err(err).Msg("Error listing tenant configs")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
