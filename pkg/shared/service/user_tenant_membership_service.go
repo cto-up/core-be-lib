@@ -1,0 +1,425 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"ctoup.com/coreapp/pkg/core/db"
+	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
+	"ctoup.com/coreapp/pkg/shared/auth/kratos"
+	"github.com/jackc/pgx/v5/pgtype"
+	ory "github.com/ory/kratos-client-go"
+	"github.com/rs/zerolog/log"
+)
+
+type UserTenantMembershipService struct {
+	store        *db.Store
+	authProvider auth.AuthProvider
+}
+
+func NewUserTenantMembershipService(store *db.Store, authProvider auth.AuthProvider) *UserTenantMembershipService {
+	return &UserTenantMembershipService{
+		store:        store,
+		authProvider: authProvider,
+	}
+}
+
+// AddUserToTenant adds a user to a tenant with a specific role
+func (s *UserTenantMembershipService) AddUserToTenant(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+	role string,
+	invitedBy string,
+) error {
+	now := time.Now()
+
+	// Create membership in database
+	_, err := s.store.CreateUserTenantMembership(ctx, repository.CreateUserTenantMembershipParams{
+		UserID:   userID,
+		TenantID: tenantID,
+		Role:     role,
+		Status:   "active",
+		InvitedBy: pgtype.Text{
+			String: invitedBy,
+			Valid:  true,
+		},
+		InvitedAt: pgtype.Timestamptz{
+			Time:  now,
+			Valid: true,
+		},
+		JoinedAt: pgtype.Timestamptz{
+			Time:  now,
+			Valid: true,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create membership: %w", err)
+	}
+
+	// Update Kratos metadata with tenant memberships
+	err = s.updateKratosTenantMemberships(ctx, userID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to update Kratos metadata")
+		// Don't fail - membership is in database
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Str("tenant_id", tenantID).
+		Str("role", role).
+		Msg("User added to tenant")
+
+	return nil
+}
+
+// RemoveUserFromTenant removes a user from a tenant
+func (s *UserTenantMembershipService) RemoveUserFromTenant(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+) error {
+	// Update status to removed
+	_, err := s.store.UpdateUserTenantMembershipStatus(ctx, repository.UpdateUserTenantMembershipStatusParams{
+		UserID:   userID,
+		TenantID: tenantID,
+		Status:   "removed",
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to remove membership: %w", err)
+	}
+
+	// Update Kratos metadata
+	err = s.updateKratosTenantMemberships(ctx, userID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to update Kratos metadata")
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Str("tenant_id", tenantID).
+		Msg("User removed from tenant")
+
+	return nil
+}
+
+// GetUserTenants returns all tenants a user belongs to
+func (s *UserTenantMembershipService) GetUserTenants(
+	ctx context.Context,
+	userID string,
+) ([]repository.ListUserTenantMembershipsRow, error) {
+	return s.store.ListUserTenantMemberships(ctx, repository.ListUserTenantMembershipsParams{
+		UserID: userID,
+		Status: "active",
+	})
+}
+
+// GetPendingInvitations returns all pending invitations for a user
+func (s *UserTenantMembershipService) GetPendingInvitations(
+	ctx context.Context,
+	userID string,
+) ([]repository.ListPendingInvitationsRow, error) {
+	return s.store.ListPendingInvitations(ctx, userID)
+}
+
+// GetTenantMembers returns all members of a tenant
+func (s *UserTenantMembershipService) GetTenantMembers(
+	ctx context.Context,
+	tenantID string,
+	status string,
+) ([]repository.CoreUserTenantMembership, error) {
+	return s.store.ListTenantMembers(ctx, repository.ListTenantMembersParams{
+		TenantID: tenantID,
+		Status:   status,
+	})
+}
+
+// CheckUserTenantAccess checks if a user has access to a tenant
+func (s *UserTenantMembershipService) CheckUserTenantAccess(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+) (bool, error) {
+	result, err := s.store.CheckUserTenantAccess(ctx, repository.CheckUserTenantAccessParams{
+		UserID:   userID,
+		TenantID: tenantID,
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return result, nil
+}
+
+// InviteUserToTenant creates a pending membership invitation
+func (s *UserTenantMembershipService) InviteUserToTenant(
+	ctx context.Context,
+	email string,
+	tenantID string,
+	role string,
+	invitedBy string,
+) error {
+	// Check if user exists
+	authClient := s.authProvider.GetAuthClient()
+	user, err := authClient.GetUserByEmail(ctx, email)
+
+	if err != nil {
+		// User doesn't exist - create pending invitation
+		// Store in separate invitations table or send email
+		return fmt.Errorf("user not found, invitation email should be sent")
+	}
+
+	now := time.Now()
+
+	// User exists - create pending membership
+	_, err = s.store.CreateUserTenantMembership(ctx, repository.CreateUserTenantMembershipParams{
+		UserID:   user.UID,
+		TenantID: tenantID,
+		Role:     role,
+		Status:   "pending",
+		InvitedBy: pgtype.Text{
+			String: invitedBy,
+			Valid:  true,
+		},
+		InvitedAt: pgtype.Timestamptz{
+			Time:  now,
+			Valid: true,
+		},
+		JoinedAt: pgtype.Timestamptz{
+			Valid: false,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create invitation: %w", err)
+	}
+
+	log.Info().
+		Str("email", email).
+		Str("user_id", user.UID).
+		Str("tenant_id", tenantID).
+		Msg("User invited to tenant")
+
+	return nil
+}
+
+// AcceptTenantInvitation accepts a pending invitation
+func (s *UserTenantMembershipService) AcceptTenantInvitation(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+) error {
+	now := time.Now()
+
+	// Update status to active and set joined_at
+	_, err := s.store.UpdateUserTenantMembershipJoinedAt(ctx, repository.UpdateUserTenantMembershipJoinedAtParams{
+		UserID:   userID,
+		TenantID: tenantID,
+		JoinedAt: pgtype.Timestamptz{
+			Time:  now,
+			Valid: true,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to accept invitation: %w", err)
+	}
+
+	// Update Kratos metadata
+	err = s.updateKratosTenantMemberships(ctx, userID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to update Kratos metadata")
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Str("tenant_id", tenantID).
+		Msg("User accepted tenant invitation")
+
+	return nil
+}
+
+// RejectTenantInvitation rejects a pending invitation
+func (s *UserTenantMembershipService) RejectTenantInvitation(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+) error {
+	// Delete the invitation
+	err := s.store.DeleteUserTenantMembership(ctx, repository.DeleteUserTenantMembershipParams{
+		UserID:   userID,
+		TenantID: tenantID,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to reject invitation: %w", err)
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Str("tenant_id", tenantID).
+		Msg("User rejected tenant invitation")
+
+	return nil
+}
+
+// UpdateMemberRole updates a member's role in a tenant
+func (s *UserTenantMembershipService) UpdateMemberRole(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+	role string,
+) error {
+	_, err := s.store.UpdateUserTenantMembershipRole(ctx, repository.UpdateUserTenantMembershipRoleParams{
+		UserID:   userID,
+		TenantID: tenantID,
+		Role:     role,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to update role: %w", err)
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Str("tenant_id", tenantID).
+		Str("role", role).
+		Msg("Member role updated")
+
+	return nil
+}
+
+// updateKratosTenantMemberships updates the user's Kratos metadata with current tenant memberships
+func (s *UserTenantMembershipService) updateKratosTenantMemberships(
+	ctx context.Context,
+	userID string,
+) error {
+	// Get all active memberships
+	memberships, err := s.GetUserTenants(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// Extract tenant IDs
+	tenantIDs := make([]string, len(memberships))
+	var primaryTenantID string
+	for i, m := range memberships {
+		tenantIDs[i] = m.TenantID
+		if i == 0 {
+			primaryTenantID = m.TenantID
+		}
+	}
+
+	// Update Kratos metadata
+	authClient := s.authProvider.GetAuthClient()
+	kratosClient, ok := authClient.(*kratos.KratosAuthClient)
+	if !ok {
+		return fmt.Errorf("auth provider is not Kratos")
+	}
+
+	// Get existing identity
+	existing, _, err := kratosClient.GetAdminClient().IdentityAPI.GetIdentity(ctx, userID).Execute()
+	if err != nil {
+		return err
+	}
+
+	// Update metadata_public
+	metadataPublic, ok := existing.MetadataPublic.(map[string]interface{})
+	if !ok || metadataPublic == nil {
+		metadataPublic = make(map[string]interface{})
+	}
+
+	metadataPublic["tenant_memberships"] = tenantIDs
+	if primaryTenantID != "" {
+		metadataPublic["primary_tenant_id"] = primaryTenantID
+	}
+
+	// Update identity
+	state := ""
+	if existing.State != nil {
+		state = string(*existing.State)
+	}
+
+	traits, ok := existing.Traits.(map[string]interface{})
+	if !ok {
+		traits = make(map[string]interface{})
+	}
+
+	updateBody := *ory.NewUpdateIdentityBody(existing.SchemaId, state, traits)
+	updateBody.MetadataPublic = metadataPublic
+
+	_, _, err = kratosClient.GetAdminClient().IdentityAPI.UpdateIdentity(ctx, userID).
+		UpdateIdentityBody(updateBody).
+		Execute()
+
+	return err
+}
+
+// SwitchPrimaryTenant changes the user's primary tenant
+func (s *UserTenantMembershipService) SwitchPrimaryTenant(
+	ctx context.Context,
+	userID string,
+	tenantID string,
+) error {
+	// Verify user has access to this tenant
+	hasAccess, err := s.CheckUserTenantAccess(ctx, userID, tenantID)
+	if err != nil {
+		return err
+	}
+
+	if !hasAccess {
+		return fmt.Errorf("user does not have access to tenant")
+	}
+
+	// Update Kratos metadata with new primary tenant
+	authClient := s.authProvider.GetAuthClient()
+	kratosClient, ok := authClient.(*kratos.KratosAuthClient)
+	if !ok {
+		return fmt.Errorf("auth provider is not Kratos")
+	}
+
+	existing, _, err := kratosClient.GetAdminClient().IdentityAPI.GetIdentity(ctx, userID).Execute()
+	if err != nil {
+		return err
+	}
+
+	metadataPublic, ok := existing.MetadataPublic.(map[string]interface{})
+	if !ok || metadataPublic == nil {
+		metadataPublic = make(map[string]interface{})
+	}
+
+	metadataPublic["primary_tenant_id"] = tenantID
+
+	state := ""
+	if existing.State != nil {
+		state = string(*existing.State)
+	}
+
+	traits, ok := existing.Traits.(map[string]interface{})
+	if !ok {
+		traits = make(map[string]interface{})
+	}
+
+	updateBody := *ory.NewUpdateIdentityBody(existing.SchemaId, state, traits)
+	updateBody.MetadataPublic = metadataPublic
+
+	_, _, err = kratosClient.GetAdminClient().IdentityAPI.UpdateIdentity(ctx, userID).
+		UpdateIdentityBody(updateBody).
+		Execute()
+
+	if err != nil {
+		return err
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Str("tenant_id", tenantID).
+		Msg("User switched primary tenant")
+
+	return nil
+}
