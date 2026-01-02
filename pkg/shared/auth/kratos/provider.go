@@ -107,12 +107,7 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 		}
 	}
 
-	// Roles in Kratos are often in traits as company_role (per ORY_KRATOS.md)
-	// We also support flattened boolean flags for SUPER_ADMIN, etc.
 	customClaims := []string{}
-	if role, ok := token.Claims["company_role"].(string); ok && role != "" {
-		customClaims = append(customClaims, role)
-	}
 
 	// Add boolean roles to customClaims if they are true
 	for _, r := range roles {

@@ -56,7 +56,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			return
 		}
 
-		// SUPER_ADMIN can access any tenant
+		// SUPER_ADMIN can access any tenant with OWNER role
 		if isSuperAdmin {
 			// Get tenant ID from database for context, but don't validate user's tenant
 			tenantID, err := ktm.multitenantService.GetFirebaseTenantID(c, subdomain)
@@ -73,12 +73,14 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			// Set tenant context for downstream handlers
 			c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
 			c.Set("tenant_subdomain", subdomain)
+			c.Set("tenant_roles", []string{"OWNER"}) // SUPER_ADMIN gets OWNER role in all tenants
 
 			log.Debug().
 				Str("tenant_id", tenantID).
 				Str("subdomain", subdomain).
 				Str("user_id", c.GetString(auth.AUTH_USER_ID)).
-				Msg("SUPER_ADMIN accessing tenant - validation bypassed")
+				Strs("roles", []string{"OWNER"}).
+				Msg("SUPER_ADMIN accessing tenant with OWNER role")
 
 			c.Next()
 			return
@@ -105,8 +107,42 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			return
 		}
 
-		// Check if user has access to this tenant via tenant_memberships in session
-		// This is stored in the session by the auth middleware from Kratos metadata_public
+		// Check database for user's tenant membership and roles
+		if ktm.membershipService != nil {
+			// Get user's roles in this tenant (also validates access)
+			roles, err := ktm.membershipService.GetUserTenantRoles(c.Request.Context(), userID, tenantID)
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Str("user_id", userID).
+					Str("tenant_id", tenantID).
+					Str("subdomain", subdomain).
+					Msg("User does not have access to tenant")
+				c.JSON(http.StatusForbidden, gin.H{
+					"status":  http.StatusForbidden,
+					"message": "Access denied: no membership in this tenant",
+				})
+				c.Abort()
+				return
+			}
+
+			// User has valid membership - set context
+			c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
+			c.Set("tenant_subdomain", subdomain)
+			c.Set("tenant_roles", roles)
+
+			log.Debug().
+				Str("tenant_id", tenantID).
+				Str("subdomain", subdomain).
+				Str("user_id", userID).
+				Strs("roles", roles).
+				Msg("Tenant access validated with roles")
+
+			c.Next()
+			return
+		}
+
+		// Fallback: Check tenant_memberships from session if membership service not available
 		tenantMembershipsInterface, exists := c.Get("tenant_memberships")
 		if exists {
 			tenantMemberships, ok := tenantMembershipsInterface.([]string)
@@ -135,7 +171,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					return
 				}
 
-				// User has valid membership
+				// User has valid membership (but no role info)
 				c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
 				c.Set("tenant_subdomain", subdomain)
 
@@ -143,59 +179,11 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					Str("tenant_id", tenantID).
 					Str("subdomain", subdomain).
 					Str("user_id", userID).
-					Msg("Tenant access validated via session memberships")
+					Msg("Tenant access validated via session memberships (no role)")
 
 				c.Next()
 				return
 			}
-		}
-
-		// Fallback: Check database if tenant_memberships not in session
-		// This handles cases where session was created before membership feature
-		if ktm.membershipService != nil {
-			hasAccess, err := ktm.membershipService.CheckUserTenantAccess(c, userID, tenantID)
-			if err != nil {
-				log.Error().
-					Err(err).
-					Str("user_id", userID).
-					Str("tenant_id", tenantID).
-					Msg("Failed to check user tenant access")
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-				c.Abort()
-				return
-			}
-
-			if !hasAccess {
-				log.Warn().
-					Str("user_id", userID).
-					Str("tenant_id", tenantID).
-					Str("subdomain", subdomain).
-					Msg("User does not have access to tenant (DB check)")
-				c.JSON(http.StatusForbidden, gin.H{
-					"status":  http.StatusForbidden,
-					"message": "Access denied: no membership in this tenant",
-				})
-				c.Abort()
-				return
-			}
-
-			// User has valid membership - update session for next time
-			log.Info().
-				Str("user_id", userID).
-				Str("tenant_id", tenantID).
-				Msg("User validated via DB - session should be refreshed")
-
-			c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
-			c.Set("tenant_subdomain", subdomain)
-
-			log.Debug().
-				Str("tenant_id", tenantID).
-				Str("subdomain", subdomain).
-				Str("user_id", userID).
-				Msg("Tenant access validated via database fallback")
-
-			c.Next()
-			return
 		}
 
 		// Final fallback to metadata-based validation (legacy)

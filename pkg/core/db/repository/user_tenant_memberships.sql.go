@@ -13,6 +13,62 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addRoleToUserTenantMembership = `-- name: AddRoleToUserTenantMembership :one
+UPDATE core_user_tenant_memberships
+SET roles = array_append(roles, $1::TEXT), updated_at = clock_timestamp()
+WHERE user_id = $2 
+  AND tenant_id = $3 
+  AND NOT ($1::TEXT = ANY(roles))
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
+`
+
+type AddRoleToUserTenantMembershipParams struct {
+	Role     string `json:"role"`
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+func (q *Queries) AddRoleToUserTenantMembership(ctx context.Context, arg AddRoleToUserTenantMembershipParams) (CoreUserTenantMembership, error) {
+	row := q.db.QueryRow(ctx, addRoleToUserTenantMembership, arg.Role, arg.UserID, arg.TenantID)
+	var i CoreUserTenantMembership
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TenantID,
+		&i.Status,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.JoinedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Roles,
+	)
+	return i, err
+}
+
+const checkUserHasTenantRole = `-- name: CheckUserHasTenantRole :one
+SELECT EXISTS(
+    SELECT 1 FROM core_user_tenant_memberships
+    WHERE user_id = $1 
+      AND tenant_id = $2 
+      AND status = 'active' 
+      AND $3::TEXT = ANY(roles)
+) as has_role
+`
+
+type CheckUserHasTenantRoleParams struct {
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+	Role     string `json:"role"`
+}
+
+func (q *Queries) CheckUserHasTenantRole(ctx context.Context, arg CheckUserHasTenantRoleParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkUserHasTenantRole, arg.UserID, arg.TenantID, arg.Role)
+	var has_role bool
+	err := row.Scan(&has_role)
+	return has_role, err
+}
+
 const checkUserTenantAccess = `-- name: CheckUserTenantAccess :one
 SELECT EXISTS(
     SELECT 1 FROM core_user_tenant_memberships
@@ -36,20 +92,20 @@ const createUserTenantMembership = `-- name: CreateUserTenantMembership :one
 INSERT INTO core_user_tenant_memberships (
     user_id,
     tenant_id,
-    role,
+    roles,
     status,
     invited_by,
     invited_at,
     joined_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7
-) RETURNING id, user_id, tenant_id, role, status, invited_by, invited_at, joined_at, created_at, updated_at
+) RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
 `
 
 type CreateUserTenantMembershipParams struct {
 	UserID    string             `json:"user_id"`
 	TenantID  string             `json:"tenant_id"`
-	Role      string             `json:"role"`
+	Roles     []string           `json:"roles"`
 	Status    string             `json:"status"`
 	InvitedBy pgtype.Text        `json:"invited_by"`
 	InvitedAt pgtype.Timestamptz `json:"invited_at"`
@@ -60,7 +116,7 @@ func (q *Queries) CreateUserTenantMembership(ctx context.Context, arg CreateUser
 	row := q.db.QueryRow(ctx, createUserTenantMembership,
 		arg.UserID,
 		arg.TenantID,
-		arg.Role,
+		arg.Roles,
 		arg.Status,
 		arg.InvitedBy,
 		arg.InvitedAt,
@@ -71,13 +127,13 @@ func (q *Queries) CreateUserTenantMembership(ctx context.Context, arg CreateUser
 		&i.ID,
 		&i.UserID,
 		&i.TenantID,
-		&i.Role,
 		&i.Status,
 		&i.InvitedBy,
 		&i.InvitedAt,
 		&i.JoinedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Roles,
 	)
 	return i, err
 }
@@ -98,7 +154,7 @@ func (q *Queries) DeleteUserTenantMembership(ctx context.Context, arg DeleteUser
 }
 
 const getUserTenantMembership = `-- name: GetUserTenantMembership :one
-SELECT id, user_id, tenant_id, role, status, invited_by, invited_at, joined_at, created_at, updated_at FROM core_user_tenant_memberships
+SELECT id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles FROM core_user_tenant_memberships
 WHERE user_id = $1 AND tenant_id = $2
 LIMIT 1
 `
@@ -115,20 +171,38 @@ func (q *Queries) GetUserTenantMembership(ctx context.Context, arg GetUserTenant
 		&i.ID,
 		&i.UserID,
 		&i.TenantID,
-		&i.Role,
 		&i.Status,
 		&i.InvitedBy,
 		&i.InvitedAt,
 		&i.JoinedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Roles,
 	)
 	return i, err
 }
 
+const getUserTenantRoles = `-- name: GetUserTenantRoles :one
+SELECT roles FROM core_user_tenant_memberships
+WHERE user_id = $1 AND tenant_id = $2 AND status = 'active'
+LIMIT 1
+`
+
+type GetUserTenantRolesParams struct {
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+func (q *Queries) GetUserTenantRoles(ctx context.Context, arg GetUserTenantRolesParams) ([]string, error) {
+	row := q.db.QueryRow(ctx, getUserTenantRoles, arg.UserID, arg.TenantID)
+	var roles []string
+	err := row.Scan(&roles)
+	return roles, err
+}
+
 const listPendingInvitations = `-- name: ListPendingInvitations :many
 SELECT 
-    utm.id, utm.user_id, utm.tenant_id, utm.role, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at,
+    utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles,
     t.name as tenant_name,
     t.subdomain
 FROM core_user_tenant_memberships utm
@@ -141,13 +215,13 @@ type ListPendingInvitationsRow struct {
 	ID         uuid.UUID          `json:"id"`
 	UserID     string             `json:"user_id"`
 	TenantID   string             `json:"tenant_id"`
-	Role       string             `json:"role"`
 	Status     string             `json:"status"`
 	InvitedBy  pgtype.Text        `json:"invited_by"`
 	InvitedAt  pgtype.Timestamptz `json:"invited_at"`
 	JoinedAt   pgtype.Timestamptz `json:"joined_at"`
 	CreatedAt  time.Time          `json:"created_at"`
 	UpdatedAt  time.Time          `json:"updated_at"`
+	Roles      []string           `json:"roles"`
 	TenantName string             `json:"tenant_name"`
 	Subdomain  string             `json:"subdomain"`
 }
@@ -165,13 +239,13 @@ func (q *Queries) ListPendingInvitations(ctx context.Context, userID string) ([]
 			&i.ID,
 			&i.UserID,
 			&i.TenantID,
-			&i.Role,
 			&i.Status,
 			&i.InvitedBy,
 			&i.InvitedAt,
 			&i.JoinedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Roles,
 			&i.TenantName,
 			&i.Subdomain,
 		); err != nil {
@@ -186,7 +260,7 @@ func (q *Queries) ListPendingInvitations(ctx context.Context, userID string) ([]
 }
 
 const listTenantMembers = `-- name: ListTenantMembers :many
-SELECT utm.id, utm.user_id, utm.tenant_id, utm.role, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at
+SELECT utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles
 FROM core_user_tenant_memberships utm
 WHERE utm.tenant_id = $1 AND utm.status = $2
 ORDER BY utm.created_at DESC
@@ -210,13 +284,13 @@ func (q *Queries) ListTenantMembers(ctx context.Context, arg ListTenantMembersPa
 			&i.ID,
 			&i.UserID,
 			&i.TenantID,
-			&i.Role,
 			&i.Status,
 			&i.InvitedBy,
 			&i.InvitedAt,
 			&i.JoinedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Roles,
 		); err != nil {
 			return nil, err
 		}
@@ -230,7 +304,7 @@ func (q *Queries) ListTenantMembers(ctx context.Context, arg ListTenantMembersPa
 
 const listUserTenantMemberships = `-- name: ListUserTenantMemberships :many
 SELECT 
-    utm.id, utm.user_id, utm.tenant_id, utm.role, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at,
+    utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles,
     t.name as tenant_name,
     t.subdomain
 FROM core_user_tenant_memberships utm
@@ -248,13 +322,13 @@ type ListUserTenantMembershipsRow struct {
 	ID         uuid.UUID          `json:"id"`
 	UserID     string             `json:"user_id"`
 	TenantID   string             `json:"tenant_id"`
-	Role       string             `json:"role"`
 	Status     string             `json:"status"`
 	InvitedBy  pgtype.Text        `json:"invited_by"`
 	InvitedAt  pgtype.Timestamptz `json:"invited_at"`
 	JoinedAt   pgtype.Timestamptz `json:"joined_at"`
 	CreatedAt  time.Time          `json:"created_at"`
 	UpdatedAt  time.Time          `json:"updated_at"`
+	Roles      []string           `json:"roles"`
 	TenantName string             `json:"tenant_name"`
 	Subdomain  string             `json:"subdomain"`
 }
@@ -272,13 +346,13 @@ func (q *Queries) ListUserTenantMemberships(ctx context.Context, arg ListUserTen
 			&i.ID,
 			&i.UserID,
 			&i.TenantID,
-			&i.Role,
 			&i.Status,
 			&i.InvitedBy,
 			&i.InvitedAt,
 			&i.JoinedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Roles,
 			&i.TenantName,
 			&i.Subdomain,
 		); err != nil {
@@ -292,11 +366,44 @@ func (q *Queries) ListUserTenantMemberships(ctx context.Context, arg ListUserTen
 	return items, nil
 }
 
+const removeRoleFromUserTenantMembership = `-- name: RemoveRoleFromUserTenantMembership :one
+UPDATE core_user_tenant_memberships
+SET roles = array_remove(roles, $1::TEXT), updated_at = clock_timestamp()
+WHERE user_id = $2 
+  AND tenant_id = $3 
+  AND $1::TEXT = ANY(roles)
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
+`
+
+type RemoveRoleFromUserTenantMembershipParams struct {
+	Role     string `json:"role"`
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+func (q *Queries) RemoveRoleFromUserTenantMembership(ctx context.Context, arg RemoveRoleFromUserTenantMembershipParams) (CoreUserTenantMembership, error) {
+	row := q.db.QueryRow(ctx, removeRoleFromUserTenantMembership, arg.Role, arg.UserID, arg.TenantID)
+	var i CoreUserTenantMembership
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TenantID,
+		&i.Status,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.JoinedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Roles,
+	)
+	return i, err
+}
+
 const updateUserTenantMembershipJoinedAt = `-- name: UpdateUserTenantMembershipJoinedAt :one
 UPDATE core_user_tenant_memberships
 SET joined_at = $3, status = 'active', updated_at = clock_timestamp()
 WHERE user_id = $1 AND tenant_id = $2
-RETURNING id, user_id, tenant_id, role, status, invited_by, invited_at, joined_at, created_at, updated_at
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
 `
 
 type UpdateUserTenantMembershipJoinedAtParams struct {
@@ -312,44 +419,44 @@ func (q *Queries) UpdateUserTenantMembershipJoinedAt(ctx context.Context, arg Up
 		&i.ID,
 		&i.UserID,
 		&i.TenantID,
-		&i.Role,
 		&i.Status,
 		&i.InvitedBy,
 		&i.InvitedAt,
 		&i.JoinedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Roles,
 	)
 	return i, err
 }
 
-const updateUserTenantMembershipRole = `-- name: UpdateUserTenantMembershipRole :one
+const updateUserTenantMembershipRoles = `-- name: UpdateUserTenantMembershipRoles :one
 UPDATE core_user_tenant_memberships
-SET role = $3, updated_at = clock_timestamp()
+SET roles = $3, updated_at = clock_timestamp()
 WHERE user_id = $1 AND tenant_id = $2
-RETURNING id, user_id, tenant_id, role, status, invited_by, invited_at, joined_at, created_at, updated_at
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
 `
 
-type UpdateUserTenantMembershipRoleParams struct {
-	UserID   string `json:"user_id"`
-	TenantID string `json:"tenant_id"`
-	Role     string `json:"role"`
+type UpdateUserTenantMembershipRolesParams struct {
+	UserID   string   `json:"user_id"`
+	TenantID string   `json:"tenant_id"`
+	Roles    []string `json:"roles"`
 }
 
-func (q *Queries) UpdateUserTenantMembershipRole(ctx context.Context, arg UpdateUserTenantMembershipRoleParams) (CoreUserTenantMembership, error) {
-	row := q.db.QueryRow(ctx, updateUserTenantMembershipRole, arg.UserID, arg.TenantID, arg.Role)
+func (q *Queries) UpdateUserTenantMembershipRoles(ctx context.Context, arg UpdateUserTenantMembershipRolesParams) (CoreUserTenantMembership, error) {
+	row := q.db.QueryRow(ctx, updateUserTenantMembershipRoles, arg.UserID, arg.TenantID, arg.Roles)
 	var i CoreUserTenantMembership
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.TenantID,
-		&i.Role,
 		&i.Status,
 		&i.InvitedBy,
 		&i.InvitedAt,
 		&i.JoinedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Roles,
 	)
 	return i, err
 }
@@ -358,7 +465,7 @@ const updateUserTenantMembershipStatus = `-- name: UpdateUserTenantMembershipSta
 UPDATE core_user_tenant_memberships
 SET status = $3, updated_at = clock_timestamp()
 WHERE user_id = $1 AND tenant_id = $2
-RETURNING id, user_id, tenant_id, role, status, invited_by, invited_at, joined_at, created_at, updated_at
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
 `
 
 type UpdateUserTenantMembershipStatusParams struct {
@@ -374,13 +481,13 @@ func (q *Queries) UpdateUserTenantMembershipStatus(ctx context.Context, arg Upda
 		&i.ID,
 		&i.UserID,
 		&i.TenantID,
-		&i.Role,
 		&i.Status,
 		&i.InvitedBy,
 		&i.InvitedAt,
 		&i.JoinedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Roles,
 	)
 	return i, err
 }
