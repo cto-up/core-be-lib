@@ -18,11 +18,14 @@ const (
 
 // AuthenticatedUser represents the user info extracted from a token
 type AuthenticatedUser struct {
-	UserID        string                 `json:"user_id"`
-	Email         string                 `json:"email"`
-	EmailVerified bool                   `json:"email_verified"`
-	Claims        map[string]interface{} `json:"claims"`
-	CustomClaims  []string               `json:"custom_claims"`
+	UserID            string                 `json:"user_id"`
+	Email             string                 `json:"email"`
+	EmailVerified     bool                   `json:"email_verified"`
+	Claims            map[string]interface{} `json:"claims"`
+	CustomClaims      []string               `json:"custom_claims"`
+	TenantID          string                 `json:"tenant_id,omitempty"`
+	Subdomain         string                 `json:"subdomain,omitempty"`
+	TenantMemberships []string               `json:"tenant_memberships,omitempty"` // List of tenant IDs user has access to
 }
 
 // UserRecord represents a user in the authentication system

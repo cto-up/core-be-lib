@@ -93,6 +93,20 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 		return nil, err
 	}
 
+	// Extract tenant information from metadata_public
+	tenantID, _ := token.Claims["tenant_id"].(string)
+	subdomain, _ := token.Claims["subdomain"].(string)
+
+	// Extract tenant memberships (list of tenant IDs user has access to)
+	var tenantMemberships []string
+	if membershipsInterface, ok := token.Claims["tenant_memberships"].([]interface{}); ok {
+		for _, m := range membershipsInterface {
+			if tenantIDStr, ok := m.(string); ok {
+				tenantMemberships = append(tenantMemberships, tenantIDStr)
+			}
+		}
+	}
+
 	// Roles in Kratos are often in traits as company_role (per ORY_KRATOS.md)
 	// We also support flattened boolean flags for SUPER_ADMIN, etc.
 	customClaims := []string{}
@@ -107,14 +121,26 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 		}
 	}
 
+	// Also check roles array from metadata
+	if rolesArr, ok := token.Claims["roles"].([]interface{}); ok {
+		for _, role := range rolesArr {
+			if roleStr, ok := role.(string); ok {
+				customClaims = append(customClaims, roleStr)
+			}
+		}
+	}
+
 	email, _ := token.Claims["email"].(string)
 
 	return &auth.AuthenticatedUser{
-		UserID:        token.UID,
-		Email:         email,
-		EmailVerified: true, // Should check verifiable_addresses if needed
-		Claims:        token.Claims,
-		CustomClaims:  customClaims,
+		UserID:            token.UID,
+		Email:             email,
+		EmailVerified:     true, // Should check verifiable_addresses if needed
+		Claims:            token.Claims,
+		CustomClaims:      customClaims,
+		TenantID:          tenantID,
+		Subdomain:         subdomain,
+		TenantMemberships: tenantMemberships,
 	}, nil
 }
 
@@ -141,6 +167,16 @@ type KratosAuthClient struct {
 	adminClient    *ory.APIClient
 	publicClient   *ory.APIClient
 	organizationID *string
+}
+
+// GetAdminClient returns the admin API client
+func (k *KratosAuthClient) GetAdminClient() *ory.APIClient {
+	return k.adminClient
+}
+
+// GetPublicClient returns the public API client
+func (k *KratosAuthClient) GetPublicClient() *ory.APIClient {
+	return k.publicClient
 }
 
 func (k *KratosAuthClient) CreateUser(ctx context.Context, user *auth.UserToCreate) (*auth.UserRecord, error) {
@@ -356,6 +392,27 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*
 					}
 				}
 				claims[key] = v
+			}
+		}
+
+		// Extract tenant memberships from metadata_public
+		if metadataPublic, ok := session.Identity.MetadataPublic.(map[string]interface{}); ok {
+			// Add tenant_memberships to claims
+			if tenantMemberships, ok := metadataPublic["tenant_memberships"].([]interface{}); ok {
+				claims["tenant_memberships"] = tenantMemberships
+			}
+
+			// Add primary_tenant_id to claims
+			if primaryTenantID, ok := metadataPublic["primary_tenant_id"].(string); ok {
+				claims["primary_tenant_id"] = primaryTenantID
+			}
+
+			// For backward compatibility, also set tenant_id and subdomain
+			if tenantID, ok := metadataPublic["tenant_id"].(string); ok {
+				claims["tenant_id"] = tenantID
+			}
+			if subdomain, ok := metadataPublic["subdomain"].(string); ok {
+				claims["subdomain"] = subdomain
 			}
 		}
 	}

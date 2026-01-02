@@ -1,5 +1,5 @@
 {
-  "$id": "https://schemas.ory.sh/presets/kratos/quickstart/email-password/identity.schema.json",
+  "$id": "https://schemas.ory.sh/presets/kratos/identity.email.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Person",
   "type": "object",
@@ -12,10 +12,15 @@
           "format": "email",
           "title": "E-Mail",
           "minLength": 3,
+          "maxLength": 320,
           "ory.sh/kratos": {
             "credentials": {
               "password": {
                 "identifier": true
+              },
+              "code": {
+                "identifier": true,
+                "via": "email"
               }
             },
             "verification": {
@@ -26,28 +31,58 @@
             }
           }
         },
-        "roles": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
         "name": {
-          "type": "object",
-          "properties": {
-            "first": {
-              "title": "First Name",
-              "type": "string"
-            },
-            "last": {
-              "title": "Last Name",
-              "type": "string"
-            }
-          }
+          "type": "string",
+          "title": "Full Name",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "subdomain": {
+          "type": "string",
+          "title": "Tenant Subdomain",
+          "description": "Subdomain for tenant assignment during registration"
         }
       },
       "required": [
         "email"
       ],
       "additionalProperties": false
+    },
+    "metadata_public": {
+      "type": "object",
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "title": "Primary Tenant ID",
+          "description": "Primary tenant the user belongs to (for backward compatibility)"
+        },
+        "subdomain": {
+          "type": "string",
+          "title": "Primary Tenant Subdomain",
+          "description": "Subdomain of primary tenant (for backward compatibility)"
+        },
+        "tenant_memberships": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tenant Memberships",
+          "description": "List of tenant IDs the user has access to"
+        },
+        "primary_tenant_id": {
+          "type": "string",
+          "title": "Primary Tenant ID",
+          "description": "User's primary/default tenant"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "Global User Roles",
+          "description": "Global roles like SUPER_ADMIN, ADMIN"
+        }
+      }
     }
   }
 }
