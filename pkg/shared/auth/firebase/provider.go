@@ -317,6 +317,12 @@ func (f *FirebaseAuthClient) EmailSignInLink(ctx context.Context, email string, 
 	return link, nil
 }
 
+// RequiresRecoveryProxy returns false for Firebase since recovery links work directly
+// without needing a backend proxy
+func (f *FirebaseAuthClient) RequiresRecoveryProxy() bool {
+	return false
+}
+
 func (f *FirebaseAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error) {
 	token, err := f.client.VerifyIDToken(ctx, idToken)
 	if err != nil {

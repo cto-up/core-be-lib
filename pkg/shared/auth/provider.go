@@ -178,6 +178,11 @@ type AuthClient interface {
 
 	// Token Verification
 	VerifyIDToken(ctx context.Context, idToken string) (*Token, error)
+
+	// Provider Capabilities
+	// RequiresRecoveryProxy returns true if the provider needs a backend proxy endpoint
+	// for password recovery (like Kratos), false if recovery links work directly (like Firebase)
+	RequiresRecoveryProxy() bool
 }
 
 // TenantManager defines the interface for multi-tenant authentication management

@@ -1,0 +1,55 @@
+get:
+  summary: Handle password recovery
+  description: Proxies password recovery request to Kratos while preserving subdomain context
+  operationId: handleRecovery
+  tags:
+    - auth
+  parameters:
+    - name: flow
+      in: query
+      required: true
+      schema:
+        type: string
+      description: Recovery flow ID from Kratos
+    - name: token
+      in: query
+      required: true
+      schema:
+        type: string
+      description: Recovery token from Kratos
+  responses:
+    "200":
+      description: Recovery successful
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string
+              redirect_url:
+                type: string
+    "400":
+      description: Invalid or expired recovery link
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string

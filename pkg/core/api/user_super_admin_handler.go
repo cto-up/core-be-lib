@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/rs/zerolog/log"
@@ -14,8 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-
-	"ctoup.com/coreapp/pkg/shared/util"
 )
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
@@ -281,23 +278,13 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 		return
 	}
 
-	host, err := util.GetHost(c)
+	// Use the reusable buildTenantURL function
+	url, err := buildTenantURL(c, "/signin?from=/", tenant.Subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get host")
+		log.Error().Err(err).Msg("Failed to build tenant URL")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	domain, err := util.GetDomain(c)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get domain")
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	hostUrl := host.Scheme + "://" + tenant.Subdomain + "." + domain
-
-	url := fmt.Sprintf("%s/signin?from=/", hostUrl)
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, tenant.Subdomain)
 	if err != nil {

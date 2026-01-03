@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/emailservice"
@@ -13,30 +12,38 @@ import (
 	utils "ctoup.com/coreapp/pkg/shared/util"
 )
 
+// buildTenantURL constructs a URL for a specific tenant subdomain with proper port handling
+// If subdomain is empty, uses the current subdomain from the request
+func buildTenantURL(c *gin.Context, path string, subdomain string) (string, error) {
+	host, err := utils.GetHost(c)
+	if err != nil {
+		return "", err
+	}
+
+	// If no subdomain passed, return the full host which includes existing subdomain
+	if subdomain == "" {
+		url := fmt.Sprintf("%s://%s%s", host.Scheme, host.Host, path)
+		return url, nil
+	}
+
+	// Get base domain with port
+	domain, err := utils.GetBaseDomainWithPort(c)
+	if err != nil {
+		return "", err
+	}
+
+	// Build URL with subdomain and domain (which includes port if present)
+	url := fmt.Sprintf("%s://%s.%s%s", host.Scheme, subdomain, domain, path)
+	return url, nil
+}
+
 func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 	var subdomain string
 	if len(subdomains) > 0 {
 		subdomain = subdomains[0]
 	}
 
-	host, err := utils.GetHost(c)
-	if err != nil {
-		return "", err
-	}
-	// if no subdomain passed, return the full host which includes existing subdomain
-	if subdomain == "" {
-		url := fmt.Sprintf("%s://%s/signin?from=/", host.Scheme, host.Host)
-		return url, nil
-	}
-
-	host.Host = host.Host[strings.Index(host.Host, ".")+1:]
-	domain, err := utils.GetBaseDomainWithPort(c)
-	if err != nil {
-		return "", err
-	}
-	url := fmt.Sprintf("%s://%s.%s/signin?from=/", host.Scheme, subdomain, domain)
-
-	return url, nil
+	return buildTenantURL(c, "/signin?from=/", subdomain)
 }
 
 func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail string) error {
@@ -77,7 +84,7 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, t
 	templateData := struct {
 		Link string
 	}{
-		Link: link,
+		Link: link,	
 	}
 
 	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Reset Password Link", "")

@@ -385,7 +385,7 @@ func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) 
 		return "", convertKratosError(err)
 	}
 
-	log.Info().Str("email", email).Str("identity_id", identityID).Msg("Recovery link created via Admin API")
+	log.Info().Str("email", email).Str("identity_id", identityID).Str("recovery_link", recoveryLink.RecoveryLink).Msg("Recovery link created via Admin API")
 	return recoveryLink.RecoveryLink, nil
 }
 
@@ -458,11 +458,58 @@ func (k *KratosAuthClient) EmailVerificationLinkWithSettings(ctx context.Context
 }
 
 func (k *KratosAuthClient) PasswordResetLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
-	return k.PasswordResetLink(ctx, email)
+	// Get the Kratos recovery link
+	kratosLink, err := k.PasswordResetLink(ctx, email)
+	if err != nil {
+		return "", err
+	}
+
+	// If settings with URL are provided, replace the Kratos base URL with the frontend URL
+	// The Kratos link format is: http://localhost:4433/self-service/recovery?flow=xxx&token=yyy
+	// For Kratos, we want to change it to point to our backend proxy which will handle the recovery flow:
+	// http://subdomain.ctoup.localhost:5173/recovery?flow=xxx&token=yyy
+	// The frontend will then call the backend proxy endpoint: /public-api/v1/auth/recovery?flow=xxx&token=yyy
+	if settings != nil && settings.URL != "" {
+		// Extract the query parameters from the Kratos link
+		if strings.Contains(kratosLink, "?") {
+			queryPart := kratosLink[strings.Index(kratosLink, "?")+1:]
+
+			// Extract base URL from settings.URL (remove path and query string)
+			// settings.URL might be: http://corpb.ctoup.localhost:5173/signin?from=/
+			// We need: http://corpb.ctoup.localhost:5173
+			baseURL := settings.URL
+			if idx := strings.Index(baseURL, "?"); idx != -1 {
+				baseURL = baseURL[:idx]
+			}
+			if idx := strings.LastIndex(baseURL, "/"); idx > 8 { // After http:// or https://
+				baseURL = baseURL[:idx]
+			}
+
+			// Construct the frontend recovery URL
+			// This URL will be opened by the user and will call our backend proxy
+			frontendLink := fmt.Sprintf("%s/recovery?%s", baseURL, queryPart)
+			log.Info().
+				Str("kratos_link", kratosLink).
+				Str("settings_url", settings.URL).
+				Str("base_url", baseURL).
+				Str("frontend_link", frontendLink).
+				Str("email", email).
+				Msg("Converted Kratos recovery link to frontend URL")
+			return frontendLink, nil
+		}
+	}
+
+	return kratosLink, nil
 }
 
 func (k *KratosAuthClient) EmailSignInLink(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
 	return "", &auth.AuthError{Code: "not-implemented"}
+}
+
+// RequiresRecoveryProxy returns true for Kratos since it needs a backend proxy
+// to activate recovery links and create settings flows
+func (k *KratosAuthClient) RequiresRecoveryProxy() bool {
+	return true
 }
 
 // KratosTenantManager implements TenantManager for Kratos
