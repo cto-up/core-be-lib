@@ -8,6 +8,11 @@ serve:
     cors:
       enabled: true
       allowed_origins:
+        - http://localhost:5173
+        - http://localhost:4455
+        - http://ctoup.localhost:5173
+        - http://moncto.localhost:5173
+        - http://corpb.ctoup.localhost:5173
         - http://*.localhost:5173
         - http://*.moncto.localhost:5173
         - http://*.ctoup.localhost:5173
@@ -23,10 +28,12 @@ serve:
         - Authorization
         - Content-Type
         - X-Session-Token
+        - X-CSRF-Token
         - Cookie
       exposed_headers:
         - Content-Type
         - Set-Cookie
+        - Location
       allow_credentials: true
       debug: true
   admin:
@@ -46,10 +53,16 @@ serve:
 #     same_site: Lax
 
 selfservice:
-  default_browser_return_url: http://localhost:4455/welcome
+  default_browser_return_url: http://localhost:5173/
   allowed_return_urls:
     - http://localhost:4455
+    - http://localhost:5173
+    - http://ctoup.localhost:5173
+    - http://moncto.localhost:5173
+    - http://corpb.ctoup.localhost:5173
     - http://*.localhost:5173
+    - http://*.ctoup.localhost:5173
+    - http://*.moncto.localhost:5173
     - http://*.localhost:19006/Callback
     - http://*.ctoup.localhost:19006/Callback
     - exp://*.localhost:8081/--/Callback
@@ -74,33 +87,31 @@ selfservice:
       ui_url: http://localhost:4455/error
 
     settings:
-      ui_url: http://localhost:4455/settings
+      ui_url: /recovery
       privileged_session_max_age: 15m
-      required_aal: highest_available
 
     recovery:
       enabled: true
-      ui_url: http://localhost:4455/recovery
+      ui_url: /recovery
       use: code
+
+    login:
+      ui_url: /signin
 
     verification:
       enabled: true
-      ui_url: http://localhost:4455/verification
+      ui_url: http://localhost:5173/verification
       use: code
       after:
-        default_browser_return_url: http://localhost:4455/welcome
+        default_browser_return_url: http://localhost:5173/
 
     logout:
       after:
-        default_browser_return_url: http://localhost:4455/login
-
-    login:
-      ui_url: http://localhost:4455/login
-      lifespan: 10m
+        default_browser_return_url: http://localhost:5173/signin
 
     registration:
       lifespan: 10m
-      ui_url: http://localhost:4455/registration
+      ui_url: http://localhost:5173/signup
       after:
         password:
           hooks:
