@@ -200,6 +200,7 @@ type TenantManager interface {
 // TenantConfig represents configuration for a tenant
 type TenantConfig struct {
 	DisplayName           string
+	Subdomain             string
 	EnableEmailLinkSignIn bool
 	AllowPasswordSignUp   bool
 	EnableAnonymousUsers  bool
