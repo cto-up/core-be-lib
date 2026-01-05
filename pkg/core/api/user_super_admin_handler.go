@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/rs/zerolog/log"
@@ -115,6 +116,42 @@ func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	c.Status(http.StatusNoContent)
+}
+
+// RemoveUserFromTenantFromSuperAdmin removes a user from a specific tenant (deletes membership only)
+// (DELETE /superadmin-api/v1/tenants/{tenantid}/users/{userid}/remove-from-tenant)
+func (uh *UserSuperAdminHandler) RemoveUserFromTenantFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userid string) {
+
+	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Check if user exists in this tenant
+	isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
+		UserID:   userid,
+		TenantID: tenant.TenantID,
+	})
+	if err != nil || !isMember {
+		log.Error().Err(err).Msg("failed to check user membership")
+		c.JSON(http.StatusNotFound, helpers.ErrorResponse(errors.New("user not found in this tenant")))
+		return
+	}
+
+	// Remove user from tenant (delete membership)
+	err = uh.store.RemoveUserFromTenant(c, repository.RemoveUserFromTenantParams{
+		UserID:   userid,
+		TenantID: tenant.TenantID,
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to remove user from tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
 	c.Status(http.StatusNoContent)
 }
 

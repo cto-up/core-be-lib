@@ -70,6 +70,12 @@ RETURNING *;
 DELETE FROM core_user_tenant_memberships
 WHERE user_id = $1 AND tenant_id = $2;
 
+-- name: RemoveUserFromTenant :exec
+-- Remove a user from a tenant (delete membership only)
+-- This is different from DeleteUserTenantMembership as it's more explicit about the action
+DELETE FROM core_user_tenant_memberships
+WHERE user_id = $1 AND tenant_id = $2;
+
 -- name: CheckUserTenantAccess :one
 SELECT EXISTS(
     SELECT 1 FROM core_user_tenant_memberships
@@ -106,3 +112,22 @@ SELECT EXISTS(
     SELECT 1 FROM core_user_tenant_memberships
     WHERE user_id = $1 AND tenant_id = $2
 ) as is_member;
+
+-- name: ListUsersWithMemberships :many
+-- List users for a tenant via memberships table (for Kratos)
+-- This joins with core_users to get user details
+SELECT 
+    u.id,
+    u.email,
+    u.profile,
+    u.created_at,
+    utm.roles,
+    utm.status
+FROM core_user_tenant_memberships utm
+INNER JOIN core_users u ON utm.user_id = u.id
+WHERE utm.tenant_id = $1 
+  AND utm.status = 'active'
+  AND (UPPER(u.email) LIKE UPPER(sqlc.narg('like')) OR sqlc.narg('like') IS NULL)
+ORDER BY u.created_at
+LIMIT $2
+OFFSET $3;
