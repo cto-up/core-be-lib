@@ -7,9 +7,25 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	subentity "ctoup.com/coreapp/pkg/shared/repository/subentity"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const countUserTenants = `-- name: CountUserTenants :one
+SELECT COUNT(DISTINCT tenant_id)::int
+FROM core_user_tenant_memberships
+WHERE user_id = $1 AND status = 'active'
+`
+
+// Count how many tenants a user belongs to
+func (q *Queries) CountUserTenants(ctx context.Context, userID string) (int32, error) {
+	row := q.db.QueryRow(ctx, countUserTenants, userID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO core_users (
@@ -93,20 +109,46 @@ func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) 
 	return i, err
 }
 
-const getUserByID = `-- name: GetUserByID :one
-SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
-WHERE id = $1
-AND tenant_id = $2::text
+const getUserByEmailGlobal = `-- name: GetUserByEmailGlobal :one
+SELECT DISTINCT ON (id) 
+    id, 
+    email, 
+    profile, 
+    created_at
+FROM core_users
+WHERE email = $1::text
 LIMIT 1
 `
 
-type GetUserByIDParams struct {
-	ID       string `json:"id"`
-	TenantID string `json:"tenant_id"`
+type GetUserByEmailGlobalRow struct {
+	ID        string                `json:"id"`
+	Email     pgtype.Text           `json:"email"`
+	Profile   subentity.UserProfile `json:"profile"`
+	CreatedAt time.Time             `json:"created_at"`
 }
 
-func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (CoreUser, error) {
-	row := q.db.QueryRow(ctx, getUserByID, arg.ID, arg.TenantID)
+// Get user by email across all tenants (for checking existence)
+// This returns the first user found with this email
+func (q *Queries) GetUserByEmailGlobal(ctx context.Context, email string) (GetUserByEmailGlobalRow, error) {
+	row := q.db.QueryRow(ctx, getUserByEmailGlobal, email)
+	var i GetUserByEmailGlobalRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Profile,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getUserByID = `-- name: GetUserByID :one
+SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
+WHERE id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, id string) (CoreUser, error) {
+	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i CoreUser
 	err := row.Scan(
 		&i.ID,

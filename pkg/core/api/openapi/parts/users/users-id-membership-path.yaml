@@ -1,0 +1,37 @@
+post:
+  description: |
+    Add an existing user to the current tenant (create membership)
+  operationId: addUserMembership
+  parameters:
+    - name: userid
+      in: path
+      description: User ID
+      required: true
+      schema:
+        type: string
+  requestBody:
+    description: Membership details
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - roles
+          properties:
+            roles:
+              type: array
+              items:
+                $ref: "../../core-schema.yaml#/components/schemas/Role"
+              description: Roles to assign to the user in this tenant
+  responses:
+    "201":
+      description: Membership created successfully
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/User"
+    "400":
+      description: Bad request (e.g., user already a member)
+    "404":
+      description: User not found

@@ -84,7 +84,7 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, t
 	templateData := struct {
 		Link string
 	}{
-		Link: link,	
+		Link: link,
 	}
 
 	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Reset Password Link", "")
@@ -191,5 +191,34 @@ func sendConfirmationEmail(c *gin.Context, url, toEmail string, confirmationToke
 		log.Error().Err(err).Msg("Failed to send email verification")
 		return err
 	}
+	return nil
+}
+
+func sendTenantAddedEmail(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail, tenantName string) error {
+	fromEmail := os.Getenv("SYSTEM_EMAIL")
+	if fromEmail == "" {
+		fromEmail = "noreply@ctoup.com"
+	}
+
+	// Send the notification email
+	templateData := struct {
+		Link       string
+		TenantName string
+	}{
+		Link:       url,
+		TenantName: tenantName,
+	}
+
+	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "You've been added to "+tenantName, "")
+	if err := r.ParseTemplateWithDomain(c, "email-tenant-added.html", templateData); err != nil {
+		log.Error().Err(err).Msg("Failed to parse template for tenant added notification")
+		return err
+	}
+
+	if err := r.SendEmail(); err != nil {
+		log.Error().Err(err).Msg("Failed to send tenant added notification")
+		return err
+	}
+	log.Info().Str("email", toEmail).Str("tenant", tenantName).Msg("Tenant added notification sent successfully")
 	return nil
 }

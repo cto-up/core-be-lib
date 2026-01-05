@@ -99,3 +99,10 @@ SELECT EXISTS(
       AND status = 'active' 
       AND sqlc.arg(role)::TEXT = ANY(roles)
 ) as has_role;
+
+-- name: IsUserMemberOfTenant :one
+-- Check if user is already a member of a specific tenant
+SELECT EXISTS(
+    SELECT 1 FROM core_user_tenant_memberships
+    WHERE user_id = $1 AND tenant_id = $2
+) as is_member;

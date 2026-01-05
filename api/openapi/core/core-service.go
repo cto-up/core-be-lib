@@ -456,10 +456,22 @@ type ListUsersParams struct {
 // ListUsersParamsOrder defines parameters for ListUsers.
 type ListUsersParamsOrder string
 
+// CheckUserExistsParams defines parameters for CheckUserExists.
+type CheckUserExistsParams struct {
+	// Email Email address to check
+	Email openapi_types.Email `form:"email" json:"email"`
+}
+
 // ImportUsersFromAdminMultipartBody defines parameters for ImportUsersFromAdmin.
 type ImportUsersFromAdminMultipartBody struct {
 	// File CSV file with user data (lastname;firstname;email format)
 	File *openapi_types.File `json:"file,omitempty"`
+}
+
+// AddUserMembershipJSONBody defines parameters for AddUserMembership.
+type AddUserMembershipJSONBody struct {
+	// Roles Roles to assign to the user in this tenant
+	Roles []Role `json:"roles"`
 }
 
 // ResetPasswordRequestByAdminJSONBody defines parameters for ResetPasswordRequestByAdmin.
@@ -622,6 +634,18 @@ type ListUsersFromSuperAdminParams struct {
 // ListUsersFromSuperAdminParamsOrder defines parameters for ListUsersFromSuperAdmin.
 type ListUsersFromSuperAdminParamsOrder string
 
+// CheckUserExistsFromSuperAdminParams defines parameters for CheckUserExistsFromSuperAdmin.
+type CheckUserExistsFromSuperAdminParams struct {
+	// Email Email address to check
+	Email openapi_types.Email `form:"email" json:"email"`
+}
+
+// AddUserMembershipFromSuperAdminJSONBody defines parameters for AddUserMembershipFromSuperAdmin.
+type AddUserMembershipFromSuperAdminJSONBody struct {
+	// Roles Roles to assign to the user in this tenant
+	Roles []Role `json:"roles"`
+}
+
 // ResetPasswordRequestBySuperAdminJSONBody defines parameters for ResetPasswordRequestBySuperAdmin.
 type ResetPasswordRequestBySuperAdminJSONBody struct {
 	// Email email
@@ -700,6 +724,9 @@ type ImportUsersFromAdminMultipartRequestBody ImportUsersFromAdminMultipartBody
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = User
 
+// AddUserMembershipJSONRequestBody defines body for AddUserMembership for application/json ContentType.
+type AddUserMembershipJSONRequestBody AddUserMembershipJSONBody
+
 // ResetPasswordRequestByAdminJSONRequestBody defines body for ResetPasswordRequestByAdmin for application/json ContentType.
 type ResetPasswordRequestByAdminJSONRequestBody ResetPasswordRequestByAdminJSONBody
 
@@ -744,6 +771,9 @@ type AddUserFromSuperAdminJSONRequestBody = NewUser
 
 // UpdateUserFromSuperAdminJSONRequestBody defines body for UpdateUserFromSuperAdmin for application/json ContentType.
 type UpdateUserFromSuperAdminJSONRequestBody = User
+
+// AddUserMembershipFromSuperAdminJSONRequestBody defines body for AddUserMembershipFromSuperAdmin for application/json ContentType.
+type AddUserMembershipFromSuperAdminJSONRequestBody AddUserMembershipFromSuperAdminJSONBody
 
 // ResetPasswordRequestBySuperAdminJSONRequestBody defines body for ResetPasswordRequestBySuperAdmin for application/json ContentType.
 type ResetPasswordRequestBySuperAdminJSONRequestBody ResetPasswordRequestBySuperAdminJSONBody
@@ -886,6 +916,9 @@ type ServerInterface interface {
 	// (GET /api/v1/users/by-email/{email})
 	GetUserByEmail(c *gin.Context, email string)
 
+	// (GET /api/v1/users/check)
+	CheckUserExists(c *gin.Context, params CheckUserExistsParams)
+
 	// (POST /api/v1/users/import)
 	ImportUsersFromAdmin(c *gin.Context)
 
@@ -897,6 +930,9 @@ type ServerInterface interface {
 
 	// (PUT /api/v1/users/{userid})
 	UpdateUser(c *gin.Context, userid string)
+
+	// (POST /api/v1/users/{userid}/membership)
+	AddUserMembership(c *gin.Context, userid string)
 
 	// (POST /api/v1/users/{userid}/password-reset-request)
 	ResetPasswordRequestByAdmin(c *gin.Context, userid string)
@@ -994,6 +1030,9 @@ type ServerInterface interface {
 	// (POST /superadmin-api/v1/tenants/{tenantid}/users)
 	AddUserFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID)
 
+	// (GET /superadmin-api/v1/tenants/{tenantid}/users/check)
+	CheckUserExistsFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, params CheckUserExistsFromSuperAdminParams)
+
 	// (DELETE /superadmin-api/v1/tenants/{tenantid}/users/{userid})
 	DeleteUserFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
 
@@ -1002,6 +1041,9 @@ type ServerInterface interface {
 
 	// (PUT /superadmin-api/v1/tenants/{tenantid}/users/{userid})
 	UpdateUserFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
+
+	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/membership)
+	AddUserMembershipFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
 
 	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/password-reset-request)
 	ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
@@ -2362,6 +2404,39 @@ func (siw *ServerInterfaceWrapper) GetUserByEmail(c *gin.Context) {
 	siw.Handler.GetUserByEmail(c, email)
 }
 
+// CheckUserExists operation middleware
+func (siw *ServerInterfaceWrapper) CheckUserExists(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CheckUserExistsParams
+
+	// ------------- Required query parameter "email" -------------
+
+	if paramValue := c.Query("email"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument email is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "email", c.Request.URL.Query(), &params.Email)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter email: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CheckUserExists(c, params)
+}
+
 // ImportUsersFromAdmin operation middleware
 func (siw *ServerInterfaceWrapper) ImportUsersFromAdmin(c *gin.Context) {
 
@@ -2445,6 +2520,30 @@ func (siw *ServerInterfaceWrapper) UpdateUser(c *gin.Context) {
 	}
 
 	siw.Handler.UpdateUser(c, userid)
+}
+
+// AddUserMembership operation middleware
+func (siw *ServerInterfaceWrapper) AddUserMembership(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AddUserMembership(c, userid)
 }
 
 // ResetPasswordRequestByAdmin operation middleware
@@ -3324,6 +3423,48 @@ func (siw *ServerInterfaceWrapper) AddUserFromSuperAdmin(c *gin.Context) {
 	siw.Handler.AddUserFromSuperAdmin(c, tenantid)
 }
 
+// CheckUserExistsFromSuperAdmin operation middleware
+func (siw *ServerInterfaceWrapper) CheckUserExistsFromSuperAdmin(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CheckUserExistsFromSuperAdminParams
+
+	// ------------- Required query parameter "email" -------------
+
+	if paramValue := c.Query("email"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument email is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "email", c.Request.URL.Query(), &params.Email)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter email: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CheckUserExistsFromSuperAdmin(c, tenantid, params)
+}
+
 // DeleteUserFromSuperAdmin operation middleware
 func (siw *ServerInterfaceWrapper) DeleteUserFromSuperAdmin(c *gin.Context) {
 
@@ -3421,6 +3562,39 @@ func (siw *ServerInterfaceWrapper) UpdateUserFromSuperAdmin(c *gin.Context) {
 	}
 
 	siw.Handler.UpdateUserFromSuperAdmin(c, tenantid, userid)
+}
+
+// AddUserMembershipFromSuperAdmin operation middleware
+func (siw *ServerInterfaceWrapper) AddUserMembershipFromSuperAdmin(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AddUserMembershipFromSuperAdmin(c, tenantid, userid)
 }
 
 // ResetPasswordRequestBySuperAdmin operation middleware
@@ -3644,10 +3818,12 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/api/v1/users", wrapper.ListUsers)
 	router.POST(options.BaseURL+"/api/v1/users", wrapper.AddUser)
 	router.GET(options.BaseURL+"/api/v1/users/by-email/:email", wrapper.GetUserByEmail)
+	router.GET(options.BaseURL+"/api/v1/users/check", wrapper.CheckUserExists)
 	router.POST(options.BaseURL+"/api/v1/users/import", wrapper.ImportUsersFromAdmin)
 	router.DELETE(options.BaseURL+"/api/v1/users/:userid", wrapper.DeleteUser)
 	router.GET(options.BaseURL+"/api/v1/users/:userid", wrapper.GetUserByID)
 	router.PUT(options.BaseURL+"/api/v1/users/:userid", wrapper.UpdateUser)
+	router.POST(options.BaseURL+"/api/v1/users/:userid/membership", wrapper.AddUserMembership)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/password-reset-request", wrapper.ResetPasswordRequestByAdmin)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:role/assign", wrapper.AssignRole)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:role/unassign", wrapper.UnassignRole)
@@ -3680,9 +3856,11 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.PUT(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid", wrapper.UpdateTenant)
 	router.GET(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users", wrapper.ListUsersFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users", wrapper.AddUserFromSuperAdmin)
+	router.GET(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/check", wrapper.CheckUserExistsFromSuperAdmin)
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.DeleteUserFromSuperAdmin)
 	router.GET(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.GetUserByIDFromSuperAdmin)
 	router.PUT(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.UpdateUserFromSuperAdmin)
+	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/membership", wrapper.AddUserMembershipFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/password-reset-request", wrapper.ResetPasswordRequestBySuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/roles/:role/assign", wrapper.AssignRoleFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/roles/:role/unassign", wrapper.UnassignRoleFromSuperAdmin)

@@ -252,12 +252,9 @@ func convertToRoles(roles []core.Role) []string {
 	return dbRoles
 }
 
-func (uh *UserService) GetUserByID(c *gin.Context, authClient auth.AuthClient, tenantId string, id string) (FullUser, error) {
+func (uh *UserService) GetUserByID(c *gin.Context, authClient auth.AuthClient, id string) (FullUser, error) {
 	fullUser := FullUser{}
-	dbUser, err := uh.store.GetUserByID(c, repository.GetUserByIDParams{
-		ID:       id,
-		TenantID: tenantId,
-	})
+	dbUser, err := uh.store.GetUserByID(c, id)
 	if err != nil {
 		return fullUser, err
 	}
@@ -449,4 +446,80 @@ func (uh *UserService) UpdateUserStatus(c *gin.Context, authClient auth.AuthClie
 	}
 	_, err := authClient.UpdateUser(c, userID, params)
 	return err
+}
+
+// GetUserByEmailGlobal gets a user by email across all tenants
+func (uh *UserService) GetUserByEmailGlobal(c context.Context, email string) (*core.User, error) {
+	userRow, err := uh.store.GetUserByEmailGlobal(c, email)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to core.User
+	user := &core.User{
+		Id:    userRow.ID,
+		Email: userRow.Email.String,
+		Profile: &core.UserProfileSchema{
+			Name: userRow.Profile.Name,
+		},
+		CreatedAt: &userRow.CreatedAt,
+	}
+
+	return user, nil
+}
+
+// AddUserToTenant adds an existing user to a tenant (creates membership)
+func (uh *UserService) AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role) error {
+	// Check if user exists
+	_, err := authClient.GetUser(c, userID)
+	if err != nil {
+		return errors.New("user not found in auth provider")
+	}
+
+	// Convert roles to string array
+	roleStrings := make([]string, len(roles))
+	for i, role := range roles {
+		roleStrings[i] = string(role)
+	}
+
+	// Create membership
+	_, err = uh.store.CreateUserTenantMembership(c, repository.CreateUserTenantMembershipParams{
+		UserID:   userID,
+		TenantID: tenantID,
+		Roles:    roleStrings,
+		Status:   "active",
+	})
+	if err != nil {
+		return err
+	}
+
+	// Create user record in core_users for this tenant if it doesn't exist
+	_, err = uh.store.GetUserByID(c, userID)
+	if err != nil {
+		// User doesn't exist for this tenant, create it
+		// Get user info from auth provider
+		authUser, err := authClient.GetUser(c, userID)
+		if err != nil {
+			return err
+		}
+
+		profile := subentity.UserProfile{}
+		if authUser.DisplayName != "" {
+			profile.Name = authUser.DisplayName
+		}
+
+		_, err = uh.store.CreateUser(c, repository.CreateUserParams{
+			ID:       userID,
+			Email:    authUser.Email,
+			Profile:  profile,
+			Roles:    roleStrings,
+			TenantID: tenantID,
+		})
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to create user record for tenant")
+			// Don't fail the whole operation if this fails
+		}
+	}
+
+	return nil
 }

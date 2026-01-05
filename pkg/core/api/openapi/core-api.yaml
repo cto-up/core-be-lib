@@ -30,8 +30,12 @@ paths:
   /public-api/v1/auth/recovery:
     $ref: "./parts/auth/recovery-path.yaml"
   # users (api token not allowed)
+  /api/v1/users/check:
+    $ref: "./parts/users/users-check-path.yaml"
   /api/v1/users/{userid}:
     $ref: "./parts/users/users-id-path.yaml"
+  /api/v1/users/{userid}/membership:
+    $ref: "./parts/users/users-id-membership-path.yaml"
   /api/v1/users/{userid}/status:
     $ref: "./parts/users/users-id-status-path.yaml"
   /api/v1/users/{userid}/roles/{role}/assign:
@@ -46,8 +50,12 @@ paths:
   /api/v1/users/by-email/{email}:
     $ref: "./parts/users/users-email-path.yaml"
 
+  /superadmin-api/v1/tenants/{tenantid}/users/check:
+    $ref: "./parts/users/super-admin-users-check-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}:
     $ref: "./parts/users/super-admin-users-id-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/membership:
+    $ref: "./parts/users/super-admin-users-id-membership-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}/status:
     $ref: "./parts/users/super-admin-users-id-status-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{role}/assign:
