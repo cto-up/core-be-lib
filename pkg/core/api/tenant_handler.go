@@ -94,6 +94,7 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 
 	tenantConfig := &auth.TenantConfig{
 		DisplayName:           req.Name,
+		Subdomain:             req.Subdomain,
 		EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
 		AllowPasswordSignUp:   req.AllowPasswordSignUp,
 	}

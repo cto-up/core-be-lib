@@ -523,7 +523,7 @@ type KratosTenantManager struct {
 func (k *KratosTenantManager) CreateTenant(ctx context.Context, config *auth.TenantConfig) (*auth.Tenant, error) {
 	// Kratos doesn't manage tenants - they're database-only
 	// Return a tenant with generated ID so the handler can proceed
-	tenantID := fmt.Sprintf("tenant_%d", time.Now().UnixNano())
+	tenantID := fmt.Sprintf("%s-%d", config.Subdomain, time.Now().UnixNano())
 
 	return &auth.Tenant{
 		ID:                    tenantID,
