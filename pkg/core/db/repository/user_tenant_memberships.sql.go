@@ -200,6 +200,26 @@ func (q *Queries) GetUserTenantRoles(ctx context.Context, arg GetUserTenantRoles
 	return roles, err
 }
 
+const isUserMemberOfTenant = `-- name: IsUserMemberOfTenant :one
+SELECT EXISTS(
+    SELECT 1 FROM core_user_tenant_memberships
+    WHERE user_id = $1 AND tenant_id = $2
+) as is_member
+`
+
+type IsUserMemberOfTenantParams struct {
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+// Check if user is already a member of a specific tenant
+func (q *Queries) IsUserMemberOfTenant(ctx context.Context, arg IsUserMemberOfTenantParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isUserMemberOfTenant, arg.UserID, arg.TenantID)
+	var is_member bool
+	err := row.Scan(&is_member)
+	return is_member, err
+}
+
 const listPendingInvitations = `-- name: ListPendingInvitations :many
 SELECT 
     utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles,

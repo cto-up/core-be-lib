@@ -94,19 +94,13 @@ func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
 }
 
 func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
-	tenantID, exists := ctx.Get(auth.AUTH_TENANT_ID_KEY)
-	if !exists {
-		ctx.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
-		return
-	}
 	authUserID, exists := ctx.Get(auth.AUTH_USER_ID)
 	if !exists {
 		ctx.JSON(http.StatusBadRequest, "Not Authenticated")
 		return
 	}
-	user, err := s.store.GetUserByID(ctx, repository.GetUserByIDParams{
-		ID:       authUserID.(string),
-		TenantID: tenantID.(string)})
+	user, err := s.store.GetUserByID(ctx, authUserID.(string))
+
 	if err != nil {
 		if err.Error() == pgx.ErrNoRows.Error() {
 			// user does not exist yet create it

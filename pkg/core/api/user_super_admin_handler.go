@@ -8,6 +8,7 @@ import (
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
+	"ctoup.com/coreapp/pkg/core/db/repository"
 	sharedauth "ctoup.com/coreapp/pkg/shared/auth"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
@@ -133,7 +134,7 @@ func (uh *UserSuperAdminHandler) GetUserByIDFromSuperAdmin(c *gin.Context, tenan
 		return
 	}
 
-	user, err := uh.userService.GetUserByID(c, baseAuthClient, tenant.TenantID, id)
+	user, err := uh.userService.GetUserByID(c, baseAuthClient, id)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get user by ID")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -314,4 +315,128 @@ func NewUserSuperAdminHandler(store *db.Store, authProvider sharedauth.AuthProvi
 		authProvider: authProvider,
 		userService:  userService}
 	return handler
+}
+
+// CheckUserExistsFromSuperAdmin checks if a user exists globally by email (Super Admin)
+func (uh *UserSuperAdminHandler) CheckUserExistsFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, params core.CheckUserExistsFromSuperAdminParams) {
+	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	email := string(params.Email)
+
+	// Check if user exists globally (across all tenants)
+	user, err := uh.userService.GetUserByEmailGlobal(c, email)
+	if err != nil {
+		// User doesn't exist
+		c.JSON(http.StatusOK, gin.H{
+			"exists": false,
+		})
+		return
+	}
+
+	// Check if user is already a member of the specified tenant
+	isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
+		UserID:   user.Id,
+		TenantID: tenant.TenantID,
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to check tenant membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Count how many tenants the user belongs to
+	tenantCount, err := uh.store.CountUserTenants(c, user.Id)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to count user tenants")
+		tenantCount = 0
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"exists": true,
+		"user": gin.H{
+			"id":               user.Id,
+			"name":             user.Profile.Name,
+			"email":            user.Email,
+			"tenantCount":      tenantCount,
+			"isMemberOfTenant": isMember,
+		},
+	})
+}
+
+// AddUserMembershipFromSuperAdmin adds an existing user to a specific tenant (Super Admin)
+func (uh *UserSuperAdminHandler) AddUserMembershipFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userid string) {
+	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	var req core.AddUserMembershipFromSuperAdminJSONRequestBody
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Error().Err(err).Msg("Failed to bind JSON")
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Check if user already a member
+	isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
+		UserID:   userid,
+		TenantID: tenant.TenantID,
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to check tenant membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	if isMember {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User is already a member of this tenant"})
+		return
+	}
+
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Add user to tenant (create membership)
+	err = uh.userService.AddUserToTenant(c, baseAuthClient, tenant.TenantID, userid, req.Roles)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to add user to tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Get updated user info
+	user, err := uh.userService.GetUserByID(c, baseAuthClient, userid)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get user after adding membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Send notification email
+	if tenant.Name != "" {
+		url, err := buildTenantURL(c, "/", tenant.Subdomain)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to get URL for notification")
+			// Don't fail the request if email fails
+		} else {
+			err = sendTenantAddedEmail(c, baseAuthClient, url, user.Email, tenant.Name)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to send tenant added notification")
+				// Don't fail the request if email fails
+			}
+		}
+	}
+
+	c.JSON(http.StatusCreated, user)
 }

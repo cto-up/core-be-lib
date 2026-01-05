@@ -1,7 +1,6 @@
 -- name: GetUserByID :one
 SELECT * FROM core_users
 WHERE id = $1
-AND tenant_id = sqlc.arg(tenant_id)::text
 LIMIT 1;
 
 -- name: GetUserByEmail :one
@@ -54,3 +53,21 @@ WHERE id = $1
 AND tenant_id = sqlc.arg(tenant_id)::text
 RETURNING id
 ;
+
+-- name: GetUserByEmailGlobal :one
+-- Get user by email across all tenants (for checking existence)
+-- This returns the first user found with this email
+SELECT DISTINCT ON (id) 
+    id, 
+    email, 
+    profile, 
+    created_at
+FROM core_users
+WHERE email = sqlc.arg(email)::text
+LIMIT 1;
+
+-- name: CountUserTenants :one
+-- Count how many tenants a user belongs to
+SELECT COUNT(DISTINCT tenant_id)::int
+FROM core_user_tenant_memberships
+WHERE user_id = $1 AND status = 'active';

@@ -176,12 +176,9 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		return
 	}
 	// check if user is deleting another customer admin
-	user, err := uh.store.GetUserByID(c, repository.GetUserByIDParams{
-		ID:       userid,
-		TenantID: tenantID.(string),
-	})
+	user, err := uh.store.GetUserByID(c, userid)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get user by ID")
+		log.Error().Err(err).Msg("failed to get user by ID")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -226,11 +223,6 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 
 // GetUserByID implements openapi.ServerInterface.
 func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
-	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
-	if !exists {
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
-		return
-	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
@@ -246,7 +238,7 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 		return
 	}
 
-	user, err := uh.userService.GetUserByID(c, baseAuthClient, tenantID.(string), id)
+	user, err := uh.userService.GetUserByID(c, baseAuthClient, id)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get user by ID")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -422,10 +414,7 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 		return
 	}
 
-	user, err := uh.store.GetUserByID(c, repository.GetUserByIDParams{
-		ID:       userID,
-		TenantID: c.GetString(auth.AUTH_TENANT_ID_KEY),
-	})
+	user, err := uh.store.GetUserByID(c, userID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get user by ID")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -469,7 +458,139 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
 }
 
-// ImportUsersFromAdmin implements the CSV import functionality
+// CheckUserExists checks if a user exists globally by email
+func (uh *UserAdminHandler) CheckUserExists(c *gin.Context, params core.CheckUserExistsParams) {
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
+
+	email := string(params.Email)
+
+	// Check if user exists globally (across all tenants)
+	user, err := uh.userService.GetUserByEmailGlobal(c, email)
+	if err != nil {
+		// User doesn't exist
+		c.JSON(http.StatusOK, gin.H{
+			"exists": false,
+		})
+		return
+	}
+
+	// Check if user is already a member of current tenant
+	isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
+		UserID:   user.Id,
+		TenantID: tenantID.(string),
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to check tenant membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Count how many tenants the user belongs to
+	tenantCount, err := uh.store.CountUserTenants(c, user.Id)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to count user tenants")
+		tenantCount = 0
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"exists": true,
+		"user": gin.H{
+			"id":                      user.Id,
+			"name":                    user.Profile.Name,
+			"email":                   user.Email,
+			"tenantCount":             tenantCount,
+			"isMemberOfCurrentTenant": isMember,
+		},
+	})
+}
+
+// AddUserMembership adds an existing user to the current tenant
+func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
+
+	var req core.AddUserMembershipJSONRequestBody
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Check authorization for roles
+	if err := checkAuthorizedRoles(c, req.Roles); err != nil {
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Check if user already a member
+	isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
+		UserID:   userid,
+		TenantID: tenantID.(string),
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to check tenant membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	if isMember {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User is already a member of this tenant"})
+		return
+	}
+
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get subdomain")
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Add user to tenant (create membership)
+	err = uh.userService.AddUserToTenant(c, baseAuthClient, tenantID.(string), userid, req.Roles)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to add user to tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Get updated user info
+	user, err := uh.userService.GetUserByID(c, baseAuthClient, userid)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get user after adding membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Send notification email
+	userEmail := user.Email
+	url, err := getResetPasswordURL(c)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get URL for notification")
+		// Don't fail the request if email fails
+	} else {
+		err = sendTenantAddedEmail(c, baseAuthClient, url, userEmail, subdomain)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to send tenant added notification")
+			// Don't fail the request if email fails
+		}
+	}
+
+	c.JSON(http.StatusCreated, user)
+}
+
 func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {

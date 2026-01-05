@@ -1,0 +1,52 @@
+get:
+  description: |
+    Check if a user exists globally by email (Super Admin)
+  operationId: checkUserExistsFromSuperAdmin
+  parameters:
+    - name: tenantid
+      in: path
+      description: Tenant ID to check membership against
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: email
+      in: query
+      description: Email address to check
+      required: true
+      schema:
+        type: string
+        format: email
+  responses:
+    "200":
+      description: User existence check result
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - exists
+            properties:
+              exists:
+                type: boolean
+                description: Whether the user exists
+              user:
+                type: object
+                description: User information if exists
+                properties:
+                  id:
+                    type: string
+                    description: User ID
+                  name:
+                    type: string
+                    description: User name
+                  email:
+                    type: string
+                    format: email
+                    description: User email
+                  tenantCount:
+                    type: integer
+                    description: Number of tenants user belongs to
+                  isMemberOfTenant:
+                    type: boolean
+                    description: Whether user is already a member of the specified tenant
