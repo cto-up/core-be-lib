@@ -50,9 +50,11 @@ func GetUserEventInitFunc() UserEventInitFunc {
 type AuthClientPool = auth.AuthClientPool
 
 type UserService struct {
-	store          *db.Store
-	authClientPool AuthClientPool
-	onUserCreated  UserCreatedCallback
+	store               *db.Store
+	authClientPool      AuthClientPool
+	onUserCreated       UserCreatedCallback
+	userListingStrategy UserListingStrategy
+	strategyFactory     *UserListingStrategyFactory
 }
 
 func IsCustomerAdmin(c *gin.Context) bool {
@@ -82,8 +84,16 @@ func IsSuperAdmin(c *gin.Context) bool {
 }
 
 func NewUserService(store *db.Store, authClientPool AuthClientPool) *UserService {
-	userService := &UserService{store: store,
-		authClientPool: authClientPool}
+	userService := &UserService{
+		store:           store,
+		authClientPool:  authClientPool,
+		strategyFactory: &UserListingStrategyFactory{},
+	}
+
+	// Initialize the strategy based on provider
+	providerName := authClientPool.GetProviderName()
+	userService.userListingStrategy = userService.strategyFactory.CreateStrategy(providerName)
+
 	return userService
 }
 
@@ -300,32 +310,8 @@ func (uh *UserService) GetUserByEmail(c *gin.Context, tenantId string, email str
 }
 
 func (uh *UserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
-	dbUsers, err := uh.store.ListUsers(c, repository.ListUsersParams{
-		Limit:    pagingSql.PageSize,
-		Offset:   pagingSql.Offset,
-		Like:     like,
-		TenantID: tenantId,
-	})
-
-	if err != nil {
-		return []core.User{}, err
-	}
-
-	// create a slice of users
-	users := make([]core.User, len(dbUsers))
-	for j, dbUser := range dbUsers {
-
-		user := core.User{
-			Id:        dbUser.ID,
-			Name:      dbUser.Profile.Name,
-			Email:     dbUser.Email.String,
-			Roles:     convertToRoleDTOs(dbUser.Roles),
-			CreatedAt: &dbUser.CreatedAt,
-		}
-		users[j] = user
-	}
-
-	return users, nil
+	// Delegate to the appropriate strategy
+	return uh.userListingStrategy.ListUsers(c, uh.store, tenantId, pagingSql, like)
 }
 
 func (uh *UserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {

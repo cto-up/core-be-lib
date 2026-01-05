@@ -24,5 +24,5 @@ BEFORE UPDATE ON core_user_tenant_memberships
 FOR EACH ROW
 EXECUTE FUNCTION update_modified_column();
 
--- Possible roles: USER, ADMIN, OWNER
+-- Possible roles: USER, ADMIN, CUSTOMER_ADMIN
 -- Possible statuses: pending, active, suspended, removed

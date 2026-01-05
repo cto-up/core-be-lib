@@ -36,6 +36,8 @@ paths:
     $ref: "./parts/users/users-id-path.yaml"
   /api/v1/users/{userid}/membership:
     $ref: "./parts/users/users-id-membership-path.yaml"
+  /api/v1/users/{userid}/remove-from-tenant:
+    $ref: "./parts/users/users-id-remove-from-tenant-path.yaml"
   /api/v1/users/{userid}/status:
     $ref: "./parts/users/users-id-status-path.yaml"
   /api/v1/users/{userid}/roles/{role}/assign:
@@ -56,6 +58,8 @@ paths:
     $ref: "./parts/users/super-admin-users-id-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}/membership:
     $ref: "./parts/users/super-admin-users-id-membership-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/remove-from-tenant:
+    $ref: "./parts/users/super-admin-users-id-remove-from-tenant-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}/status:
     $ref: "./parts/users/super-admin-users-id-status-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{role}/assign:

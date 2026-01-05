@@ -221,6 +221,82 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 	c.Status(http.StatusNoContent)
 }
 
+// RemoveUserFromTenant removes a user from the current tenant (deletes membership only)
+// (DELETE /api/v1/users/{userid}/remove-from-tenant)
+func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) {
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
+
+	// Check if user is removing self
+	if userid == c.GetString(auth.AUTH_USER_ID) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove self from tenant"})
+		return
+	}
+
+	// Check if user has rights to remove user (CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN)
+	if !access.IsCustomerAdmin(c) && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove user from tenant"})
+		return
+	}
+
+	// Check if user exists and get their roles
+	// First check if user has membership in this tenant
+	isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
+		UserID:   userid,
+		TenantID: tenantID.(string),
+	})
+	if err != nil || !isMember {
+		log.Error().Err(err).Msg("failed to check user membership")
+		c.JSON(http.StatusNotFound, helpers.ErrorResponse(errors.New("user not found in this tenant")))
+		return
+	}
+
+	// Get user roles from membership
+	roles, err := uh.store.GetUserTenantRoles(c, repository.GetUserTenantRolesParams{
+		UserID:   userid,
+		TenantID: tenantID.(string),
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get user roles")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove CUSTOMER_ADMIN
+	if slices.Contains(roles, "CUSTOMER_ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) && !access.IsCustomerAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove CUSTOMER_ADMIN from tenant. Must be ADMIN or SUPER_ADMIN."})
+		return
+	}
+
+	// Only ADMIN or SUPER_ADMIN can remove ADMIN
+	if slices.Contains(roles, "ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove ADMIN from tenant. Must be SUPER_ADMIN."})
+		return
+	}
+
+	// Only SUPER_ADMIN can remove SUPER_ADMIN
+	if slices.Contains(roles, "SUPER_ADMIN") && !access.IsSuperAdmin(c) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove SUPER_ADMIN from tenant. Must be SUPER_ADMIN."})
+		return
+	}
+
+	// Remove user from tenant (delete membership)
+	err = uh.store.RemoveUserFromTenant(c, repository.RemoveUserFromTenantParams{
+		UserID:   userid,
+		TenantID: tenantID.(string),
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to remove user from tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 // GetUserByID implements openapi.ServerInterface.
 func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 

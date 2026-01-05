@@ -9,6 +9,7 @@ import (
 	"context"
 	"time"
 
+	subentity "ctoup.com/coreapp/pkg/shared/repository/subentity"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -386,6 +387,74 @@ func (q *Queries) ListUserTenantMemberships(ctx context.Context, arg ListUserTen
 	return items, nil
 }
 
+const listUsersWithMemberships = `-- name: ListUsersWithMemberships :many
+SELECT 
+    u.id,
+    u.email,
+    u.profile,
+    u.created_at,
+    utm.roles,
+    utm.status
+FROM core_user_tenant_memberships utm
+INNER JOIN core_users u ON utm.user_id = u.id
+WHERE utm.tenant_id = $1 
+  AND utm.status = 'active'
+  AND (UPPER(u.email) LIKE UPPER($4) OR $4 IS NULL)
+ORDER BY u.created_at
+LIMIT $2
+OFFSET $3
+`
+
+type ListUsersWithMembershipsParams struct {
+	TenantID string      `json:"tenant_id"`
+	Limit    int32       `json:"limit"`
+	Offset   int32       `json:"offset"`
+	Like     interface{} `json:"like"`
+}
+
+type ListUsersWithMembershipsRow struct {
+	ID        string                `json:"id"`
+	Email     pgtype.Text           `json:"email"`
+	Profile   subentity.UserProfile `json:"profile"`
+	CreatedAt time.Time             `json:"created_at"`
+	Roles     []string              `json:"roles"`
+	Status    string                `json:"status"`
+}
+
+// List users for a tenant via memberships table (for Kratos)
+// This joins with core_users to get user details
+func (q *Queries) ListUsersWithMemberships(ctx context.Context, arg ListUsersWithMembershipsParams) ([]ListUsersWithMembershipsRow, error) {
+	rows, err := q.db.Query(ctx, listUsersWithMemberships,
+		arg.TenantID,
+		arg.Limit,
+		arg.Offset,
+		arg.Like,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUsersWithMembershipsRow{}
+	for rows.Next() {
+		var i ListUsersWithMembershipsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Profile,
+			&i.CreatedAt,
+			&i.Roles,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeRoleFromUserTenantMembership = `-- name: RemoveRoleFromUserTenantMembership :one
 UPDATE core_user_tenant_memberships
 SET roles = array_remove(roles, $1::TEXT), updated_at = clock_timestamp()
@@ -417,6 +486,23 @@ func (q *Queries) RemoveRoleFromUserTenantMembership(ctx context.Context, arg Re
 		&i.Roles,
 	)
 	return i, err
+}
+
+const removeUserFromTenant = `-- name: RemoveUserFromTenant :exec
+DELETE FROM core_user_tenant_memberships
+WHERE user_id = $1 AND tenant_id = $2
+`
+
+type RemoveUserFromTenantParams struct {
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+// Remove a user from a tenant (delete membership only)
+// This is different from DeleteUserTenantMembership as it's more explicit about the action
+func (q *Queries) RemoveUserFromTenant(ctx context.Context, arg RemoveUserFromTenantParams) error {
+	_, err := q.db.Exec(ctx, removeUserFromTenant, arg.UserID, arg.TenantID)
+	return err
 }
 
 const updateUserTenantMembershipJoinedAt = `-- name: UpdateUserTenantMembershipJoinedAt :one

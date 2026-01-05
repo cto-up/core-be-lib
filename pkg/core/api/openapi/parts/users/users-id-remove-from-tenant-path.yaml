@@ -1,0 +1,18 @@
+delete:
+  description: |
+    Remove a user from the current tenant (delete membership only, not the user)
+  operationId: removeUserFromTenant
+  parameters:
+    - name: userid
+      in: path
+      description: User ID
+      required: true
+      schema:
+        type: string
+  responses:
+    "204":
+      description: User removed from tenant successfully
+    "404":
+      description: User or membership not found
+    "403":
+      description: Forbidden - insufficient permissions
