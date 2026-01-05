@@ -56,33 +56,6 @@ This guide sets up a native multi-tenant authentication system where users are l
 
 ### 1. Kratos Schema (`identity.schema.json`)
 
-Before starting, define your traits to include the `company_role` claim.
-
-```json
-{
-  "$id": "https://schemas.ory.sh/presets/kratos/identity.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "User",
-  "type": "object",
-  "properties": {
-    "traits": {
-      "type": "object",
-      "properties": {
-        "email": { "type": "string", "format": "email", "title": "E-Mail" },
-        "company_role": { 
-          "type": "string", 
-          "enum": ["SUPER_ADMIN", "ADMIN", "CUSTOMER_ADMIN", "USER"],
-          "title": "Role Claim" 
-        }
-      },
-      "required": ["email"],
-      "additionalProperties": false
-    }
-  }
-}
-
-```
-
 ### 2. `kratos.yaml`
 
 Ensure `organizations` is a top-level key (not nested under `selfservice`).
@@ -102,7 +75,6 @@ organizations:
 
 courier:
   enabled: true
-
 ```
 
 ---
@@ -176,9 +148,7 @@ func createUser(c *gin.Context) {
     // Map traits (Claims) and Organization ID
     ident := *ory.NewCreateIdentityBody("default", map[string]interface{}{
         "email":        req.Email,
-        "company_role": req.Role,
     })
-    ident.OrganizationId = &tenantID
 
     user, _, err := kratosAdmin.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(ident).Execute()
     if err != nil {
@@ -202,9 +172,8 @@ To bootstrap your system, you can create a "Global" admin not tied to a specific
 func seedSuperAdmin(c *gin.Context) {
     ident := *ory.NewCreateIdentityBody("default", map[string]interface{}{
         "email":        "admin@system.com",
-        "company_role": "SUPER_ADMIN",
     })
-    
+
     user, _, err := kratosAdmin.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(ident).Execute()
     if err != nil {
         c.JSON(500, gin.H{"message": "Seed failed", "error": err.Error()})
@@ -231,12 +200,8 @@ func AuthMiddleware() gin.HandlerFunc {
             return
         }
 
-        // 1. Extract Tenant ID
-        c.Set("tenantID", session.Identity.OrganizationId)
-
         // 2. Extract Role Claim
         traits := session.Identity.Traits.(map[string]interface{})
-        c.Set("role", traits["company_role"])
 
         c.Next()
     }
@@ -248,7 +213,6 @@ func AuthMiddleware() gin.HandlerFunc {
 
 ## Key Developer Commands
 
-* **Start Infrastructure**: `docker-compose up -d`
-* **Check Organizations**: `curl http://localhost:4434/admin/organizations`
-* **Verify Identity**: `curl http://localhost:4434/admin/identities/<uuid>`
-
+- **Start Infrastructure**: `docker-compose up -d`
+- **Check Organizations**: `curl http://localhost:4434/admin/organizations`
+- **Verify Identity**: `curl http://localhost:4434/admin/identities/<uuid>`

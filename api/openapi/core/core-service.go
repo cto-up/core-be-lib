@@ -486,18 +486,6 @@ type HandleRecoveryParams struct {
 	Token string `form:"token" json:"token"`
 }
 
-// SetPasswordJSONBody defines parameters for SetPassword.
-type SetPasswordJSONBody struct {
-	// CsrfToken CSRF token from settings flow
-	CsrfToken string `json:"csrf_token"`
-
-	// FlowId Settings flow ID from recovery response
-	FlowId string `json:"flow_id"`
-
-	// Password New password
-	Password string `json:"password"`
-}
-
 // ResetPasswordRequestJSONBody defines parameters for ResetPasswordRequest.
 type ResetPasswordRequestJSONBody struct {
 	// Email email
@@ -718,9 +706,6 @@ type ResetPasswordRequestByAdminJSONRequestBody ResetPasswordRequestByAdminJSONB
 // UpdateUserStatusJSONRequestBody defines body for UpdateUserStatus for application/json ContentType.
 type UpdateUserStatusJSONRequestBody UpdateUserStatusJSONBody
 
-// SetPasswordJSONRequestBody defines body for SetPassword for application/json ContentType.
-type SetPasswordJSONRequestBody SetPasswordJSONBody
-
 // ResetPasswordRequestJSONRequestBody defines body for ResetPasswordRequest for application/json ContentType.
 type ResetPasswordRequestJSONRequestBody ResetPasswordRequestJSONBody
 
@@ -927,9 +912,6 @@ type ServerInterface interface {
 	// Handle password recovery
 	// (GET /public-api/v1/auth/recovery)
 	HandleRecovery(c *gin.Context, params HandleRecoveryParams)
-	// Set password after recovery
-	// (POST /public-api/v1/auth/set-password)
-	SetPassword(c *gin.Context)
 	// API Health Check
 	// (GET /public-api/v1/health)
 	GetHealthCheck(c *gin.Context)
@@ -2627,19 +2609,6 @@ func (siw *ServerInterfaceWrapper) HandleRecovery(c *gin.Context) {
 	siw.Handler.HandleRecovery(c, params)
 }
 
-// SetPassword operation middleware
-func (siw *ServerInterfaceWrapper) SetPassword(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.SetPassword(c)
-}
-
 // GetHealthCheck operation middleware
 func (siw *ServerInterfaceWrapper) GetHealthCheck(c *gin.Context) {
 
@@ -3684,7 +3653,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:role/unassign", wrapper.UnassignRole)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/status", wrapper.UpdateUserStatus)
 	router.GET(options.BaseURL+"/public-api/v1/auth/recovery", wrapper.HandleRecovery)
-	router.POST(options.BaseURL+"/public-api/v1/auth/set-password", wrapper.SetPassword)
 	router.GET(options.BaseURL+"/public-api/v1/health", wrapper.GetHealthCheck)
 	router.POST(options.BaseURL+"/public-api/v1/password-reset-request", wrapper.ResetPasswordRequest)
 	router.POST(options.BaseURL+"/public-api/v1/sign-up", wrapper.Signup)
