@@ -117,17 +117,19 @@ func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *auth.Authen
 	c.Set(auth.AUTH_USER_ID, user.UserID)
 	c.Set(auth.AUTH_CLAIMS, user.Claims)
 
+	// Set custom claims for easy role checking
+	if len(user.CustomClaims) > 0 {
+		c.Set("custom_claims", user.CustomClaims)
+	}
+
 	// Set tenant context if available
 	if user.TenantID != "" {
 		c.Set(auth.AUTH_TENANT_ID_KEY, user.TenantID)
 	}
-	if user.Subdomain != "" {
-		c.Set("auth_subdomain", user.Subdomain)
-	}
 
 	// Set tenant memberships for efficient middleware validation
 	if len(user.TenantMemberships) > 0 {
-		c.Set("tenant_memberships", user.TenantMemberships)
+		c.Set(auth.AUTH_TENANT_MEMBERSHIPS, user.TenantMemberships)
 	}
 }
 
@@ -185,15 +187,13 @@ func GetAuthenticatedUser(c *gin.Context) *auth.AuthenticatedUser {
 	userID, _ := c.Get(auth.AUTH_USER_ID)
 	claims, _ := c.Get(auth.AUTH_CLAIMS)
 	tenantID, _ := c.Get(auth.AUTH_TENANT_ID_KEY)
-	subdomain, _ := c.Get("auth_subdomain")
-	tenantMemberships, _ := c.Get("tenant_memberships")
+	tenantMemberships, _ := c.Get(auth.AUTH_TENANT_MEMBERSHIPS)
 
 	emailStr, _ := email.(string)
 	userIDStr, _ := userID.(string)
 	claimsMap, _ := claims.(map[string]interface{})
 	tenantIDStr, _ := tenantID.(string)
-	subdomainStr, _ := subdomain.(string)
-	tenantMembershipsSlice, _ := tenantMemberships.([]string)
+	tenantMembershipsSlice, _ := tenantMemberships.([]auth.TenantMembership)
 
 	customClaims := util.FilterMapToArray(claimsMap, util.UppercaseOnly)
 
@@ -203,7 +203,6 @@ func GetAuthenticatedUser(c *gin.Context) *auth.AuthenticatedUser {
 		Claims:            claimsMap,
 		CustomClaims:      customClaims,
 		TenantID:          tenantIDStr,
-		Subdomain:         subdomainStr,
 		TenantMemberships: tenantMembershipsSlice,
 	}
 }

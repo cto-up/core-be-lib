@@ -47,11 +47,10 @@ func GetUserEventInitFunc() UserEventInitFunc {
 
 // AuthClientPool interface for dependency injection
 // This allows UserService to work with any auth provider
-type AuthClientPool = auth.AuthClientPool
 
 type UserService struct {
 	store               *db.Store
-	authClientPool      AuthClientPool
+	authClientPool      auth.AuthClientPool
 	onUserCreated       UserCreatedCallback
 	userListingStrategy UserListingStrategy
 	strategyFactory     *UserListingStrategyFactory
@@ -79,11 +78,35 @@ func IsSuperAdmin(c *gin.Context) bool {
 	if !exist {
 		return false
 	}
+	// Works for both Firebase and Kratos:
+	// - Firebase: Sets SUPER_ADMIN as custom claim boolean
+	// - Kratos: Extracts from global_roles array and sets as boolean for backward compatibility
 	isSuperAdmin := claims.((map[string]interface{}))["SUPER_ADMIN"] == true
 	return isSuperAdmin
 }
 
-func NewUserService(store *db.Store, authClientPool AuthClientPool) *UserService {
+// IsSuperAdminFromCustomClaims checks if user is SUPER_ADMIN using CustomClaims array
+// This is an alternative method that works with both Firebase and Kratos
+func IsSuperAdminFromCustomClaims(c *gin.Context) bool {
+	customClaims, exist := c.Get("custom_claims")
+	if !exist {
+		return false
+	}
+
+	claims, ok := customClaims.([]string)
+	if !ok {
+		return false
+	}
+
+	for _, claim := range claims {
+		if claim == "SUPER_ADMIN" {
+			return true
+		}
+	}
+	return false
+}
+
+func NewUserService(store *db.Store, authClientPool auth.AuthClientPool) *UserService {
 	userService := &UserService{
 		store:           store,
 		authClientPool:  authClientPool,

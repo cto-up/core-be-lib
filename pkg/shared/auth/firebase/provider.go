@@ -87,14 +87,24 @@ func (f *FirebaseAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedU
 		return nil, err
 	}
 
+	tenantID, err := f.multitenantService.GetTenantIDWithSubdomain(c.Request.Context(), subdomain)
+	if err != nil {
+		return nil, err
+	}
+
+	return f.VerifyTokenWithTenantID(c, tenantID, token)
+}
+
+func (f *FirebaseAuthProvider) VerifyTokenWithTenantID(c context.Context, tenantID string, token string) (*auth.AuthenticatedUser, error) {
+
 	// Get tenant-specific auth client
-	authClient, err := f.GetAuthClientForSubdomain(c, subdomain)
+	authClient, err := f.GetAuthClientForTenant(c, tenantID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Verify the ID token
-	idToken, err := authClient.VerifyIDToken(c.Request.Context(), token)
+	idToken, err := authClient.VerifyIDToken(c, token)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +131,7 @@ func (f *FirebaseAuthProvider) GetTenantManager() auth.TenantManager {
 }
 
 func (f *FirebaseAuthProvider) GetAuthClientForSubdomain(ctx context.Context, subdomain string) (auth.AuthClient, error) {
-	tenantID, err := f.multitenantService.GetFirebaseTenantID(ctx, subdomain)
+	tenantID, err := f.multitenantService.GetTenantIDWithSubdomain(ctx, subdomain)
 	if err != nil {
 		return nil, err
 	}

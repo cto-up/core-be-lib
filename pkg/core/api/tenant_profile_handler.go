@@ -18,7 +18,7 @@ func (s *TenantHandler) GetTenantProfile(ctx *gin.Context) {
 	subdomain, err := utils.GetSubdomain(ctx)
 
 	// get tenant from context using subdomain
-	tenantID, err := s.multiTenantService.GetFirebaseTenantID(ctx, subdomain)
+	tenantID, err := s.multiTenantService.GetTenantIDWithSubdomain(ctx, subdomain)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

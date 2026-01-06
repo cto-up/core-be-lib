@@ -39,7 +39,7 @@ import (
 type ServerConfig struct {
 	Router           *gin.Engine
 	AuthProvider     auth.AuthProvider
-	TenantMiddleware *service.TenantMiddleware
+	TenantMiddleware gin.HandlerFunc
 	AuthMiddleware   *service.AuthMiddleware
 	APIOptions       core.GinServerOptions
 }
@@ -103,7 +103,6 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 		log.Fatal().Err(err).Msg("Failed to initialize auth provider")
 	}
 
-	tenantMiddleWare := service.NewTenantMiddleware(nil, multiTenantService)
 	clientAppService := service.NewClientApplicationService(coreStore)
 
 	// Create the combined auth middleware with the generic auth provider
@@ -112,14 +111,41 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 		clientAppService,
 	)
 
-	apiOptions := core.GinServerOptions{
-		BaseURL: "",
-		Middlewares: []core.MiddlewareFunc{
+	// Configure middleware order based on provider type
+	var middlewares []core.MiddlewareFunc
+
+	tenantMiddleware := service.NewTenantMiddleware(nil, multiTenantService)
+
+	if authProvider.GetProviderName() == "kratos" {
+		// For Kratos: Need THREE middlewares in order:
+		// 1. Basic tenant middleware (extract tenant ID from subdomain)
+		// 2. Auth middleware (verify token, set claims including SUPER_ADMIN)
+		// 3. Kratos tenant middleware (validate access using claims)
+
+		kratosMiddleware := service.NewKratosTenantMiddleware(multiTenantService, authProvider)
+		middlewares = []core.MiddlewareFunc{
 			core.MiddlewareFunc(service.RequestIDMiddleware()),
-			// Use the combined middleware, allowing API tokens
-			core.MiddlewareFunc(tenantMiddleWare.MiddlewareFunc()),
+			core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
 			core.MiddlewareFunc(authMiddleware.MiddlewareFunc()),
-		},
+			core.MiddlewareFunc(kratosMiddleware.MiddlewareFunc()),
+		}
+		log.Info().Msg("Using Kratos middleware order: RequestID -> BasicTenant -> Auth -> KratosTenantValidation")
+	} else {
+		// For Firebase: TWO middlewares
+		// 1. Tenant middleware (extract tenant ID)
+		// 2. Auth middleware (verify token)
+
+		middlewares = []core.MiddlewareFunc{
+			core.MiddlewareFunc(service.RequestIDMiddleware()),
+			core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
+			core.MiddlewareFunc(authMiddleware.MiddlewareFunc()),
+		}
+		log.Info().Msg("Using Firebase middleware order: RequestID -> Tenant -> Auth")
+	}
+
+	apiOptions := core.GinServerOptions{
+		BaseURL:     "",
+		Middlewares: middlewares,
 	}
 
 	// Seed
@@ -133,7 +159,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	return &ServerConfig{
 		Router:           router,
 		AuthProvider:     authProvider,
-		TenantMiddleware: tenantMiddleWare,
+		TenantMiddleware: tenantMiddleware.MiddlewareFunc(),
 		AuthMiddleware:   authMiddleware,
 		APIOptions:       apiOptions,
 	}

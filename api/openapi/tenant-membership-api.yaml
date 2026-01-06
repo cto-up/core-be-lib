@@ -113,37 +113,6 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /api/v1/users/me/primary-tenant:
-    post:
-      summary: Set primary tenant
-      description: Set the user's primary tenant
-      operationId: setPrimaryTenant
-      tags:
-        - Tenant Membership
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SetPrimaryTenantRequest"
-      responses:
-        "200":
-          description: Primary tenant updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessResponse"
-        "400":
-          $ref: "#/components/responses/BadRequestError"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "403":
-          $ref: "#/components/responses/ForbiddenError"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
-
   /api/v1/tenants/{tenantId}/members:
     get:
       summary: List tenant members
@@ -320,7 +289,7 @@ components:
           type: string
         role:
           type: string
-          enum: [USER, ADMIN, OWNER]
+          enum: [USER, ADMIN, CUSTOMER_ADMIN]
         status:
           type: string
           enum: [pending, active, suspended, removed]
@@ -357,7 +326,7 @@ components:
           type: string
         role:
           type: string
-          enum: [USER, ADMIN, OWNER]
+          enum: [USER, ADMIN, CUSTOMER_ADMIN]
         status:
           type: string
           enum: [pending, active, suspended, removed]
@@ -397,15 +366,7 @@ components:
       properties:
         role:
           type: string
-          enum: [USER, ADMIN, OWNER]
-
-    SetPrimaryTenantRequest:
-      type: object
-      required:
-        - tenant_id
-      properties:
-        tenant_id:
-          type: string
+          enum: [USER, ADMIN, CUSTOMER_ADMIN]
 
     SuccessResponse:
       type: object

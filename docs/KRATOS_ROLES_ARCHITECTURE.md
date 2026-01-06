@@ -11,7 +11,7 @@ This document describes how user roles are implemented in the Kratos multi-tenan
 Stored in `metadata_public.roles` array in Kratos identity:
 
 - **SUPER_ADMIN**: System-wide administrator with access to all tenants
-  - Automatically gets OWNER permissions in all tenants
+  - Automatically gets CUSTOMER_ADMIN permissions in all tenants
   - Can bypass tenant validation
   - Managed through Kratos metadata
 
@@ -27,13 +27,13 @@ Stored in `metadata_public.roles` array in Kratos identity:
 
 Stored in `core_user_tenant_memberships.role` column:
 
-- **OWNER**: Full control within the tenant
+- **ADMIN**: Full control within the tenant
 
   - Can manage all members and settings
   - Can delete the tenant
   - Can change other members' roles
 
-- **ADMIN**: Administrative access within the tenant
+- **CUSTOMER_ADMIN**: Administrative access within the tenant
 
   - Can manage users and content
   - Cannot change owner or delete tenant
@@ -52,7 +52,7 @@ Stored in `core_user_tenant_memberships.role` column:
 │  email: user@example.com                                     │
 │  id: user-123                                                │
 │  metadata_public: {                                          │
-│    primary_tenant_id: "tenant-1",                           │
+│    tenant_id: "tenant-1",                                   │
 │    tenant_memberships: ["tenant-1", "tenant-2"],            │
 │    roles: ["SUPER_ADMIN"]  ← Global roles only              │
 │  }                                                           │
@@ -60,17 +60,17 @@ Stored in `core_user_tenant_memberships.role` column:
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Application Database                            │
-│                                                              │
+│              Application Database                           │
+│                                                             │
 │  core_user_tenant_memberships table:                        │
-│  ┌──────────┬───────────┬─────────┬────────────┐           │
-│  │ user_id  │ tenant_id │ role    │ status     │           │
-│  ├──────────┼───────────┼─────────┼────────────┤           │
-│  │ user-123 │ tenant-1  │ OWNER   │ active     │           │
-│  │ user-123 │ tenant-2  │ ADMIN   │ active     │           │
-│  │ user-123 │ tenant-3  │ USER    │ pending    │           │
-│  └──────────┴───────────┴─────────┴────────────┘           │
-│                                                              │
+│  ┌──────────┬───────────┬────────---------─┬────────────┐   │
+│  │ user_id  │ tenant_id │ role             │ status     │   │
+│  ├──────────┼───────────┼────────---------─┼────────────┤   │
+│  │ user-123 │ tenant-1  │ CUSTOMER_ADMIN   │ active     │   │
+│  │ user-123 │ tenant-2  │ ADMIN            │ active     │   │
+│  │ user-123 │ tenant-3  │ USER             │ pending    │   │
+│  └──────────┴───────────┴────────---------─┴────────────┘   │
+│                                                             │
 │  ← Per-tenant roles (source of truth)                       │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -90,8 +90,7 @@ The Kratos tenant middleware now automatically loads tenant roles:
 2. KratosTenantMiddleware (UPDATED)
    ↓ Validates tenant access
    ↓ Queries database for user's role in tenant
-   ↓ Sets tenant_id, tenant_subdomain, and tenant_role in context
-   ↓ SUPER_ADMIN automatically gets OWNER role
+   ↓ SUPER_ADMIN automatically gets ADMIN role
 
 3. Handler
    ↓ Can check role via helper functions
@@ -118,7 +117,6 @@ if ktm.membershipService != nil {
 
     // Set context
     c.Set("tenant_id", tenantID)
-    c.Set("tenant_subdomain", subdomain)
     c.Set("tenant_role", role)  // ← Role automatically loaded
 }
 ```
@@ -130,7 +128,7 @@ CREATE TABLE core_user_tenant_memberships (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     user_id VARCHAR(128) NOT NULL,
     tenant_id VARCHAR(64) NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'USER',  -- OWNER, ADMIN, USER
+    role VARCHAR(50) NOT NULL DEFAULT 'USER',  -- CUSTOMER_ADMIN, ADMIN, USER
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     invited_by VARCHAR(128),
     invited_at timestamptz,
@@ -206,9 +204,9 @@ func (s *TenantRoleService) LoadTenantRoleMiddleware() gin.HandlerFunc {
         userID := c.GetString("user_id")
         tenantID := c.GetString("tenant_id")
 
-        // SUPER_ADMIN gets OWNER role in all tenants
+        // SUPER_ADMIN gets ADMIN role in all tenants
         if IsSuperAdmin(c) {
-            c.Set("tenant_role", "OWNER")
+            c.Set("tenant_role", "ADMIN")
             c.Next()
             return
         }
@@ -240,7 +238,7 @@ func (s *TenantRoleService) RequireTenantRole(requiredRole TenantRole) gin.Handl
     }
 }
 
-// Require minimum role level (OWNER > ADMIN > USER)
+// Require minimum role level (ADMIN > CUSTOMER_ADMIN > USER)
 func (s *TenantRoleService) RequireMinimumTenantRole(minimumRole TenantRole) gin.HandlerFunc {
     return func(c *gin.Context) {
         role, _ := c.Get("tenant_role")
@@ -326,16 +324,16 @@ func updateSettings(c *gin.Context) {
 ### 4. Creating Users with Roles
 
 ```go
-// Register first user as OWNER
+// Register first user as ADMIN
 func registerTenant(c *gin.Context) {
     // Create user
     user, err := authClient.CreateUser(ctx, &auth.UserToCreate{}.
         Email("owner@company.com").
         Password("password"))
 
-    // Add as OWNER of new tenant
+    // Add as ADMIN of new tenant
     err = membershipService.AddUserToTenant(
-        ctx, user.UID, tenantID, "OWNER", "system")
+        ctx, user.UID, tenantID, "ADMIN", "system")
 }
 
 // Invite user as ADMIN
@@ -352,9 +350,9 @@ func inviteAdmin(c *gin.Context) {
 
 ```go
 func promoteToAdmin(c *gin.Context) {
-    // Only OWNER can promote users
+    // Only ADMIN can promote users
     if !service.IsTenantOwner(c) {
-        c.JSON(403, gin.H{"error": "Only owner can promote users"})
+        c.JSON(403, gin.H{"error": "Only ADMIN can promote users"})
         return
     }
 
@@ -369,19 +367,19 @@ func promoteToAdmin(c *gin.Context) {
 
 ```
 SUPER_ADMIN (Global)
-    ↓ (acts as OWNER in all tenants)
+    ↓ (acts as ADMIN in all tenants)
 
-OWNER (Per-Tenant)
+ADMIN (Per-Tenant)
     ↓ (can do everything ADMIN can do, plus:)
     - Delete tenant
     - Transfer ownership
     - Change any member's role
 
-ADMIN (Per-Tenant)
+CUSTOMER_ADMIN (Per-Tenant)
     ↓ (can do everything USER can do, plus:)
     - Invite members
-    - Remove members (except OWNER)
-    - Change USER roles to ADMIN
+    - Remove members (except ADMIN)
+    - Change USER roles to CUSTOMER_ADMIN
     - Manage tenant settings
 
 USER (Per-Tenant)
@@ -399,27 +397,6 @@ func IsSuperAdmin(c *gin.Context) bool {
     return exists && val.(bool)
 }
 
-// Check if user is tenant owner
-func IsTenantOwner(c *gin.Context) bool {
-    role, exists := c.Get("tenant_role")
-    return exists && role == "OWNER"
-}
-
-// Check if user is tenant admin
-func IsTenantAdmin(c *gin.Context) bool {
-    role, exists := c.Get("tenant_role")
-    return exists && role == "ADMIN"
-}
-
-// Check if user is admin or owner
-func IsTenantAdminOrOwner(c *gin.Context) bool {
-    role, exists := c.Get("tenant_role")
-    if !exists {
-        return false
-    }
-    roleStr := role.(string)
-    return roleStr == "ADMIN" || roleStr == "OWNER"
-}
 ```
 
 ## Best Practices

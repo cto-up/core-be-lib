@@ -10,11 +10,18 @@ import (
 
 const (
 	// Context keys for authenticated user info
-	AUTH_EMAIL         = "auth_email"
-	AUTH_USER_ID       = "auth_user_id"
-	AUTH_CLAIMS        = "auth_claims"
-	AUTH_TENANT_ID_KEY = "auth_tenant_id"
+	AUTH_EMAIL              = "auth_email"
+	AUTH_USER_ID            = "auth_user_id"
+	AUTH_CLAIMS             = "auth_claims"
+	AUTH_TENANT_ID_KEY      = "auth_tenant_id"
+	AUTH_TENANT_MEMBERSHIPS = "tenant_memberships"
 )
+
+// TenantMembership represents a user's membership in a tenant with roles
+type TenantMembership struct {
+	TenantID string   `json:"tenant_id"`
+	Roles    []string `json:"roles"`
+}
 
 // AuthenticatedUser represents the user info extracted from a token
 type AuthenticatedUser struct {
@@ -24,8 +31,7 @@ type AuthenticatedUser struct {
 	Claims            map[string]interface{} `json:"claims"`
 	CustomClaims      []string               `json:"custom_claims"`
 	TenantID          string                 `json:"tenant_id,omitempty"`
-	Subdomain         string                 `json:"subdomain,omitempty"`
-	TenantMemberships []string               `json:"tenant_memberships,omitempty"` // List of tenant IDs user has access to
+	TenantMemberships []TenantMembership     `json:"tenant_memberships,omitempty"` // List of tenant memberships with roles
 }
 
 // UserRecord represents a user in the authentication system
@@ -42,7 +48,7 @@ type UserRecord struct {
 
 // MultitenantService interface for getting tenant information
 type MultitenantService interface {
-	GetFirebaseTenantID(ctx context.Context, subdomain string) (string, error)
+	GetTenantIDWithSubdomain(ctx context.Context, subdomain string) (string, error)
 }
 
 // UserToCreate represents parameters for creating a new user
@@ -225,6 +231,8 @@ type Tenant struct {
 type AuthProvider interface {
 	// Token Verification (Middleware use)
 	VerifyToken(c *gin.Context) (*AuthenticatedUser, error)
+
+	VerifyTokenWithTenantID(ctx context.Context, subdomain string, token string) (*AuthenticatedUser, error)
 
 	// Get the base auth client (for non-tenant operations)
 	GetAuthClient() AuthClient

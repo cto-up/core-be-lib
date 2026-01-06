@@ -18,5 +18,5 @@ ALTER TABLE core_user_tenant_memberships
 -- Create GIN index for efficient role queries
 CREATE INDEX idx_user_tenant_memberships_roles ON core_user_tenant_memberships USING GIN(roles);
 
--- Possible roles: USER, ADMIN, OWNER (can have multiple)
+-- Possible roles: USER, ADMIN, CUSTOMER_ADMIN (can have multiple)
 -- Example: roles = ['USER', 'ADMIN'] means user has both USER and ADMIN roles
