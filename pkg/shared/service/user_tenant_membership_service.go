@@ -396,7 +396,7 @@ func (s *UserTenantMembershipService) UpdateMemberRole(
 	return s.UpdateMemberRoles(ctx, userID, tenantID, []string{role})
 }
 
-// updateKratosTenantMemberships updates the user's Kratos metadata with current tenant memberships
+// updateKratosTenantMemberships updates the user's Kratos metadata with current tenant memberships and roles
 func (s *UserTenantMembershipService) updateKratosTenantMemberships(
 	ctx context.Context,
 	userID string,
@@ -407,13 +407,12 @@ func (s *UserTenantMembershipService) updateKratosTenantMemberships(
 		return err
 	}
 
-	// Extract tenant IDs
-	tenantIDs := make([]string, len(memberships))
-	var primaryTenantID string
-	for i, m := range memberships {
-		tenantIDs[i] = m.TenantID
-		if i == 0 {
-			primaryTenantID = m.TenantID
+	// Build tenant memberships with roles
+	tenantMemberships := make([]map[string]interface{}, len(memberships))
+	for i, membership := range memberships {
+		tenantMemberships[i] = map[string]interface{}{
+			"tenant_id": membership.TenantID,
+			"roles":     membership.Roles,
 		}
 	}
 
@@ -436,10 +435,7 @@ func (s *UserTenantMembershipService) updateKratosTenantMemberships(
 		metadataPublic = make(map[string]interface{})
 	}
 
-	metadataPublic["tenant_memberships"] = tenantIDs
-	if primaryTenantID != "" {
-		metadataPublic["primary_tenant_id"] = primaryTenantID
-	}
+	metadataPublic[auth.AUTH_TENANT_MEMBERSHIPS] = tenantMemberships
 
 	// Update identity
 	state := ""
@@ -460,68 +456,4 @@ func (s *UserTenantMembershipService) updateKratosTenantMemberships(
 		Execute()
 
 	return err
-}
-
-// SwitchPrimaryTenant changes the user's primary tenant
-func (s *UserTenantMembershipService) SwitchPrimaryTenant(
-	ctx context.Context,
-	userID string,
-	tenantID string,
-) error {
-	// Verify user has access to this tenant
-	hasAccess, err := s.CheckUserTenantAccess(ctx, userID, tenantID)
-	if err != nil {
-		return err
-	}
-
-	if !hasAccess {
-		return fmt.Errorf("user does not have access to tenant")
-	}
-
-	// Update Kratos metadata with new primary tenant
-	authClient := s.authProvider.GetAuthClient()
-	kratosClient, ok := authClient.(*kratos.KratosAuthClient)
-	if !ok {
-		return fmt.Errorf("auth provider is not Kratos")
-	}
-
-	existing, _, err := kratosClient.GetAdminClient().IdentityAPI.GetIdentity(ctx, userID).Execute()
-	if err != nil {
-		return err
-	}
-
-	metadataPublic, ok := existing.MetadataPublic.(map[string]interface{})
-	if !ok || metadataPublic == nil {
-		metadataPublic = make(map[string]interface{})
-	}
-
-	metadataPublic["primary_tenant_id"] = tenantID
-
-	state := ""
-	if existing.State != nil {
-		state = string(*existing.State)
-	}
-
-	traits, ok := existing.Traits.(map[string]interface{})
-	if !ok {
-		traits = make(map[string]interface{})
-	}
-
-	updateBody := *ory.NewUpdateIdentityBody(existing.SchemaId, state, traits)
-	updateBody.MetadataPublic = metadataPublic
-
-	_, _, err = kratosClient.GetAdminClient().IdentityAPI.UpdateIdentity(ctx, userID).
-		UpdateIdentityBody(updateBody).
-		Execute()
-
-	if err != nil {
-		return err
-	}
-
-	log.Info().
-		Str("user_id", userID).
-		Str("tenant_id", tenantID).
-		Msg("User switched primary tenant")
-
-	return nil
 }

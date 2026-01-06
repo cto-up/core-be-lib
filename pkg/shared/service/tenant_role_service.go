@@ -11,9 +11,9 @@ import (
 type TenantRole string
 
 const (
-	TenantRoleOwner TenantRole = "OWNER"
-	TenantRoleAdmin TenantRole = "ADMIN"
-	TenantRoleUser  TenantRole = "USER"
+	TenantRoleCustomerAdmin TenantRole = "CUSTOMER_ADMIN"
+	TenantRoleAdmin         TenantRole = "ADMIN"
+	TenantRoleUser          TenantRole = "USER"
 )
 
 // Context keys for tenant role information
@@ -81,7 +81,7 @@ func (s *TenantRoleService) HasAnyTenantRole(c *gin.Context, requiredRoles ...Te
 }
 
 // HasMinimumTenantRole checks if the user has at least the specified role level
-// Role hierarchy: OWNER > ADMIN > USER
+// Role hierarchy: ADMIN > CUSTOMER_ADMIN > USER
 func (s *TenantRoleService) HasMinimumTenantRole(c *gin.Context, minimumRole TenantRole) bool {
 	roles, err := s.GetUserTenantRoles(c)
 	if err != nil {
@@ -182,12 +182,12 @@ func (s *TenantRoleService) LoadTenantRolesMiddleware() gin.HandlerFunc {
 
 		// Check if user is SUPER_ADMIN (global role)
 		if IsSuperAdmin(c) {
-			// SUPER_ADMIN gets OWNER role in all tenants
-			c.Set(ContextKeyTenantRoles, []string{string(TenantRoleOwner)})
+			// SUPER_ADMIN gets ADMIN role in all tenants
+			c.Set(ContextKeyTenantRoles, []string{string(TenantRoleAdmin)})
 			log.Debug().
 				Str("user_id", userID).
 				Str("tenant_id", tenantID).
-				Msg("SUPER_ADMIN granted OWNER role in tenant")
+				Msg("SUPER_ADMIN granted ADMIN role in tenant")
 			c.Next()
 			return
 		}
@@ -220,9 +220,9 @@ func (s *TenantRoleService) LoadTenantRolesMiddleware() gin.HandlerFunc {
 // Higher number = more permissions
 func getRoleLevel(role TenantRole) int {
 	switch role {
-	case TenantRoleOwner:
-		return 3
 	case TenantRoleAdmin:
+		return 3
+	case TenantRoleCustomerAdmin:
 		return 2
 	case TenantRoleUser:
 		return 1
@@ -232,24 +232,6 @@ func getRoleLevel(role TenantRole) int {
 }
 
 // IsTenantOwner checks if the user is an owner of the current tenant
-func IsTenantOwner(c *gin.Context) bool {
-	rolesInterface, exists := c.Get(ContextKeyTenantRoles)
-	if !exists {
-		return false
-	}
-	roles, ok := rolesInterface.([]string)
-	if !ok {
-		return false
-	}
-	for _, role := range roles {
-		if role == string(TenantRoleOwner) {
-			return true
-		}
-	}
-	return false
-}
-
-// IsTenantAdmin checks if the user is an admin of the current tenant
 func IsTenantAdmin(c *gin.Context) bool {
 	rolesInterface, exists := c.Get(ContextKeyTenantRoles)
 	if !exists {
@@ -267,8 +249,8 @@ func IsTenantAdmin(c *gin.Context) bool {
 	return false
 }
 
-// IsTenantAdminOrOwner checks if the user is an admin or owner of the current tenant
-func IsTenantAdminOrOwner(c *gin.Context) bool {
+// IsTenantAdmin checks if the user is an admin of the current tenant
+func IsTenantCustomerAdmin(c *gin.Context) bool {
 	rolesInterface, exists := c.Get(ContextKeyTenantRoles)
 	if !exists {
 		return false
@@ -278,7 +260,25 @@ func IsTenantAdminOrOwner(c *gin.Context) bool {
 		return false
 	}
 	for _, role := range roles {
-		if role == string(TenantRoleAdmin) || role == string(TenantRoleOwner) {
+		if role == string(TenantRoleCustomerAdmin) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsTenantAdminOrOwner checks if the user is an admin or owner of the current tenant
+func IsTenantAdminOrCustomerAdmin(c *gin.Context) bool {
+	rolesInterface, exists := c.Get(ContextKeyTenantRoles)
+	if !exists {
+		return false
+	}
+	roles, ok := rolesInterface.([]string)
+	if !ok {
+		return false
+	}
+	for _, role := range roles {
+		if role == string(TenantRoleAdmin) || role == string(TenantRoleCustomerAdmin) {
 			return true
 		}
 	}

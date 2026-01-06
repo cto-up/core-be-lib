@@ -69,7 +69,7 @@ func (kwh *KratosWebhookHandler) HandleRegistrationWebhook(c *gin.Context) {
 	// If subdomain is provided in traits, assign user to tenant
 	if payload.Identity.Traits.Subdomain != "" {
 		// Get tenant ID from subdomain
-		tenantID, err := kwh.multitenantService.GetFirebaseTenantID(c.Request.Context(), payload.Identity.Traits.Subdomain)
+		tenantID, err := kwh.multitenantService.GetTenantIDWithSubdomain(c.Request.Context(), payload.Identity.Traits.Subdomain)
 		if err != nil {
 			log.Error().
 				Err(err).

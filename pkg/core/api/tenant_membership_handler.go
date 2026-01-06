@@ -117,34 +117,6 @@ func (h *TenantMembershipHandler) RejectTenantInvitation(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// SetPrimaryTenant sets the user's primary tenant
-// POST /api/v1/users/me/primary-tenant
-func (h *TenantMembershipHandler) SetPrimaryTenant(c *gin.Context) {
-	userID := c.GetString(auth.AUTH_USER_ID)
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
-		return
-	}
-
-	var req struct {
-		TenantID string `json:"tenant_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
-		return
-	}
-
-	err := h.membershipService.SwitchPrimaryTenant(c, userID, req.TenantID)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to set primary tenant")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Primary tenant updated"})
-}
-
 // ListTenantMembers returns all members of a tenant (requires ADMIN role)
 // GET /api/v1/tenants/{tenantId}/members
 func (h *TenantMembershipHandler) ListTenantMembers(c *gin.Context) {
@@ -183,7 +155,7 @@ func (h *TenantMembershipHandler) InviteUserToTenant(c *gin.Context) {
 
 	var req struct {
 		Email string   `json:"email" binding:"required,email"`
-		Roles []string `json:"roles" binding:"required,min=1,dive,oneof=USER ADMIN OWNER"`
+		Roles []string `json:"roles" binding:"required,min=1,dive,oneof=USER ADMIN CUSTOMER_ADMIN"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -213,7 +185,7 @@ func (h *TenantMembershipHandler) UpdateMemberRole(c *gin.Context) {
 	}
 
 	var req struct {
-		Role string `json:"role" binding:"required,oneof=USER ADMIN OWNER"`
+		Role string `json:"role" binding:"required,oneof=USER ADMIN CUSTOMER_ADMIN"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -7,7 +7,6 @@ ALTER TABLE core_user_tenant_memberships
 -- Migrate data: take first role from array (or highest priority role)
 UPDATE core_user_tenant_memberships 
 SET role = CASE 
-    WHEN 'OWNER' = ANY(roles) THEN 'OWNER'
     WHEN 'ADMIN' = ANY(roles) THEN 'ADMIN'
     WHEN 'CUSTOMER_ADMIN' = ANY(roles) THEN 'CUSTOMER_ADMIN'
     WHEN 'USER' = ANY(roles) THEN 'USER'

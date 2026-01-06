@@ -61,7 +61,6 @@
       "tenant-123",
       "tenant-456"
     ],
-    "primary_tenant_id": "tenant-123", // ✅ User's default tenant
     "roles": ["SUPER_ADMIN"] // ✅ Global roles
   }
 }
@@ -102,7 +101,6 @@ Creates membership: user → tenant1
 ```json
 "metadata_public": {
   "tenant_memberships": ["tenant-123", "tenant-456"],  // ✅ Cached for middleware
-  "primary_tenant_id": "tenant-123",                   // ✅ User's default tenant
   "roles": ["SUPER_ADMIN"],                            // ✅ Global roles
   "tenant_id": "tenant-123",                           // ✅ Backward compatibility
   "subdomain": "tenant1"                               // ✅ Backward compatibility
@@ -112,7 +110,6 @@ Creates membership: user → tenant1
 **Purpose:**
 
 - `tenant_memberships` - **Key field** for session-based validation (no DB hit)
-- `primary_tenant_id` - User's default/preferred tenant
 - `roles` - Global roles (SUPER_ADMIN, ADMIN)
 - `tenant_id`, `subdomain` - Backward compatibility with old code
 
@@ -141,7 +138,6 @@ await membershipService.AddUserToTenant(userID, tenantID, "USER", "system");
 // 5. Backend updates metadata_public
 await membershipService.updateKratosTenantMemberships(userID);
 // Sets: tenant_memberships = ["tenant-123"]
-//       primary_tenant_id = "tenant-123"
 ```
 
 ### Session Validation (No DB Hit)
@@ -164,7 +160,6 @@ await membershipService.AcceptTenantInvitation(userID, "tenant-456");
 // Updates metadata_public
 await membershipService.updateKratosTenantMemberships(userID);
 // Sets: tenant_memberships = ["tenant-123", "tenant-456"]
-//       primary_tenant_id = "tenant-123" (unchanged)
 
 // Next login: session includes both tenants
 // User can access both tenant1 and tenant2 ✅
@@ -178,7 +173,6 @@ await membershipService.updateKratosTenantMemberships(userID);
 | `name`               | traits          | Display name                 | User (registration/settings) |
 | `subdomain`          | traits          | Tenant assignment hint       | User (registration)          |
 | `tenant_memberships` | metadata_public | **Session-based validation** | Backend (membership service) |
-| `primary_tenant_id`  | metadata_public | User's default tenant        | Backend (user preference)    |
 | `roles`              | metadata_public | Global roles (SUPER_ADMIN)   | Backend (admin)              |
 | `tenant_id`          | metadata_public | Backward compatibility       | Backend (legacy)             |
 
@@ -221,7 +215,6 @@ await kratosClient.UpdateIdentity(userID, {
   metadata_public: {
     ...identity.metadata_public,
     tenant_memberships: tenantIDs, // ✅ Add
-    primary_tenant_id: tenantIDs[0], // ✅ Add
   },
 });
 ```
@@ -237,7 +230,7 @@ await kratosClient.UpdateIdentity(userID, {
 ### Metadata Public
 
 - `tenant_memberships` - Array of strings (tenant IDs)
-- `primary_tenant_id` - String (must be in tenant_memberships)
+- `tenant_id`
 - `roles` - Array of strings (SUPER_ADMIN, ADMIN, etc.)
 
 ## Best Practices

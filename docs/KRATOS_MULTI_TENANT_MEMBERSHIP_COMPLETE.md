@@ -18,7 +18,7 @@ This document describes the complete implementation of the multi-tenant membersh
 - id (uuid, primary key)
 - user_id (varchar, Kratos identity ID)
 - tenant_id (varchar, references core_tenants)
-- role (varchar: USER, ADMIN, OWNER)
+- role (varchar: USER, ADMIN, CUSTOMER_ADMIN)
 - status (varchar: pending, active, suspended, removed)
 - invited_by (varchar, nullable)
 - invited_at (timestamptz, nullable)
@@ -46,7 +46,7 @@ The key optimization is storing tenant memberships in the Kratos session metadat
      ```json
      {
        "tenant_memberships": ["tenant-id-1", "tenant-id-2"],
-       "primary_tenant_id": "tenant-id-1"
+       "tenant_id": "tenant-id-1"
      }
      ```
 
@@ -295,7 +295,7 @@ if IsSuperAdmin(c) {
 
 3. **Role-Based Access**
 
-   - Membership table stores role (USER, ADMIN, OWNER)
+   - Membership table stores role (USER, ADMIN, CUSTOMER_ADMIN)
    - Can be used for fine-grained permissions
    - Currently not enforced in middleware (future enhancement)
 
@@ -322,7 +322,7 @@ if IsSuperAdmin(c) {
 1. **Role-Based Permissions**
 
    - Enforce role checks in middleware
-   - Different permissions for USER/ADMIN/OWNER
+   - Different permissions for USER/ADMIN/CUSTOMER_ADMIN
 
 2. **Session Invalidation**
 

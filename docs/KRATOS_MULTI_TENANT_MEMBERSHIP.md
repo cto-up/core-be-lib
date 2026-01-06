@@ -12,7 +12,7 @@ This pattern allows a single user (one email/identity) to belong to multiple ten
 │  email: user@example.com                                     │
 │  id: user-123                                                │
 │  metadata_public: {                                          │
-│    primary_tenant_id: "tenant-1",                           │
+│    tenant_id: "tenant-1",                           │
 │    tenant_memberships: ["tenant-1", "tenant-2", "tenant-3"] │
 │  }                                                           │
 └─────────────────────────────────────────────────────────────┘
@@ -64,7 +64,7 @@ BEFORE UPDATE ON core_user_tenant_memberships
 FOR EACH ROW
 EXECUTE FUNCTION update_modified_column();
 
--- Possible roles: USER, ADMIN, OWNER
+-- Possible roles: USER, ADMIN, CUSTOMER_ADMIN
 -- Possible statuses: pending, active, suspended, removed
 ```
 
@@ -381,7 +381,7 @@ func (s *UserTenantMembershipService) updateKratosTenantMemberships(
 	}
 
 	metadataPublic["tenant_memberships"] = tenantIDs
-	metadataPublic["primary_tenant_id"] = primaryTenantID
+	metadataPublic["tenant_id"] = primaryTenantID
 
 	// Update identity
 	state := ""
@@ -399,64 +399,6 @@ func (s *UserTenantMembershipService) updateKratosTenantMemberships(
 	return err
 }
 
-// SwitchPrimaryTenant changes the user's primary tenant
-func (s *UserTenantMembershipService) SwitchPrimaryTenant(
-	ctx context.Context,
-	userID string,
-	tenantID string,
-) error {
-	// Verify user has access to this tenant
-	hasAccess, err := s.CheckUserTenantAccess(ctx, userID, tenantID)
-	if err != nil {
-		return err
-	}
-
-	if !hasAccess {
-		return fmt.Errorf("user does not have access to tenant")
-	}
-
-	// Update Kratos metadata with new primary tenant
-	authClient := s.authProvider.GetAuthClient()
-	kratosClient, ok := authClient.(*kratos.KratosAuthClient)
-	if !ok {
-		return fmt.Errorf("auth provider is not Kratos")
-	}
-
-	existing, _, err := kratosClient.adminClient.IdentityAPI.GetIdentity(ctx, userID).Execute()
-	if err != nil {
-		return err
-	}
-
-	metadataPublic := existing.MetadataPublic
-	if metadataPublic == nil {
-		metadataPublic = make(map[string]interface{})
-	}
-
-	metadataPublic["primary_tenant_id"] = tenantID
-
-	state := ""
-	if existing.State != nil {
-		state = string(*existing.State)
-	}
-
-	updateBody := *ory.NewUpdateIdentityBody(existing.SchemaId, state, existing.Traits)
-	updateBody.MetadataPublic = metadataPublic
-
-	_, _, err = kratosClient.adminClient.IdentityAPI.UpdateIdentity(ctx, userID).
-		UpdateIdentityBody(updateBody).
-		Execute()
-
-	if err != nil {
-		return err
-	}
-
-	log.Info().
-		Str("user_id", userID).
-		Str("tenant_id", tenantID).
-		Msg("User switched primary tenant")
-
-	return nil
-}
 ```
 
 ### 2. Update Tenant Middleware
@@ -493,7 +435,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		}
 
 		// Get tenant ID from database using subdomain
-		tenantID, err := ktm.multitenantService.GetFirebaseTenantID(c, subdomain)
+		tenantID, err := ktm.multitenantService.GetTenantIDWithSubdomain(c, subdomain)
 		if err != nil {
 			log.Error().Err(err).Str("subdomain", subdomain).Msg("Tenant not found")
 			c.JSON(http.StatusNotFound, gin.H{
@@ -507,7 +449,6 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		// SUPER_ADMIN can access any tenant
 		if isSuperAdmin {
 			c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
-			c.Set("tenant_subdomain", subdomain)
 
 			log.Debug().
 				Str("tenant_id", tenantID).
@@ -547,7 +488,6 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 
 		// Set tenant context for downstream handlers
 		c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
-		c.Set("tenant_subdomain", subdomain)
 
 		log.Debug().
 			Str("tenant_id", tenantID).
@@ -589,7 +529,7 @@ const currentTenant = ref<string | null>(null);
 const isLoading = ref(false);
 
 const primaryTenantId = computed(() => {
-  return session.value?.identity.metadata_public?.primary_tenant_id || null;
+  return session.value?.identity.metadata_public?.tenant_id || null;
 });
 
 const tenantMemberships = computed(() => {
@@ -627,17 +567,6 @@ async function switchTenant(subdomain: string) {
 
   window.location.href = `${protocol}//${subdomain}.${domain}${port}`;
 }
-
-async function setPrimaryTenant(tenantId: string) {
-  try {
-    await axios.post("/api/v1/users/me/primary-tenant", {
-      tenant_id: tenantId,
-    });
-    await loadTenants();
-  } catch (error) {
-    console.error("Failed to set primary tenant:", error);
-  }
-}
 </script>
 
 <template>
@@ -657,28 +586,6 @@ async function setPrimaryTenant(tenantId: string) {
           <h4>{{ tenant.tenant_name }}</h4>
           <p>{{ tenant.subdomain }}.app.com</p>
           <span class="role-badge">{{ tenant.role }}</span>
-          <span
-            v-if="tenant.tenant_id === primaryTenantId"
-            class="primary-badge"
-          >
-            Primary
-          </span>
-        </div>
-
-        <div class="tenant-actions">
-          <button
-            v-if="tenant.subdomain !== currentTenant"
-            @click="switchTenant(tenant.subdomain)"
-          >
-            Switch
-          </button>
-
-          <button
-            v-if="tenant.tenant_id !== primaryTenantId"
-            @click="setPrimaryTenant(tenant.tenant_id)"
-          >
-            Set as Primary
-          </button>
         </div>
       </div>
     </div>
@@ -740,10 +647,6 @@ import { useKratosAuth } from "./kratos-auth.composable";
 
 export function useTenant() {
   const { session } = useKratosAuth();
-
-  const primaryTenantId = computed(() => {
-    return session.value?.identity.metadata_public?.primary_tenant_id || null;
-  });
 
   const tenantMemberships = computed(() => {
     return session.value?.identity.metadata_public?.tenant_memberships || [];

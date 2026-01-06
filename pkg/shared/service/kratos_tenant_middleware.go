@@ -10,23 +10,21 @@ import (
 )
 
 // KratosTenantMiddleware validates tenant context for Kratos-authenticated requests
-// This middleware should run AFTER AuthMiddleware to ensure user is authenticated
+// This middleware MUST run AFTER AuthMiddleware to ensure user is authenticated
+// and claims are available in the context
 type KratosTenantMiddleware struct {
 	multitenantService *MultitenantService
 	authProvider       auth.AuthProvider
-	membershipService  *UserTenantMembershipService
 }
 
 // NewKratosTenantMiddleware creates a new tenant validation middleware for Kratos
 func NewKratosTenantMiddleware(
 	multitenantService *MultitenantService,
 	authProvider auth.AuthProvider,
-	membershipService *UserTenantMembershipService,
 ) *KratosTenantMiddleware {
 	return &KratosTenantMiddleware{
 		multitenantService: multitenantService,
 		authProvider:       authProvider,
-		membershipService:  membershipService,
 	}
 }
 
@@ -51,15 +49,18 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 				log.Debug().
 					Str("user_id", c.GetString(auth.AUTH_USER_ID)).
 					Msg("SUPER_ADMIN accessing root domain - no tenant required")
+				c.Next()
+				return
 			}
-			c.Next()
+			log.Error().Msg("Tenant subdomain required for non-SUPER_ADMIN users")
+			c.Abort()
 			return
 		}
 
-		// SUPER_ADMIN can access any tenant with OWNER role
+		// SUPER_ADMIN can access any tenant with ADMIN role
 		if isSuperAdmin {
 			// Get tenant ID from database for context, but don't validate user's tenant
-			tenantID, err := ktm.multitenantService.GetFirebaseTenantID(c, subdomain)
+			tenantID, err := ktm.multitenantService.GetTenantIDWithSubdomain(c, subdomain)
 			if err != nil {
 				log.Error().Err(err).Str("subdomain", subdomain).Msg("Tenant not found")
 				c.JSON(http.StatusNotFound, gin.H{
@@ -72,22 +73,20 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 
 			// Set tenant context for downstream handlers
 			c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
-			c.Set("tenant_subdomain", subdomain)
-			c.Set("tenant_roles", []string{"OWNER"}) // SUPER_ADMIN gets OWNER role in all tenants
 
 			log.Debug().
 				Str("tenant_id", tenantID).
 				Str("subdomain", subdomain).
 				Str("user_id", c.GetString(auth.AUTH_USER_ID)).
-				Strs("roles", []string{"OWNER"}).
-				Msg("SUPER_ADMIN accessing tenant with OWNER role")
+				Strs("roles", []string{"ADMIN"}).
+				Msg("SUPER_ADMIN accessing tenant with ADMIN role")
 
 			c.Next()
 			return
 		}
 
 		// Get tenant ID from database using subdomain
-		tenantID, err := ktm.multitenantService.GetFirebaseTenantID(c, subdomain)
+		tenantID, err := ktm.multitenantService.GetTenantIDWithSubdomain(c, subdomain)
 		if err != nil {
 			log.Error().Err(err).Str("subdomain", subdomain).Msg("Tenant not found")
 			c.JSON(http.StatusNotFound, gin.H{
@@ -107,92 +106,13 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			return
 		}
 
-		// Check database for user's tenant membership and roles
-		if ktm.membershipService != nil {
-			// Get user's roles in this tenant (also validates access)
-			roles, err := ktm.membershipService.GetUserTenantRoles(c.Request.Context(), userID, tenantID)
-			if err != nil {
-				log.Warn().
-					Err(err).
-					Str("user_id", userID).
-					Str("tenant_id", tenantID).
-					Str("subdomain", subdomain).
-					Msg("User does not have access to tenant")
-				c.JSON(http.StatusForbidden, gin.H{
-					"status":  http.StatusForbidden,
-					"message": "Access denied: no membership in this tenant",
-				})
-				c.Abort()
-				return
-			}
-
-			// User has valid membership - set context
-			c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
-			c.Set("tenant_subdomain", subdomain)
-			c.Set("tenant_roles", roles)
-
-			log.Debug().
-				Str("tenant_id", tenantID).
-				Str("subdomain", subdomain).
-				Str("user_id", userID).
-				Strs("roles", roles).
-				Msg("Tenant access validated with roles")
-
-			c.Next()
-			return
-		}
-
-		// Fallback: Check tenant_memberships from session if membership service not available
-		tenantMembershipsInterface, exists := c.Get("tenant_memberships")
-		if exists {
-			tenantMemberships, ok := tenantMembershipsInterface.([]string)
-			if ok {
-				// Check if user has access to this tenant
-				hasAccess := false
-				for _, memberTenantID := range tenantMemberships {
-					if memberTenantID == tenantID {
-						hasAccess = true
-						break
-					}
-				}
-
-				if !hasAccess {
-					log.Warn().
-						Str("user_id", userID).
-						Str("tenant_id", tenantID).
-						Str("subdomain", subdomain).
-						Strs("user_tenants", tenantMemberships).
-						Msg("User does not have access to tenant")
-					c.JSON(http.StatusForbidden, gin.H{
-						"status":  http.StatusForbidden,
-						"message": "Access denied: no membership in this tenant",
-					})
-					c.Abort()
-					return
-				}
-
-				// User has valid membership (but no role info)
-				c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
-				c.Set("tenant_subdomain", subdomain)
-
-				log.Debug().
-					Str("tenant_id", tenantID).
-					Str("subdomain", subdomain).
-					Str("user_id", userID).
-					Msg("Tenant access validated via session memberships (no role)")
-
-				c.Next()
-				return
-			}
-		}
-
-		// Final fallback to metadata-based validation (legacy)
-		userTenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
+		// Get tenant memberships from context (set by AuthMiddleware)
+		tenantMembershipsInterface, exists := c.Get(auth.AUTH_TENANT_MEMBERSHIPS)
 		if !exists {
 			log.Warn().
 				Str("user_id", userID).
 				Str("subdomain", subdomain).
-				Msg("User has no tenant metadata or memberships")
+				Msg("User has no tenant memberships in metadata")
 
 			c.JSON(http.StatusForbidden, gin.H{
 				"status":  http.StatusForbidden,
@@ -202,30 +122,50 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			return
 		}
 
-		userTenantIDStr, ok := userTenantID.(string)
-		if !ok || userTenantIDStr != tenantID {
+		tenantMemberships, ok := tenantMembershipsInterface.([]auth.TenantMembership)
+		if !ok {
 			log.Error().
-				Str("user_tenant", userTenantIDStr).
-				Str("requested_tenant", tenantID).
-				Str("subdomain", subdomain).
-				Msg("Tenant mismatch")
+				Str("user_id", userID).
+				Msg("Invalid tenant memberships format in context")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			c.Abort()
+			return
+		}
 
+		// Find membership for this tenant
+		var userRoles []string
+		hasAccess := false
+		for _, membership := range tenantMemberships {
+			if membership.TenantID == tenantID {
+				hasAccess = true
+				userRoles = membership.Roles
+				break
+			}
+		}
+
+		if !hasAccess {
+			log.Warn().
+				Str("user_id", userID).
+				Str("tenant_id", tenantID).
+				Str("subdomain", subdomain).
+				Msg("User does not have access to tenant")
 			c.JSON(http.StatusForbidden, gin.H{
 				"status":  http.StatusForbidden,
-				"message": "Access denied: tenant mismatch",
+				"message": "Access denied: no membership in this tenant",
 			})
 			c.Abort()
 			return
 		}
 
+		// User has valid membership - set context
 		c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
-		c.Set("tenant_subdomain", subdomain)
 
 		log.Debug().
 			Str("tenant_id", tenantID).
 			Str("subdomain", subdomain).
 			Str("user_id", userID).
-			Msg("Tenant context validated via legacy metadata")
+			Strs("roles", userRoles).
+			Msg("Tenant access validated with roles from metadata")
 
 		c.Next()
 	}

@@ -31,7 +31,7 @@ func (fam *TenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		}
 
 		// get tenant from context using subdomain
-		tenantID, err := fam.multitenantService.GetFirebaseTenantID(ctx, subdomain)
+		tenantID, err := fam.multitenantService.GetTenantIDWithSubdomain(ctx, subdomain)
 		if err != nil {
 			ctx.JSON(http.StatusUnauthorized, gin.H{
 				"status":  http.StatusUnauthorized,

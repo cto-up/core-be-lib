@@ -126,7 +126,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
         subdomain, err := utils.GetSubdomain(c)
 
         // 2. Get tenant ID from database
-        tenantID, err := ktm.multitenantService.GetFirebaseTenantID(c, subdomain)
+        tenantID, err := ktm.multitenantService.GetTenantIDWithSubdomain(c, subdomain)
 
         // 3. Validate user's tenant matches subdomain's tenant
         userTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)

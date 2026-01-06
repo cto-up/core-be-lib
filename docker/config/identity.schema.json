@@ -51,28 +51,28 @@
     "metadata_public": {
       "type": "object",
       "properties": {
-        "tenant_id": {
-          "type": "string",
-          "title": "Primary Tenant ID",
-          "description": "Primary tenant the user belongs to (for backward compatibility)"
-        },
-        "subdomain": {
-          "type": "string",
-          "title": "Primary Tenant Subdomain",
-          "description": "Subdomain of primary tenant (for backward compatibility)"
-        },
         "tenant_memberships": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "tenant_id": {
+                "type": "string",
+                "title": "Tenant ID"
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["CUSTOMER_ADMIN", "ADMIN", "USER"]
+                },
+                "title": "Tenant Roles"
+              }
+            },
+            "required": ["tenant_id", "roles"]
           },
           "title": "Tenant Memberships",
-          "description": "List of tenant IDs the user has access to"
-        },
-        "primary_tenant_id": {
-          "type": "string",
-          "title": "Primary Tenant ID",
-          "description": "User's primary/default tenant"
+          "description": "List of tenant memberships with associated roles for efficient middleware validation"
         },
         "global_roles": {
           "type": "array",
@@ -81,7 +81,7 @@
             "enum": ["SUPER_ADMIN"]
           },
           "title": "Global Roles",
-          "description": "Global system roles (SUPER_ADMIN only). Tenant-specific roles (OWNER, ADMIN, USER) are stored in core_user_tenant_memberships table."
+          "description": "Global system roles (SUPER_ADMIN only)"
         }
       }
     }
