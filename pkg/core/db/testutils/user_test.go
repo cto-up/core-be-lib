@@ -13,7 +13,7 @@ import (
 )
 
 func Test_CreateUser(t *testing.T) {
-	params := repository.CreateUserParams{
+	params := repository.CreateUserByTenantParams{
 		ID: testutils.RandomOwner(),
 		Profile: subentity.UserProfile{
 			About:     testutils.RandomAbout(),
@@ -22,7 +22,7 @@ func Test_CreateUser(t *testing.T) {
 		TenantID: testutils.RandomTenant(),
 	}
 
-	user, err := testStore.CreateUser(context.Background(), params)
+	user, err := testStore.CreateUserByTenant(context.Background(), params)
 	require.NoError(t, err)
 	require.NotEmpty(t, user)
 	require.Equal(t, params.ID, user.ID)
@@ -34,7 +34,7 @@ func Test_CreateUser(t *testing.T) {
 }
 
 func createRandomUser(tenantID string, t *testing.T) repository.CoreUser {
-	params := repository.CreateUserParams{
+	params := repository.CreateUserByTenantParams{
 		ID: testutils.RandomOwner(),
 		Profile: subentity.UserProfile{
 			About:     testutils.RandomAbout(),
@@ -43,7 +43,7 @@ func createRandomUser(tenantID string, t *testing.T) repository.CoreUser {
 		TenantID: tenantID,
 	}
 
-	user, err := testStore.CreateUser(context.Background(), params)
+	user, err := testStore.CreateUserByTenant(context.Background(), params)
 	require.NoError(t, err)
 	require.NotEmpty(t, user)
 	require.Equal(t, params.ID, user.ID)
@@ -70,7 +70,7 @@ func Test_UpdateUser(t *testing.T) {
 	tenantID := testutils.RandomTenant()
 	user1 := createRandomUser(tenantID, t)
 
-	params := repository.UpdateProfileParams{
+	params := repository.UpdateProfileByTenantParams{
 		ID: user1.ID,
 		//  to change
 		Profile: subentity.UserProfile{
@@ -79,7 +79,7 @@ func Test_UpdateUser(t *testing.T) {
 		},
 		TenantID: tenantID,
 	}
-	_, err := testStore.UpdateProfile(context.Background(), params)
+	_, err := testStore.UpdateProfileByTenant(context.Background(), params)
 	require.NoError(t, err)
 
 	user2, err := testStore.GetUserByID(context.Background(), user1.ID)
@@ -95,8 +95,8 @@ func Test_UpdateUser(t *testing.T) {
 func Test_DeleteUser(t *testing.T) {
 	tenantID := testutils.RandomTenant()
 	user := createRandomUser(tenantID, t)
-	_, err := testStore.DeleteUser(context.Background(),
-		repository.DeleteUserParams{
+	_, err := testStore.DeleteUserByTenant(context.Background(),
+		repository.DeleteUserByTenantParams{
 			ID:       user.ID,
 			TenantID: tenantID,
 		},
@@ -116,7 +116,7 @@ func Test_DeleteUserFailsWhenNotTheUser(t *testing.T) {
 	iid := testutils.RandomOwner()
 	fmt.Println(iid)
 
-	_, err := testStore.DeleteUser(context.Background(), repository.DeleteUserParams{
+	_, err := testStore.DeleteUserByTenant(context.Background(), repository.DeleteUserByTenantParams{
 		ID:       iid,
 		TenantID: tenantID,
 	})
@@ -134,12 +134,12 @@ func Test_GetListUser(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		createRandomUser(tenantID, t)
 	}
-	params := repository.ListUsersParams{
+	params := repository.ListUsersByTenantParams{
 		Limit:    5,
 		Offset:   5,
 		TenantID: tenantID,
 	}
-	users, err := testStore.ListUsers(context.Background(), params)
+	users, err := testStore.ListUsersByTenant(context.Background(), params)
 	require.NoError(t, err)
 	require.Len(t, users, 5)
 

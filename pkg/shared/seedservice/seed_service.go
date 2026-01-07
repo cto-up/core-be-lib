@@ -112,7 +112,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 			return user, err
 		}
 
-		return qtx.CreateUser(c, repository.CreateUserParams{
+		return qtx.CreateUserByTenant(c, repository.CreateUserByTenantParams{
 			ID:    userRecord.UID,
 			Email: adminEmail,
 			Profile: subentity.UserProfile{

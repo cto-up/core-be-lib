@@ -27,7 +27,7 @@ func (q *Queries) CountUserTenants(ctx context.Context, userID string) (int32, e
 	return column_1, err
 }
 
-const createUser = `-- name: CreateUser :one
+const createUserByTenant = `-- name: CreateUserByTenant :one
 INSERT INTO core_users (
   "id", "email", "profile", roles, "tenant_id"
 ) VALUES (
@@ -36,7 +36,7 @@ INSERT INTO core_users (
 RETURNING id, profile, email, created_at, tenant_id, roles
 `
 
-type CreateUserParams struct {
+type CreateUserByTenantParams struct {
 	ID       string                `json:"id"`
 	Profile  subentity.UserProfile `json:"profile"`
 	Email    string                `json:"email"`
@@ -44,8 +44,8 @@ type CreateUserParams struct {
 	TenantID string                `json:"tenant_id"`
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CoreUser, error) {
-	row := q.db.QueryRow(ctx, createUser,
+func (q *Queries) CreateUserByTenant(ctx context.Context, arg CreateUserByTenantParams) (CoreUser, error) {
+	row := q.db.QueryRow(ctx, createUserByTenant,
 		arg.ID,
 		arg.Profile,
 		arg.Email,
@@ -64,49 +64,23 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CoreUse
 	return i, err
 }
 
-const deleteUser = `-- name: DeleteUser :one
+const deleteUserByTenant = `-- name: DeleteUserByTenant :one
 DELETE FROM core_users
 WHERE id = $1
 AND tenant_id = $2::text
 RETURNING id
 `
 
-type DeleteUserParams struct {
+type DeleteUserByTenantParams struct {
 	ID       string `json:"id"`
 	TenantID string `json:"tenant_id"`
 }
 
-func (q *Queries) DeleteUser(ctx context.Context, arg DeleteUserParams) (string, error) {
-	row := q.db.QueryRow(ctx, deleteUser, arg.ID, arg.TenantID)
+func (q *Queries) DeleteUserByTenant(ctx context.Context, arg DeleteUserByTenantParams) (string, error) {
+	row := q.db.QueryRow(ctx, deleteUserByTenant, arg.ID, arg.TenantID)
 	var id string
 	err := row.Scan(&id)
 	return id, err
-}
-
-const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
-WHERE email = $1::text
-AND tenant_id = $2::text
-LIMIT 1
-`
-
-type GetUserByEmailParams struct {
-	Email    string `json:"email"`
-	TenantID string `json:"tenant_id"`
-}
-
-func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) (CoreUser, error) {
-	row := q.db.QueryRow(ctx, getUserByEmail, arg.Email, arg.TenantID)
-	var i CoreUser
-	err := row.Scan(
-		&i.ID,
-		&i.Profile,
-		&i.Email,
-		&i.CreatedAt,
-		&i.TenantID,
-		&i.Roles,
-	)
-	return i, err
 }
 
 const getUserByEmailGlobal = `-- name: GetUserByEmailGlobal :one
@@ -161,7 +135,33 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (CoreUser, error) 
 	return i, err
 }
 
-const listUsers = `-- name: ListUsers :many
+const getUserByTenantByEmail = `-- name: GetUserByTenantByEmail :one
+SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
+WHERE email = $1::text
+AND tenant_id = $2::text
+LIMIT 1
+`
+
+type GetUserByTenantByEmailParams struct {
+	Email    string `json:"email"`
+	TenantID string `json:"tenant_id"`
+}
+
+func (q *Queries) GetUserByTenantByEmail(ctx context.Context, arg GetUserByTenantByEmailParams) (CoreUser, error) {
+	row := q.db.QueryRow(ctx, getUserByTenantByEmail, arg.Email, arg.TenantID)
+	var i CoreUser
+	err := row.Scan(
+		&i.ID,
+		&i.Profile,
+		&i.Email,
+		&i.CreatedAt,
+		&i.TenantID,
+		&i.Roles,
+	)
+	return i, err
+}
+
+const listUsersByTenant = `-- name: ListUsersByTenant :many
 SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
 WHERE (UPPER(email) LIKE UPPER($3) OR $3 IS NULL)
 AND tenant_id = $4::text
@@ -170,15 +170,15 @@ LIMIT $1
 OFFSET $2
 `
 
-type ListUsersParams struct {
+type ListUsersByTenantParams struct {
 	Limit    int32       `json:"limit"`
 	Offset   int32       `json:"offset"`
 	Like     interface{} `json:"like"`
 	TenantID string      `json:"tenant_id"`
 }
 
-func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]CoreUser, error) {
-	rows, err := q.db.Query(ctx, listUsers,
+func (q *Queries) ListUsersByTenant(ctx context.Context, arg ListUsersByTenantParams) ([]CoreUser, error) {
+	rows, err := q.db.Query(ctx, listUsersByTenant,
 		arg.Limit,
 		arg.Offset,
 		arg.Like,
@@ -209,7 +209,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]CoreUse
 	return items, nil
 }
 
-const updateProfile = `-- name: UpdateProfile :one
+const updateProfileByTenant = `-- name: UpdateProfileByTenant :one
 UPDATE core_users 
 SET profile = $1
 WHERE id = $2
@@ -217,20 +217,20 @@ AND tenant_id = $3::text
 RETURNING id
 `
 
-type UpdateProfileParams struct {
+type UpdateProfileByTenantParams struct {
 	Profile  subentity.UserProfile `json:"profile"`
 	ID       string                `json:"id"`
 	TenantID string                `json:"tenant_id"`
 }
 
-func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (string, error) {
-	row := q.db.QueryRow(ctx, updateProfile, arg.Profile, arg.ID, arg.TenantID)
+func (q *Queries) UpdateProfileByTenant(ctx context.Context, arg UpdateProfileByTenantParams) (string, error) {
+	row := q.db.QueryRow(ctx, updateProfileByTenant, arg.Profile, arg.ID, arg.TenantID)
 	var id string
 	err := row.Scan(&id)
 	return id, err
 }
 
-const updateUser = `-- name: UpdateUser :one
+const updateUserByTenant = `-- name: UpdateUserByTenant :one
 UPDATE core_users 
 SET 
     roles = $2::VARCHAR[],
@@ -245,15 +245,15 @@ AND tenant_id = $4::text
 RETURNING id
 `
 
-type UpdateUserParams struct {
+type UpdateUserByTenantParams struct {
 	ID       string   `json:"id"`
 	Roles    []string `json:"roles"`
 	Name     string   `json:"name"`
 	TenantID string   `json:"tenant_id"`
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (string, error) {
-	row := q.db.QueryRow(ctx, updateUser,
+func (q *Queries) UpdateUserByTenant(ctx context.Context, arg UpdateUserByTenantParams) (string, error) {
+	row := q.db.QueryRow(ctx, updateUserByTenant,
 		arg.ID,
 		arg.Roles,
 		arg.Name,
