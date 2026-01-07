@@ -22,7 +22,7 @@ type SharedUserService struct {
 	onUserCreated  UserCreatedCallback
 }
 
-func NewSharedUserService(store *db.Store, authClientPool auth.AuthClientPool) *SharedUserService {
+func NewSharedUserService(store *db.Store, authClientPool auth.AuthClientPool) UserService {
 	userService := &SharedUserService{
 		store:          store,
 		authClientPool: authClientPool,

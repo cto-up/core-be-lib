@@ -22,7 +22,7 @@ type IsolatedUserService struct {
 	onUserCreated  UserCreatedCallback
 }
 
-func NewIsolatedUserService(store *db.Store, authClientPool auth.AuthClientPool) *IsolatedUserService {
+func NewIsolatedUserService(store *db.Store, authClientPool auth.AuthClientPool) UserService {
 	userService := &IsolatedUserService{
 		store:          store,
 		authClientPool: authClientPool,
