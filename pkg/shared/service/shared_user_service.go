@@ -35,11 +35,6 @@ func (uh *SharedUserService) SetUserCreatedCallback(callback UserCreatedCallback
 	uh.onUserCreated = callback
 }
 
-// GetStore returns the database store (for use in callbacks that need to access tenant data)
-func (uh *SharedUserService) GetStore() *db.Store {
-	return uh.store
-}
-
 // AddUser creates a new user in the auth provider and the database
 func (uh *SharedUserService) AddUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
 
