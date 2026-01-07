@@ -45,10 +45,9 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			(!strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
 				!strings.HasPrefix(c.Request.URL.Path, "/admin-api") &&
 				!strings.HasPrefix(c.Request.URL.Path, "/superadmin-api")) {
-			// Check X-Api-Key header first
-			token := c.GetHeader(XApiKeyHeader)
 
-			// If X-Api-Key is not present, try legacy token extraction
+			// X-Api-Key header based authentication can only perform for non-user-management endpoints
+			token := c.GetHeader(XApiKeyHeader)
 			if token != "" {
 				tokenRow, err := am.apiToken.VerifyAPIToken(c, token)
 				if err == nil {
@@ -69,49 +68,32 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					c.Abort()
 					return
 				}
-			} else {
-				// Try provider-based authentication
-				user, err := am.authProvider.VerifyToken(c)
-				if err != nil {
-					log.Error().Err(err).Str("provider", am.authProvider.GetProviderName()).Msg("authentication failed")
-					c.JSON(http.StatusUnauthorized, gin.H{
-						"status":  http.StatusUnauthorized,
-						"message": "Authentication required",
-					})
-					c.Abort()
-					return
-				}
-
-				// Store authenticated user info in context
-				am.setAuthenticatedUser(c, user)
-
-				
-
-
 			}
-		} else {
-			// Use provider-based authentication
-			user, err := am.authProvider.VerifyToken(c)
-			if err != nil {
-				log.Error().Err(err).Str("provider", am.authProvider.GetProviderName()).Msg("authentication failed")
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"status":  http.StatusUnauthorized,
-					"message": http.StatusText(http.StatusUnauthorized),
-				})
-				c.Abort()
-				return
-			}
-
-			// Store authenticated user info in context
-			am.setAuthenticatedUser(c, user)
-
-			// Check role-based permissions
-			if !am.checkPermissions(c, user) {
-				return
-			}
-
-			c.Next()
 		}
+
+		// Use provider-based authentication
+		user, err := am.authProvider.VerifyToken(c)
+		if err != nil {
+			log.Error().Err(err).Str("provider", am.authProvider.GetProviderName()).Msg("authentication failed")
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":  http.StatusUnauthorized,
+				"message": http.StatusText(http.StatusUnauthorized),
+			})
+			c.Abort()
+			return
+		}
+
+		// Store authenticated user info in context
+		am.setAuthenticatedUser(c, user)
+
+		// Check role-based permissions
+		if !am.checkPermissions(c, user) {
+			c.Abort()
+			return
+		}
+
+		c.Next()
+
 	}
 }
 
