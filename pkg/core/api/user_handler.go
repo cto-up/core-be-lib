@@ -27,13 +27,14 @@ import (
 type UserHandler struct {
 	store                    *db.Store
 	authProvider             auth.AuthProvider
-	userService              *access.UserService
+	userService              access.UserService
 	emailVerificationService *service.EmailVerificationService
 	fileService              *fileservice.FileService
 }
 
 func NewUserHandler(store *db.Store, authProvider auth.AuthProvider) *UserHandler {
-	userService := access.NewUserService(store, authProvider)
+	factory := access.NewUserServiceStrategyFactory()
+	userService := factory.CreateUserServiceStrategy(store, authProvider)
 
 	// Try to initialize user event callback if available
 	// This allows the realtime module to set up the callback for user creation events
@@ -80,8 +81,8 @@ func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, "Need to be authenticated")
 		return
 	}
-	user, err := s.store.CreateUser(ctx,
-		repository.CreateUserParams{
+	user, err := s.store.CreateUserByTenant(ctx,
+		repository.CreateUserByTenantParams{
 			ID:      userID.(string),
 			Email:   userEmail.(string),
 			Profile: subentity.UserProfile{},
@@ -94,6 +95,8 @@ func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
 }
 
 func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
+	tenantID := ctx.GetString(auth.AUTH_TENANT_ID_KEY)
+
 	authUserID, exists := ctx.Get(auth.AUTH_USER_ID)
 	if !exists {
 		ctx.JSON(http.StatusBadRequest, "Not Authenticated")
@@ -104,9 +107,7 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 	if err != nil {
 		if err.Error() == pgx.ErrNoRows.Error() {
 			// user does not exist yet create it
-			user, err := s.store.CreateUser(ctx, repository.CreateUserParams{
-				ID: authUserID.(string),
-			})
+			user, err := s.userService.CreateUserInDatabase(ctx, tenantID, authUserID.(string))
 			if err != nil {
 				ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 				return
@@ -122,6 +123,7 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 }
 
 func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {
+	tenantID := ctx.GetString(auth.AUTH_TENANT_ID_KEY)
 
 	authUserID, exists := ctx.Get(auth.AUTH_USER_ID)
 	if !exists {
@@ -135,11 +137,7 @@ func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {
 		return
 	}
 
-	_, err := s.store.UpdateProfile(ctx, repository.UpdateProfileParams{
-		ID:       authUserID.(string),
-		Profile:  req,
-		TenantID: ctx.GetString(auth.AUTH_TENANT_ID_KEY),
-	})
+	err := s.userService.UpdateUserProfileInDatabase(ctx, tenantID, authUserID.(string), req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

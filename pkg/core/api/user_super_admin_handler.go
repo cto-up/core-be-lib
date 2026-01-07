@@ -21,7 +21,23 @@ import (
 type UserSuperAdminHandler struct {
 	store        *db.Store
 	authProvider sharedauth.AuthProvider
-	userService  *access.UserService
+	userService  access.UserService
+}
+
+func NewUserSuperAdminHandler(store *db.Store, authProvider sharedauth.AuthProvider) *UserSuperAdminHandler {
+	factory := access.NewUserServiceStrategyFactory()
+	userService := factory.CreateUserServiceStrategy(store, authProvider)
+
+	// Try to initialize user event callback if available
+	// This allows the realtime module to set up the callback for user creation events
+	if initFunc := access.GetUserEventInitFunc(); initFunc != nil {
+		initFunc(userService)
+	}
+
+	handler := &UserSuperAdminHandler{store: store,
+		authProvider: authProvider,
+		userService:  userService}
+	return handler
 }
 
 // AddUser implements openapi.ServerInterface.
@@ -337,21 +353,6 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
-}
-
-func NewUserSuperAdminHandler(store *db.Store, authProvider sharedauth.AuthProvider) *UserSuperAdminHandler {
-	userService := access.NewUserService(store, authProvider)
-
-	// Try to initialize user event callback if available
-	// This allows the realtime module to set up the callback for user creation events
-	if initFunc := access.GetUserEventInitFunc(); initFunc != nil {
-		initFunc(userService)
-	}
-
-	handler := &UserSuperAdminHandler{store: store,
-		authProvider: authProvider,
-		userService:  userService}
-	return handler
 }
 
 // CheckUserExistsFromSuperAdmin checks if a user exists globally by email (Super Admin)

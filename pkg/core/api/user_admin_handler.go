@@ -30,11 +30,13 @@ import (
 type UserAdminHandler struct {
 	store        *db.Store
 	authProvider auth.AuthProvider
-	userService  *access.UserService
+	userService  access.UserService
 }
 
 func NewUserAdminHandler(store *db.Store, authProvider auth.AuthProvider) *UserAdminHandler {
-	userService := access.NewUserService(store, authProvider)
+
+	factory := access.NewUserServiceStrategyFactory()
+	userService := factory.CreateUserServiceStrategy(store, authProvider)
 
 	// Try to initialize user event callback if available
 	// This allows the realtime module to set up the callback for user creation events
