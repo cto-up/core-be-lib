@@ -84,6 +84,10 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 
 				// Store authenticated user info in context
 				am.setAuthenticatedUser(c, user)
+
+				
+
+
 			}
 		} else {
 			// Use provider-based authentication
