@@ -116,31 +116,14 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 
 	tenantMiddleware := service.NewTenantMiddleware(nil, multiTenantService)
 
-	if authProvider.GetProviderName() == "kratos" {
-		// For Kratos: Need THREE middlewares in order:
-		// 1. Basic tenant middleware (extract tenant ID from subdomain)
-		// 2. Auth middleware (verify token, set claims including SUPER_ADMIN)
-		// 3. Kratos tenant middleware (validate access using claims)
+	// 1. Request ID middleware
+	// 2. Tenant middleware (extract tenant ID)
+	// 3. Auth middleware (verify token)
 
-		kratosMiddleware := service.NewKratosTenantMiddleware(multiTenantService, authProvider)
-		middlewares = []core.MiddlewareFunc{
-			core.MiddlewareFunc(service.RequestIDMiddleware()),
-			core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
-			core.MiddlewareFunc(authMiddleware.MiddlewareFunc()),
-			core.MiddlewareFunc(kratosMiddleware.MiddlewareFunc()),
-		}
-		log.Info().Msg("Using Kratos middleware order: RequestID -> BasicTenant -> Auth -> KratosTenantValidation")
-	} else {
-		// For Firebase: TWO middlewares
-		// 1. Tenant middleware (extract tenant ID)
-		// 2. Auth middleware (verify token)
-
-		middlewares = []core.MiddlewareFunc{
-			core.MiddlewareFunc(service.RequestIDMiddleware()),
-			core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
-			core.MiddlewareFunc(authMiddleware.MiddlewareFunc()),
-		}
-		log.Info().Msg("Using Firebase middleware order: RequestID -> Tenant -> Auth")
+	middlewares = []core.MiddlewareFunc{
+		core.MiddlewareFunc(service.RequestIDMiddleware()),
+		core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
+		core.MiddlewareFunc(authMiddleware.MiddlewareFunc()),
 	}
 
 	apiOptions := core.GinServerOptions{
