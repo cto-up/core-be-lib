@@ -91,10 +91,13 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 	if sessionToken == "" {
 		return nil, fmt.Errorf("missing session token")
 	}
+	return k.VerifyTokenWithTenantID(c.Request.Context(), tenantID, sessionToken)
+}
 
+func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenantID string, sessionToken string) (*auth.AuthenticatedUser, error) {
 	authClient := k.GetAuthClient()
 
-	token, err := authClient.VerifyIDToken(c.Request.Context(), sessionToken)
+	token, err := authClient.VerifyIDToken(ctx, sessionToken)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +151,7 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 					membership.TenantID = tid
 				}
 
-				// Only add for tenant
+				// Only validate for tenant
 				if membership.TenantID == tenantID {
 					if rolesInterface, ok := membershipMap["roles"].([]interface{}); ok {
 						for _, r := range rolesInterface {
@@ -164,69 +167,6 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 	}
 
 	return user, fmt.Errorf("User with userID %s, not allowed for tenantID %s .", user.UserID, tenantID)
-}
-
-func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, subdomain string, sessionToken string) (*auth.AuthenticatedUser, error) {
-
-	authClient := k.GetAuthClient()
-	token, err := authClient.VerifyIDToken(ctx, sessionToken)
-	if err != nil {
-		return nil, err
-	}
-
-	// Extract tenant information from metadata_public
-	tenantID, _ := token.Claims["tenant_id"].(string)
-
-	// Extract tenant memberships with roles
-	var tenantMemberships []auth.TenantMembership
-	if membershipsInterface, ok := token.Claims[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
-		for _, m := range membershipsInterface {
-			if membershipMap, ok := m.(map[string]interface{}); ok {
-				membership := auth.TenantMembership{}
-				if tid, ok := membershipMap["tenant_id"].(string); ok {
-					membership.TenantID = tid
-				}
-				if rolesInterface, ok := membershipMap["roles"].([]interface{}); ok {
-					for _, r := range rolesInterface {
-						if roleStr, ok := r.(string); ok {
-							membership.Roles = append(membership.Roles, roleStr)
-						}
-					}
-				}
-				if membership.TenantID != "" {
-					tenantMemberships = append(tenantMemberships, membership)
-				}
-			}
-		}
-	}
-
-	customClaims := []string{}
-
-	// Extract global roles from metadata_public
-	if globalRolesArr, ok := token.Claims["global_roles"].([]interface{}); ok {
-		for _, role := range globalRolesArr {
-			if roleStr, ok := role.(string); ok {
-				customClaims = append(customClaims, roleStr)
-			}
-		}
-	}
-
-	// Legacy: Also check for boolean SUPER_ADMIN claim
-	if val, ok := token.Claims["SUPER_ADMIN"].(bool); ok && val {
-		customClaims = append(customClaims, "SUPER_ADMIN")
-	}
-
-	email, _ := token.Claims["email"].(string)
-
-	return &auth.AuthenticatedUser{
-		UserID:            token.UID,
-		Email:             email,
-		EmailVerified:     true, // Should check verifiable_addresses if needed
-		Claims:            token.Claims,
-		CustomClaims:      customClaims,
-		TenantID:          tenantID,
-		TenantMemberships: tenantMemberships,
-	}, nil
 }
 
 func (k *KratosAuthProvider) GetTenantManager() auth.TenantManager {
