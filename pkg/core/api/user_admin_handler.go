@@ -98,7 +98,7 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		return
 	}
 
-	user, err := uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req, nil)
+	user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), req, nil)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to add user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -178,7 +178,7 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		return
 	}
 	// check if user is deleting another customer admin
-	user, err := uh.store.GetUserByID(c, userid)
+	user, err := uh.userService.GetUserByTenantIDByID(c, tenantID.(string), userid)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get user by ID")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -286,10 +286,7 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 	}
 
 	// Remove user from tenant (delete membership)
-	err = uh.store.RemoveUserFromTenant(c, repository.RemoveUserFromTenantParams{
-		UserID:   userid,
-		TenantID: tenantID.(string),
-	})
+	err = uh.userService.DeleteUser(c, uh.authProvider.GetAuthClient(), tenantID.(string), userid)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to remove user from tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -301,22 +298,13 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 
 // GetUserByID implements openapi.ServerInterface.
 func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
-
-	subdomain, err := util.GetSubdomain(c)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
-		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
-	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
-		c.JSON(http.StatusInternalServerError, err)
-		return
-	}
-
-	user, err := uh.userService.GetUserByID(c, baseAuthClient, id)
+	user, err := uh.userService.GetUserByTenantIDByID(c, tenantID.(string), id)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get user by ID")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -478,6 +466,11 @@ func (uh *UserAdminHandler) UpdateUserStatus(c *gin.Context, userID string) {
 }
 
 func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID string) {
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
 	var req struct {
 		Email string `json:"email"`
 	}
@@ -492,14 +485,14 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 		return
 	}
 
-	user, err := uh.store.GetUserByID(c, userID)
+	user, err := uh.userService.GetUserByTenantIDByID(c, tenantID.(string), userID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get user by ID")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if user.Email.String != req.Email {
+	if user.Email != req.Email {
 		log.Error().Msg("Email does not match user ID")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email"})
 		return
@@ -645,7 +638,7 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 	}
 
 	// Get updated user info
-	user, err := uh.userService.GetUserByID(c, baseAuthClient, userid)
+	user, err := uh.userService.GetUserByTenantIDByID(c, tenantID.(string), userid)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get user after adding membership")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -842,7 +835,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			if isCustomerAdmin {
 				req.Roles = []core.Role{"CUSTOMER_ADMIN"}
 			}
-			_, err = uh.userService.AddUser(c, baseAuthClient, tenantID.(string), req, nil)
+			_, err = uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), req, nil)
 			if err != nil {
 				// check if error is a firebase error and if so, check if it is a duplicate email error
 				if auth.IsEmailAlreadyExists(err) {

@@ -57,7 +57,10 @@ func createRandomUser(tenantID string, t *testing.T) repository.CoreUser {
 func Test_GetUser(t *testing.T) {
 	tenantID := testutils.RandomTenant()
 	user1 := createRandomUser(tenantID, t)
-	user2, err := testStore.GetUserByID(context.Background(), user1.ID)
+	user2, err := testStore.GetUserByTenantByID(context.Background(), repository.GetUserByTenantByIDParams{
+		TenantID: tenantID,
+		ID:       user1.ID,
+	})
 	require.NoError(t, err)
 	require.NotEmpty(t, user2)
 	require.Equal(t, user1.ID, user2.ID)
@@ -82,7 +85,10 @@ func Test_UpdateUser(t *testing.T) {
 	_, err := testStore.UpdateProfileByTenant(context.Background(), params)
 	require.NoError(t, err)
 
-	user2, err := testStore.GetUserByID(context.Background(), user1.ID)
+	user2, err := testStore.GetUserByTenantByID(context.Background(), repository.GetUserByTenantByIDParams{
+		TenantID: tenantID,
+		ID:       user1.ID,
+	})
 	require.NoError(t, err)
 	require.NotEmpty(t, user2)
 	require.Equal(t, user1.ID, user2.ID)
@@ -102,7 +108,10 @@ func Test_DeleteUser(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	user2, err := testStore.GetUserByID(context.Background(), user.ID)
+	user2, err := testStore.GetUserByTenantByID(context.Background(), repository.GetUserByTenantByIDParams{
+		TenantID: tenantID,
+		ID:       user.ID,
+	})
 	require.EqualError(t, err, pgx.ErrNoRows.Error())
 	require.Empty(t, user2)
 }
@@ -123,7 +132,10 @@ func Test_DeleteUserFailsWhenNotTheUser(t *testing.T) {
 
 	require.EqualError(t, err, pgx.ErrNoRows.Error())
 
-	user2, err := testStore.GetUserByID(context.Background(), user.ID)
+	user2, err := testStore.GetUserByTenantByID(context.Background(), repository.GetUserByTenantByIDParams{
+		TenantID: tenantID,
+		ID:       user.ID,
+	})
 	require.NoError(t, err)
 	require.NotEmpty(t, user2)
 }

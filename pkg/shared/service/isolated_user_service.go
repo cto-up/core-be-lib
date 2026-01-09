@@ -17,26 +17,21 @@ import (
 )
 
 type IsolatedUserService struct {
-	store          *db.Store
+	*BaseUserService
 	authClientPool auth.AuthClientPool
-	onUserCreated  UserCreatedCallback
 }
 
 func NewIsolatedUserService(store *db.Store, authClientPool auth.AuthClientPool) UserService {
+	baseUserService := NewBaseUserService(store)
 	userService := &IsolatedUserService{
-		store:          store,
-		authClientPool: authClientPool,
+		BaseUserService: baseUserService,
+		authClientPool:  authClientPool,
 	}
 	return userService
 }
 
-// SetUserCreatedCallback sets an optional callback function that will be called after a user is successfully created.
-func (uh *IsolatedUserService) SetUserCreatedCallback(callback UserCreatedCallback) {
-	uh.onUserCreated = callback
-}
-
-// AddUser creates a new user in the auth provider and the database
-func (uh *IsolatedUserService) AddUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
+// CreateUser creates a new user in the auth provider and the database
+func (uh *IsolatedUserService) CreateUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
 
 	user := repository.CoreUser{}
 	tx, err := uh.store.ConnPool.Begin(c)
@@ -99,8 +94,9 @@ func (uh *IsolatedUserService) AddUser(c context.Context, authClient auth.AuthCl
 	return user, err
 }
 
-// CreateUserInDatabase creates a user in the database only
-func (uh *IsolatedUserService) CreateUserInDatabase(ctx context.Context, tenantId string, userID string) (repository.CoreUser, error) {
+// InitUserInDatabase creates a user in the database only
+// Used in case the user already exists in the auth provider
+func (uh *IsolatedUserService) InitUserInDatabase(ctx context.Context, tenantId string, userID string) (repository.CoreUser, error) {
 	user, err := uh.store.CreateUserByTenant(ctx, repository.CreateUserByTenantParams{
 		ID:       userID,
 		TenantID: tenantId,
@@ -153,7 +149,7 @@ func (uh *IsolatedUserService) UpdateUser(c *gin.Context, authClient auth.AuthCl
 	return err
 }
 
-// CreateUserInDatabase creates a user in the database only
+// InitUserInDatabase creates a user in the database only
 func (uh *IsolatedUserService) UpdateUserProfileInDatabase(ctx context.Context, tenantId string, userID string, req subentity.UserProfile) error {
 	_, err := uh.store.UpdateProfileByTenant(ctx, repository.UpdateProfileByTenantParams{
 		ID:       userID,
@@ -195,19 +191,22 @@ func (uh *IsolatedUserService) DeleteUser(c *gin.Context, authClient auth.AuthCl
 	return err
 }
 
-func (uh *IsolatedUserService) GetUserByID(c *gin.Context, authClient auth.AuthClient, id string) (FullUser, error) {
+func (uh *IsolatedUserService) GetFullUserByID(c *gin.Context, authClient auth.AuthClient, tenantID string, id string) (FullUser, error) {
 	fullUser := FullUser{}
-	dbUser, err := uh.store.GetUserByID(c, id)
+
+	userDB, err := uh.store.GetUserByTenantByID(c, repository.GetUserByTenantByIDParams{
+		TenantID: tenantID,
+		ID:       id,
+	})
 	if err != nil {
 		return fullUser, err
 	}
-
 	user := core.User{
-		Id:        dbUser.ID,
-		Name:      dbUser.Profile.Name,
-		Email:     dbUser.Email.String,
-		Roles:     convertToRoleDTOs(dbUser.Roles),
-		CreatedAt: &dbUser.CreatedAt,
+		Id:        userDB.ID,
+		Name:      userDB.Profile.Name,
+		Email:     userDB.Email.String,
+		Roles:     convertToRoleDTOs(userDB.Roles),
+		CreatedAt: &userDB.CreatedAt,
 	}
 
 	userAuth, err := authClient.GetUser(c, id)
@@ -339,10 +338,6 @@ func (uh *IsolatedUserService) UnassignRole(c *gin.Context, authClient auth.Auth
 	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
 		return errors.New("must be an SUPER_ADMIN to perform such operation")
 	}
-	tenant_id, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
-	if !exists {
-		return errors.New("user email not found in context")
-	}
 
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
@@ -354,7 +349,7 @@ func (uh *IsolatedUserService) UnassignRole(c *gin.Context, authClient auth.Auth
 	_, err = qtx.UnassignRoleWithRowsAffected(c, repository.UnassignRoleWithRowsAffectedParams{
 		UserID:   userID,
 		RoleName: string(role),
-		TenantID: tenant_id.(string),
+		TenantID: tenantId,
 	})
 	if err != nil {
 		return err
@@ -392,77 +387,7 @@ func (uh *IsolatedUserService) UpdateUserStatus(c *gin.Context, authClient auth.
 	return err
 }
 
-// GetUserByEmailGlobal gets a user by email across all tenants
-func (uh *IsolatedUserService) GetUserByEmailGlobal(c context.Context, email string) (*core.User, error) {
-	userRow, err := uh.store.GetUserByEmailGlobal(c, email)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to core.User
-	user := &core.User{
-		Id:    userRow.ID,
-		Email: userRow.Email.String,
-		Profile: &core.UserProfileSchema{
-			Name: userRow.Profile.Name,
-		},
-		CreatedAt: &userRow.CreatedAt,
-	}
-
-	return user, nil
-}
-
-// AddUserToTenant adds an existing user to a tenant (creates membership)
+// AddUserToTenant is not applicable for IsolatedUserService
 func (uh *IsolatedUserService) AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role) error {
-	// Check if user exists
-	_, err := authClient.GetUser(c, userID)
-	if err != nil {
-		return errors.New("user not found in auth provider")
-	}
-
-	// Convert roles to string array
-	roleStrings := make([]string, len(roles))
-	for i, role := range roles {
-		roleStrings[i] = string(role)
-	}
-
-	// Create membership
-	_, err = uh.store.CreateUserTenantMembership(c, repository.CreateUserTenantMembershipParams{
-		UserID:   userID,
-		TenantID: tenantID,
-		Roles:    roleStrings,
-		Status:   "active",
-	})
-	if err != nil {
-		return err
-	}
-
-	// Create user record in core_users for this tenant if it doesn't exist
-	_, err = uh.store.GetUserByID(c, userID)
-	if err != nil {
-		// User doesn't exist for this tenant, create it
-		// Get user info from auth provider
-		authUser, err := authClient.GetUser(c, userID)
-		if err != nil {
-			return err
-		}
-
-		profile := subentity.UserProfile{}
-		if authUser.DisplayName != "" {
-			profile.Name = authUser.DisplayName
-		}
-
-		_, err = uh.store.CreateUserByTenant(c, repository.CreateUserByTenantParams{
-			ID:       userID,
-			Email:    authUser.Email,
-			Profile:  profile,
-			Roles:    roleStrings,
-			TenantID: tenantID,
-		})
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to create user record for tenant")
-			// Don't fail the whole operation if this fails
-		}
-	}
 	return nil
 }

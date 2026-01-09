@@ -54,14 +54,13 @@
     "subdomain": "tenant1" // ✅ For registration flow
   },
   "metadata_public": {
-    "tenant_id": "tenant-123", // ✅ Primary tenant (backward compat)
-    "subdomain": "tenant1", // ✅ Primary subdomain (backward compat)
     "tenant_memberships": [
-      // ✅ All tenant IDs user has access to
-      "tenant-123",
-      "tenant-456"
+      {
+        "tenant_id": "s1",
+        "roles": ["ADMIN"]
+      }
     ],
-    "roles": ["SUPER_ADMIN"] // ✅ Global roles
+    "global_roles": ["SUPER_ADMIN"] // ✅ Global roles
   }
 }
 ```
@@ -100,18 +99,15 @@ Creates membership: user → tenant1
 
 ```json
 "metadata_public": {
-  "tenant_memberships": ["tenant-123", "tenant-456"],  // ✅ Cached for middleware
-  "roles": ["SUPER_ADMIN"],                            // ✅ Global roles
-  "tenant_id": "tenant-123",                           // ✅ Backward compatibility
-  "subdomain": "tenant1"                               // ✅ Backward compatibility
+  "tenant_memberships": [
+      {
+        "tenant_id": "s1",
+        "roles": ["ADMIN"]
+      }
+    ],
+  "global_roles"["SUPER_ADMIN"],                            // ✅
 }
 ```
-
-**Purpose:**
-
-- `tenant_memberships` - **Key field** for session-based validation (no DB hit)
-- `roles` - Global roles (SUPER_ADMIN, ADMIN)
-- `tenant_id`, `subdomain` - Backward compatibility with old code
 
 **Updated by:**
 
@@ -137,7 +133,6 @@ await membershipService.AddUserToTenant(userID, tenantID, "USER", "system");
 
 // 5. Backend updates metadata_public
 await membershipService.updateKratosTenantMemberships(userID);
-// Sets: tenant_memberships = ["tenant-123"]
 ```
 
 ### Session Validation (No DB Hit)
@@ -159,7 +154,6 @@ await membershipService.AcceptTenantInvitation(userID, "tenant-456");
 
 // Updates metadata_public
 await membershipService.updateKratosTenantMemberships(userID);
-// Sets: tenant_memberships = ["tenant-123", "tenant-456"]
 
 // Next login: session includes both tenants
 // User can access both tenant1 and tenant2 ✅
@@ -171,10 +165,8 @@ await membershipService.updateKratosTenantMemberships(userID);
 | -------------------- | --------------- | ---------------------------- | ---------------------------- |
 | `email`              | traits          | Login identifier             | User (registration)          |
 | `name`               | traits          | Display name                 | User (registration/settings) |
-| `subdomain`          | traits          | Tenant assignment hint       | User (registration)          |
 | `tenant_memberships` | metadata_public | **Session-based validation** | Backend (membership service) |
-| `roles`              | metadata_public | Global roles (SUPER_ADMIN)   | Backend (admin)              |
-| `tenant_id`          | metadata_public | Backward compatibility       | Backend (legacy)             |
+| `global_roles`       | metadata_public | Global roles (SUPER_ADMIN)   | Backend (admin)              |
 
 ## Migration from Old Schema
 
@@ -196,25 +188,6 @@ await kratosClient.UpdateIdentity(userID, {
   },
   metadata_public: {
     roles: roles, // ✅ Move here
-  },
-});
-```
-
-### If Using Schema 2 (no tenant support)
-
-**Problem:** Missing tenant fields
-
-**Fix:**
-
-```typescript
-// Add tenant memberships to existing identities
-const memberships = await db.GetUserTenantMemberships(userID);
-const tenantIDs = memberships.map((m) => m.tenant_id);
-
-await kratosClient.UpdateIdentity(userID, {
-  metadata_public: {
-    ...identity.metadata_public,
-    tenant_memberships: tenantIDs, // ✅ Add
   },
 });
 ```
