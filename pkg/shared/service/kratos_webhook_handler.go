@@ -30,7 +30,6 @@ type KratosWebhookPayload struct {
 type KratosWebhookHandler struct {
 	tenantService      *KratosTenantService
 	authProvider       auth.AuthProvider
-	membershipService  *UserTenantMembershipService
 	multitenantService *MultitenantService
 }
 
@@ -38,13 +37,11 @@ type KratosWebhookHandler struct {
 func NewKratosWebhookHandler(
 	tenantService *KratosTenantService,
 	authProvider auth.AuthProvider,
-	membershipService *UserTenantMembershipService,
 	multitenantService *MultitenantService,
 ) *KratosWebhookHandler {
 	return &KratosWebhookHandler{
 		tenantService:      tenantService,
 		authProvider:       authProvider,
-		membershipService:  membershipService,
 		multitenantService: multitenantService,
 	}
 }
@@ -77,13 +74,7 @@ func (kwh *KratosWebhookHandler) HandleRegistrationWebhook(c *gin.Context) {
 				Msg("Failed to get tenant ID from subdomain")
 		} else {
 			// Create membership entry with default USER role
-			err = kwh.membershipService.AddUserToTenant(
-				c.Request.Context(),
-				payload.Identity.ID,
-				tenantID,
-				[]string{"USER"}, // Default role as array
-				"system",         // System-initiated during registration
-			)
+			log.Error().Msg("REGISTRATION CALLBACK NOT IMPLEMENTED")
 
 			if err != nil {
 				log.Error().

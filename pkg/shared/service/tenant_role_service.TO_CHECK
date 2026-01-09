@@ -1,0 +1,138 @@
+package service
+
+import (
+	"fmt"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
+)
+
+// TenantRoleService handles tenant-specific role operations
+type TenantRoleService struct {
+	membershipService *UserTenantMembershipService
+}
+
+// NewTenantRoleService creates a new ten	ant role service
+func NewTenantRoleService(membershipService *UserTenantMembershipService) *TenantRoleService {
+	return &TenantRoleService{
+		membershipService: membershipService,
+	}
+}
+
+// RequireTenantRole middleware that requires a specific tenant role
+func (s *TenantRoleService) RequireTenantRole(requiredRole TenantRole) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !HasTenantRole(c, requiredRole) {
+			roles, _ := GetUserTenantRoles(c)
+			log.Warn().
+				Str("user_id", c.GetString("user_id")).
+				Str("tenant_id", c.GetString("tenant_id")).
+				Strs("current_roles", roles).
+				Str("required_role", string(requiredRole)).
+				Msg("Insufficient tenant role")
+
+			c.JSON(403, gin.H{
+				"status":  403,
+				"message": fmt.Sprintf("Requires %s role", requiredRole),
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RequireAnyTenantRole middleware that requires any of the specified roles
+func (s *TenantRoleService) RequireAnyTenantRole(requiredRoles ...TenantRole) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !HasAnyTenantRole(c, requiredRoles...) {
+			roles, _ := GetUserTenantRoles(c)
+			log.Warn().
+				Str("user_id", c.GetString("user_id")).
+				Str("tenant_id", c.GetString("tenant_id")).
+				Strs("current_roles", roles).
+				Msg("Insufficient tenant role")
+
+			c.JSON(403, gin.H{
+				"status":  403,
+				"message": "Insufficient permissions",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RequireMinimumTenantRole middleware that requires at least a certain role level
+func (s *TenantRoleService) RequireMinimumTenantRole(minimumRole TenantRole) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !HasMinimumTenantRole(c, minimumRole) {
+			roles, _ := GetUserTenantRoles(c)
+			log.Warn().
+				Str("user_id", c.GetString("user_id")).
+				Str("tenant_id", c.GetString("tenant_id")).
+				Strs("current_roles", roles).
+				Str("minimum_role", string(minimumRole)).
+				Msg("Insufficient tenant role level")
+
+			c.JSON(403, gin.H{
+				"status":  403,
+				"message": fmt.Sprintf("Requires at least %s role", minimumRole),
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// LoadTenantRolesMiddleware loads the user's tenant roles into the context
+// This should run after tenant validation middleware
+// NOTE: Not needed if using KratosTenantMiddleware with membershipService
+func (s *TenantRoleService) LoadTenantRolesMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetString("user_id")
+		tenantID := c.GetString("tenant_id")
+
+		if userID == "" || tenantID == "" {
+			log.Debug().Msg("Skipping tenant roles loading - no user or tenant in context")
+			c.Next()
+			return
+		}
+
+		// Check if user is SUPER_ADMIN (global role)
+		if IsSuperAdmin(c) {
+			// SUPER_ADMIN gets ADMIN role in all tenants
+			c.Set(CONTEXT_KEY_TENANT_ROLES, []string{string(TenantRoleAdmin)})
+			log.Debug().
+				Str("user_id", userID).
+				Str("tenant_id", tenantID).
+				Msg("SUPER_ADMIN granted ADMIN role in tenant")
+			c.Next()
+			return
+		}
+
+		// Get user's roles in this tenant from database
+		roles, err := s.membershipService.GetUserTenantRoles(c.Request.Context(), userID, tenantID)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Str("user_id", userID).
+				Str("tenant_id", tenantID).
+				Msg("Failed to get user tenant roles")
+
+			// Default to USER role if we can't determine
+			c.Set(CONTEXT_KEY_TENANT_ROLES, []string{string(TenantRoleUser)})
+		} else {
+			c.Set(CONTEXT_KEY_TENANT_ROLES, roles)
+			log.Debug().
+				Str("user_id", userID).
+				Str("tenant_id", tenantID).
+				Strs("roles", roles).
+				Msg("Tenant roles loaded into context")
+		}
+
+		c.Next()
+	}
+}

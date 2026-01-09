@@ -36,11 +36,6 @@
           "title": "Full Name",
           "minLength": 1,
           "maxLength": 100
-        },
-        "subdomain": {
-          "type": "string",
-          "title": "Tenant Subdomain",
-          "description": "Subdomain for tenant assignment during registration"
         }
       },
       "required": [

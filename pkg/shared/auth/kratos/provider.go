@@ -15,8 +15,10 @@ import (
 )
 
 // Global roles stored in Kratos metadata_public
-// Tenant-specific roles (CUSTOMER_ADMIN, ADMIN, USER) are stored in core_user_tenant_memberships table
 var globalRoles = []string{"SUPER_ADMIN"}
+
+// Tenant-specific roles (CUSTOMER_ADMIN, ADMIN, USER) are stored in core_user_tenant_memberships table
+var tenantRoles = []string{"CUSTOMER_ADMIN", "ADMIN", "USER"}
 
 func init() {
 	auth.RegisterProvider(auth.ProviderTypeKratos, func(ctx context.Context, config auth.ProviderConfig) (auth.AuthProvider, error) {
@@ -309,27 +311,56 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 		traits = make(map[string]interface{})
 	}
 
-	// Get or create metadata_public
+	// 1. Prepare Metadata containers
 	metadataPublic, ok := existing.MetadataPublic.(map[string]interface{})
 	if !ok {
 		metadataPublic = make(map[string]interface{})
 	}
 
-	// Process ONLY global roles (SUPER_ADMIN)
-	// Tenant-specific roles (CUSTOMER_ADMIN, ADMIN, USER) should be managed via core_user_tenant_memberships table
-	var globalRolesToSet []string
-	for _, roleName := range globalRoles {
-		if val, exists := customClaims[roleName]; exists {
-			// If the claim is present and true, add it
-			if boolVal, ok := val.(bool); ok && boolVal {
-				globalRolesToSet = append(globalRolesToSet, roleName)
+	// Ensure tenant_memberships exists in metadata
+	rawMemberships, ok := metadataPublic["tenant_memberships"].([]interface{})
+	if !ok {
+		rawMemberships = []interface{}{}
+	}
+
+	// 2. Process the input slice
+	for _, c := range customClaims {
+		// Assert that 'c' is a map so we can index it
+		claimMap, ok := c.(map[string]interface{})
+		if !ok {
+			// Skip if the element isn't actually a map
+			continue
+		}
+
+		// Now you can safely index 'claimMap'
+		if val, exists := claimMap["global_roles"]; exists {
+			metadataPublic["global_roles"] = val
+		}
+
+		if val, exists := claimMap["tenant_membership"]; exists {
+			newMembership, ok := val.(map[string]interface{})
+			if !ok {
+				continue
 			}
+
+			newTenantID := newMembership["tenant_id"].(string)
+
+			// Filter out the existing membership for this specific tenant_id (Replace logic)
+			updatedMemberships := []interface{}{}
+			for _, m := range rawMemberships {
+				mMap, isMap := m.(map[string]interface{})
+				if isMap && mMap["tenant_id"] != newTenantID {
+					updatedMemberships = append(updatedMemberships, m)
+				}
+			}
+			// Add the new membership
+			updatedMemberships = append(updatedMemberships, newMembership)
+			rawMemberships = updatedMemberships
 		}
 	}
 
-	// Update the "global_roles" key in metadata_public
-	// This only stores SUPER_ADMIN and other global system roles
-	metadataPublic["global_roles"] = globalRolesToSet
+	// 3. Save back to metadata
+	metadataPublic["tenant_memberships"] = rawMemberships
 
 	state := ""
 	if existing.State != nil {
@@ -460,9 +491,6 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*
 			// For backward compatibility, also set tenant_id and subdomain
 			if tenantID, ok := metadataPublic["tenant_id"].(string); ok {
 				claims["tenant_id"] = tenantID
-			}
-			if subdomain, ok := metadataPublic["subdomain"].(string); ok {
-				claims["subdomain"] = subdomain
 			}
 
 			// Extract global roles and flatten them as boolean claims for backward compatibility

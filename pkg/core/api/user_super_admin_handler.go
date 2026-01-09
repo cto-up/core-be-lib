@@ -62,7 +62,7 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 		return
 	}
 
-	user, err := uh.userService.AddUser(c, baseAuthClient, tenant.TenantID, req, nil)
+	user, err := uh.userService.CreateUser(c, baseAuthClient, tenant.TenantID, req, nil)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to add user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -156,12 +156,15 @@ func (uh *UserSuperAdminHandler) RemoveUserFromTenantFromSuperAdmin(c *gin.Conte
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(errors.New("user not found in this tenant")))
 		return
 	}
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
 
 	// Remove user from tenant (delete membership)
-	err = uh.store.RemoveUserFromTenant(c, repository.RemoveUserFromTenantParams{
-		UserID:   userid,
-		TenantID: tenant.TenantID,
-	})
+	err = uh.userService.DeleteUser(c, baseAuthClient, tenant.TenantID, userid)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to remove user from tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -180,14 +183,7 @@ func (uh *UserSuperAdminHandler) GetUserByIDFromSuperAdmin(c *gin.Context, tenan
 		return
 	}
 
-	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for tenant")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-
-	user, err := uh.userService.GetUserByID(c, baseAuthClient, id)
+	user, err := uh.userService.GetUserByTenantIDByID(c, tenant.TenantID, id)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get user by ID")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -454,7 +450,7 @@ func (uh *UserSuperAdminHandler) AddUserMembershipFromSuperAdmin(c *gin.Context,
 	}
 
 	// Get updated user info
-	user, err := uh.userService.GetUserByID(c, baseAuthClient, userid)
+	user, err := uh.userService.GetUserByTenantIDByID(c, tenant.TenantID, userid)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get user after adding membership")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))

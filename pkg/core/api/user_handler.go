@@ -102,12 +102,12 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, "Not Authenticated")
 		return
 	}
-	user, err := s.store.GetUserByID(ctx, authUserID.(string))
+	user, err := s.userService.GetUserByTenantIDByID(ctx, tenantID, authUserID.(string))
 
 	if err != nil {
 		if err.Error() == pgx.ErrNoRows.Error() {
 			// user does not exist yet create it
-			user, err := s.userService.CreateUserInDatabase(ctx, tenantID, authUserID.(string))
+			user, err := s.userService.InitUserInDatabase(ctx, tenantID, authUserID.(string))
 			if err != nil {
 				ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 				return
@@ -299,7 +299,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		Roles: []core.Role{"USER"},
 	}
 
-	user, err := uh.userService.AddUser(c, baseAuthClient, tenantID.(string), newUser, &req.Password)
+	user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), newUser, &req.Password)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))

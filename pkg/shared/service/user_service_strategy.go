@@ -10,6 +10,7 @@ type UserServiceStrategyFactory struct{}
 
 func (f *UserServiceStrategyFactory) CreateUserServiceStrategy(store *db.Store, authClientPool auth.AuthClientPool) UserService {
 	providerName := authClientPool.GetProviderName()
+
 	switch providerName {
 	case "kratos":
 		return NewSharedUserService(store, authClientPool)

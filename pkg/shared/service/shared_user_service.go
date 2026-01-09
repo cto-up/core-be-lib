@@ -11,34 +11,55 @@ import (
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/rs/zerolog/log"
 
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 )
 
+// UserStrategy defines the interface for user operations
+type UserStrategy interface {
+	CreateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, userRecord *auth.UserRecord, req core.NewUser, password *string) (repository.CoreUser, error)
+	UpdateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, req core.UpdateUserJSONRequestBody) error
+	UpdateSharedProfile(ctx context.Context, store *db.Store, userID string, req subentity.UserProfile) error
+	DeleteUser(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, userId string) error
+	ListUsers(c *gin.Context, store *db.Store, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error)
+	AssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error
+	UnAssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error
+}
+
 type SharedUserService struct {
-	store          *db.Store
+	*BaseUserService
 	authClientPool auth.AuthClientPool
-	onUserCreated  UserCreatedCallback
 }
 
 func NewSharedUserService(store *db.Store, authClientPool auth.AuthClientPool) UserService {
+	baseUserService := NewBaseUserService(store)
 	userService := &SharedUserService{
-		store:          store,
-		authClientPool: authClientPool,
+		BaseUserService: baseUserService,
+		authClientPool:  authClientPool,
 	}
 	return userService
 }
 
-// SetUserCreatedCallback sets an optional callback function that will be called after a user is successfully created.
-func (uh *SharedUserService) SetUserCreatedCallback(callback UserCreatedCallback) {
-	uh.onUserCreated = callback
+func (uh *SharedUserService) getStrategy(tenantID string) UserStrategy {
+	if tenantID == "" {
+		return &GlobalUserStrategy{}
+	}
+	return &TenantUserStrategy{tenantID: tenantID}
 }
 
-// AddUser creates a new user in the auth provider and the database
-func (uh *SharedUserService) AddUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
+// InitUserInDatabase creates a user in the database only
+// Used in case the user already exists in the auth provider
+func (uh *SharedUserService) InitUserInDatabase(ctx context.Context, tenantId string, userID string) (repository.CoreUser, error) {
+	user, err := uh.store.CreateSharedUser(ctx, repository.CreateSharedUserParams{
+		ID: userID,
+	})
+	return user, err
+}
 
+// CreateUser creates a new user in the auth provider and the database
+func (uh *SharedUserService) CreateUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
 	user := repository.CoreUser{}
+
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
 		return user, err
@@ -62,30 +83,12 @@ func (uh *SharedUserService) AddUser(c context.Context, authClient auth.AuthClie
 		return user, err
 	}
 
-	claims := map[string]interface{}{}
-	for _, role := range req.Roles {
-		claims[string(role)] = true
-	}
-	if len(req.Roles) > 0 {
-		err = authClient.SetCustomUserClaims(c, userRecord.UID, claims)
-		if err != nil {
-			return user, err
-		}
-	}
-
-	user, err = qtx.CreateUserByTenant(c,
-		repository.CreateUserByTenantParams{
-			ID:    userRecord.UID,
-			Email: req.Email,
-			Profile: subentity.UserProfile{
-				Name: req.Name,
-			},
-			Roles:    convertToRoles(req.Roles),
-			TenantID: tenantId,
-		})
+	strategy := uh.getStrategy(tenantId)
+	user, err = strategy.CreateUser(c, authClient, qtx, userRecord, req, password)
 	if err != nil {
 		return user, err
 	}
+
 	err = tx.Commit(c)
 	if err != nil {
 		return user, err
@@ -99,15 +102,6 @@ func (uh *SharedUserService) AddUser(c context.Context, authClient auth.AuthClie
 	return user, err
 }
 
-// CreateUserInDatabase creates a user in the database only
-func (uh *SharedUserService) CreateUserInDatabase(ctx context.Context, tenantId string, userID string) (repository.CoreUser, error) {
-	user, err := uh.store.CreateUserByTenant(ctx, repository.CreateUserByTenantParams{
-		ID:       userID,
-		TenantID: tenantId,
-	})
-	return user, err
-}
-
 func (uh *SharedUserService) UpdateUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string, req core.UpdateUserJSONRequestBody) error {
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
@@ -116,34 +110,8 @@ func (uh *SharedUserService) UpdateUser(c *gin.Context, authClient auth.AuthClie
 	defer tx.Rollback(c)
 	qtx := uh.store.Queries.WithTx(tx)
 
-	params := (&auth.UserToUpdate{}).
-		Email(req.Email).
-		EmailVerified(false).
-		DisplayName(req.Name).
-		PhotoURL("/images/avatar-1.jpeg").
-		Disabled(false)
-
-	_, err = authClient.UpdateUser(c, userId, params)
-	if err != nil {
-		return err
-	}
-
-	claims := map[string]interface{}{}
-	for _, role := range req.Roles {
-		claims[string(role)] = true
-	}
-	err = authClient.SetCustomUserClaims(c, userId, claims)
-	if err != nil {
-		return err
-	}
-	// Display Name
-
-	_, err = qtx.UpdateUserByTenant(c, repository.UpdateUserByTenantParams{
-		ID:       userId,
-		Roles:    convertToRoles(req.Roles),
-		Name:     req.Name,
-		TenantID: tenantId,
-	})
+	strategy := uh.getStrategy(tenantId)
+	err = strategy.UpdateUser(c, authClient, qtx, req)
 	if err != nil {
 		return err
 	}
@@ -153,41 +121,25 @@ func (uh *SharedUserService) UpdateUser(c *gin.Context, authClient auth.AuthClie
 	return err
 }
 
-// CreateUserInDatabase creates a user in the database only
 func (uh *SharedUserService) UpdateUserProfileInDatabase(ctx context.Context, tenantId string, userID string, req subentity.UserProfile) error {
-	_, err := uh.store.UpdateProfileByTenant(ctx, repository.UpdateProfileByTenantParams{
-		ID:       userID,
-		Profile:  req,
-		TenantID: tenantId,
-	})
+	strategy := uh.getStrategy(tenantId)
+	err := strategy.UpdateSharedProfile(ctx, uh.store, userID, req)
 	return err
 }
 
 func (uh *SharedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error {
+	strategy := uh.getStrategy(tenantId)
+
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
 		return err
 	}
-
 	defer tx.Rollback(c)
 	qtx := uh.store.Queries.WithTx(tx)
 
-	_, err = qtx.DeleteUserByTenant(c, repository.DeleteUserByTenantParams{
-		ID:       userId,
-		TenantID: tenantId,
-	})
+	err = strategy.DeleteUser(qtx, c, authClient, userId)
 	if err != nil {
 		return err
-	}
-
-	err = authClient.DeleteUser(c, userId)
-
-	if err != nil {
-		if auth.IsUserNotFound(err) {
-			log.Error().Err(err).Msgf("User does not exist: %v", userId)
-		} else {
-			return err
-		}
 	}
 
 	err = tx.Commit(c)
@@ -195,19 +147,21 @@ func (uh *SharedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClie
 	return err
 }
 
-func (uh *SharedUserService) GetUserByID(c *gin.Context, authClient auth.AuthClient, id string) (FullUser, error) {
+func (uh *SharedUserService) GetFullUserByID(c *gin.Context, authClient auth.AuthClient, tenantID string, id string) (FullUser, error) {
 	fullUser := FullUser{}
-	dbUser, err := uh.store.GetUserByID(c, id)
+	coreUser, err := uh.store.GetSharedUserByTenantByID(c, repository.GetSharedUserByTenantByIDParams{
+		TenantID: tenantID,
+		ID:       id,
+	})
 	if err != nil {
 		return fullUser, err
 	}
-
 	user := core.User{
-		Id:        dbUser.ID,
-		Name:      dbUser.Profile.Name,
-		Email:     dbUser.Email.String,
-		Roles:     convertToRoleDTOs(dbUser.Roles),
-		CreatedAt: &dbUser.CreatedAt,
+		Id:        coreUser.ID,
+		Name:      coreUser.Profile.Name,
+		Email:     coreUser.Email.String,
+		Roles:     convertToRoleDTOs(coreUser.Roles),
+		CreatedAt: &coreUser.CreatedAt,
 	}
 
 	userAuth, err := authClient.GetUser(c, id)
@@ -224,7 +178,7 @@ func (uh *SharedUserService) GetUserByID(c *gin.Context, authClient auth.AuthCli
 
 func (uh *SharedUserService) GetUserByEmail(c *gin.Context, tenantId string, email string) (core.User, error) {
 	fullUser := core.User{}
-	dbUser, err := uh.store.GetUserByTenantByEmail(c, repository.GetUserByTenantByEmailParams{
+	dbUser, err := uh.store.GetSharedUserByTenantByEmail(c, repository.GetSharedUserByTenantByEmailParams{
 		Email:    email,
 		TenantID: tenantId,
 	})
@@ -243,48 +197,12 @@ func (uh *SharedUserService) GetUserByEmail(c *gin.Context, tenantId string, ema
 }
 
 func (uh *SharedUserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
-	// Query via user_tenant_memberships table
-	memberships, err := uh.store.ListUsersWithMemberships(c, repository.ListUsersWithMembershipsParams{
-		TenantID: tenantId,
-		Limit:    pagingSql.PageSize,
-		Offset:   pagingSql.Offset,
-		Like:     like,
-	})
-
-	if err != nil {
-		return []core.User{}, err
-	}
-
-	// Convert memberships to users
-	users := make([]core.User, len(memberships))
-	for j, membership := range memberships {
-		user := core.User{
-			Id:        membership.ID,
-			Name:      membership.Profile.Name,
-			Email:     membership.Email.String,
-			Roles:     convertToRoleDTOs(membership.Roles),
-			CreatedAt: &membership.CreatedAt,
-		}
-		users[j] = user
-	}
-
-	return users, nil
+	strategy := uh.getStrategy(tenantId)
+	return strategy.ListUsers(c, uh.store, pagingSql, like)
 }
 
 func (uh *SharedUserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
-	if !IsAdmin(c) || !IsSuperAdmin(c) {
-		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
-	}
-	if role == "CUSTOMER_ADMIN" && (!IsCustomerAdmin(c) && !IsSuperAdmin(c) && !IsAdmin(c)) {
-		return errors.New("must be at a CUSTOMER_ADMIN or SUPER_ADMIN or ADMIN to perform such operation")
-	}
-	if role == "ADMIN" && (!IsSuperAdmin(c) && !IsAdmin(c)) {
-		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
-	}
-	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
-		return errors.New("must be an SUPER_ADMIN to perform such operation")
-	}
-
+	strategy := uh.getStrategy(tenantId)
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
 		return err
@@ -292,30 +210,7 @@ func (uh *SharedUserService) AssignRole(c *gin.Context, authClient auth.AuthClie
 	defer tx.Rollback(c)
 	qtx := uh.store.Queries.WithTx(tx)
 
-	_, err = qtx.AssignRoleWithRowsAffected(c, repository.AssignRoleWithRowsAffectedParams{
-		UserID:   userID,
-		RoleName: string(role),
-		TenantID: tenantId,
-	})
-	if err != nil {
-		return err
-	}
-
-	// Lookup the user associated with the specified uid.
-	user, err := authClient.GetUser(c, userID)
-	if err != nil {
-		return err
-	}
-
-	var claims map[string]interface{}
-	if user.CustomClaims == nil {
-		claims = map[string]interface{}{}
-	} else {
-		claims = user.CustomClaims
-	}
-
-	claims[string(role)] = true
-	err = authClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
+	err = strategy.AssignRole(qtx, c, authClient, tenantId, userID, role)
 	if err != nil {
 		return err
 	}
@@ -328,20 +223,6 @@ func (uh *SharedUserService) AssignRole(c *gin.Context, authClient auth.AuthClie
 }
 
 func (uh *SharedUserService) UnassignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
-	if !IsAdmin(c) && !IsSuperAdmin(c) && !IsCustomerAdmin(c) {
-		return errors.New("must be an CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN to perform such operation")
-	}
-	if role == "ADMIN" && (!IsAdmin(c) || !IsSuperAdmin(c)) {
-		return errors.New("must be an CUSTOMER_ADMIN to perform such operation")
-	}
-
-	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
-		return errors.New("must be an SUPER_ADMIN to perform such operation")
-	}
-	tenant_id, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
-	if !exists {
-		return errors.New("user email not found in context")
-	}
 
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
@@ -350,24 +231,8 @@ func (uh *SharedUserService) UnassignRole(c *gin.Context, authClient auth.AuthCl
 	defer tx.Rollback(c)
 	qtx := uh.store.Queries.WithTx(tx)
 
-	_, err = qtx.UnassignRoleWithRowsAffected(c, repository.UnassignRoleWithRowsAffectedParams{
-		UserID:   userID,
-		RoleName: string(role),
-		TenantID: tenant_id.(string),
-	})
-	if err != nil {
-		return err
-	}
-
-	// Lookup the user associated with the specified uid.
-	user, err := authClient.GetUser(c, userID)
-	if err != nil {
-		return err
-	}
-
-	claims := user.CustomClaims
-	claims[string(role)] = false
-	err = authClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
+	strategy := uh.getStrategy(tenantId)
+	err = strategy.UnAssignRole(qtx, c, authClient, tenantId, userID, role)
 	if err != nil {
 		return err
 	}
@@ -391,32 +256,22 @@ func (uh *SharedUserService) UpdateUserStatus(c *gin.Context, authClient auth.Au
 	return err
 }
 
-// GetUserByEmailGlobal gets a user by email across all tenants
-func (uh *SharedUserService) GetUserByEmailGlobal(c context.Context, email string) (*core.User, error) {
-	userRow, err := uh.store.GetUserByEmailGlobal(c, email)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to core.User
-	user := &core.User{
-		Id:    userRow.ID,
-		Email: userRow.Email.String,
-		Profile: &core.UserProfileSchema{
-			Name: userRow.Profile.Name,
-		},
-		CreatedAt: &userRow.CreatedAt,
-	}
-
-	return user, nil
-}
-
 // AddUserToTenant adds an existing user to a tenant (creates membership)
 func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role) error {
 	// Check if user exists
 	_, err := authClient.GetUser(c, userID)
 	if err != nil {
 		return errors.New("user not found in auth provider")
+	}
+	claims := map[string]interface{}{}
+	// For tenant-scoped users, add tenant_memberships to metadata_public which includes tenant_id and assigned roles
+	claims["tenant_memberships"] = map[string]interface{}{
+		"tenant_id": tenantID,
+		"roles":     roles,
+	}
+	err = authClient.SetCustomUserClaims(c, userID, claims)
+	if err != nil {
+		return err
 	}
 
 	// Convert roles to string array
@@ -426,42 +281,15 @@ func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.
 	}
 
 	// Create membership
-	_, err = uh.store.CreateUserTenantMembership(c, repository.CreateUserTenantMembershipParams{
-		UserID:   userID,
-		TenantID: tenantID,
-		Roles:    roleStrings,
-		Status:   "active",
+	_, err = uh.store.AddSharedUserToTenant(c, repository.AddSharedUserToTenantParams{
+		UserID:      userID,
+		TenantID:    tenantID,
+		TenantRoles: roleStrings,
+		Status:      "active",
 	})
 	if err != nil {
 		return err
 	}
 
-	// Create user record in core_users for this tenant if it doesn't exist
-	_, err = uh.store.GetUserByID(c, userID)
-	if err != nil {
-		// User doesn't exist for this tenant, create it
-		// Get user info from auth provider
-		authUser, err := authClient.GetUser(c, userID)
-		if err != nil {
-			return err
-		}
-
-		profile := subentity.UserProfile{}
-		if authUser.DisplayName != "" {
-			profile.Name = authUser.DisplayName
-		}
-
-		_, err = uh.store.CreateUserByTenant(c, repository.CreateUserByTenantParams{
-			ID:       userID,
-			Email:    authUser.Email,
-			Profile:  profile,
-			Roles:    roleStrings,
-			TenantID: tenantID,
-		})
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to create user record for tenant")
-			// Don't fail the whole operation if this fails
-		}
-	}
 	return nil
 }
