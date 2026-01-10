@@ -43,7 +43,7 @@ type UserService interface {
 	UpdateUserStatus(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, requestName string, requestValue bool) error
 
 	// Membership (Crucial for the Multi-Tenant implementation)
-	AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role) error
+	AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role, invitedBy string) error
 }
 
 type BaseUserService struct {
@@ -55,27 +55,6 @@ func NewBaseUserService(store *db.Store) *BaseUserService {
 	return &BaseUserService{
 		store: store,
 	}
-}
-
-func (uh *BaseUserService) GetUserByTenantIDByID(c *gin.Context, tenantID string, id string) (core.User, error) {
-
-	dbUser, err := uh.store.GetUserByTenantByID(c, repository.GetUserByTenantByIDParams{
-		TenantID: tenantID,
-		ID:       id,
-	})
-	if err != nil {
-		return core.User{}, err
-	}
-
-	user := core.User{
-		Id:        dbUser.ID,
-		Name:      dbUser.Profile.Name,
-		Email:     dbUser.Email.String,
-		Roles:     convertToRoleDTOs(dbUser.Roles),
-		CreatedAt: &dbUser.CreatedAt,
-	}
-
-	return user, err
 }
 
 func (uh *BaseUserService) XGetUserByID(c *gin.Context, id string) (core.User, error) {

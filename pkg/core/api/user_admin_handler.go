@@ -587,6 +587,12 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 		return
 	}
 
+	byUserID, exists := c.Get(auth.AUTH_USER_ID)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("ByUserID not found"))
+		return
+	}
+
 	var req core.AddUserMembershipJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
@@ -630,7 +636,7 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 	}
 
 	// Add user to tenant (create membership)
-	err = uh.userService.AddUserToTenant(c, baseAuthClient, tenantID.(string), userid, req.Roles)
+	err = uh.userService.AddUserToTenant(c, baseAuthClient, tenantID.(string), userid, req.Roles, byUserID.(string))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to add user to tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))

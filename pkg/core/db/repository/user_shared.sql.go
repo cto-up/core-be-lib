@@ -65,6 +65,14 @@ INSERT INTO core_user_tenant_memberships (
     $6,
     NOW()
 )
+ON CONFLICT (user_id, tenant_id) 
+DO UPDATE SET
+    status = EXCLUDED.status,
+    roles = EXCLUDED.roles,
+    invited_by = COALESCE(core_user_tenant_memberships.invited_by, EXCLUDED.invited_by),
+    invited_at = COALESCE(core_user_tenant_memberships.invited_at, EXCLUDED.invited_at),
+    joined_at = NOW(),
+    updated_at = NOW()
 RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
 `
 
@@ -77,7 +85,7 @@ type AddSharedUserToTenantParams struct {
 	InvitedAt   pgtype.Timestamptz `json:"invited_at"`
 }
 
-// Add an existing user to a tenant
+// Add an existing user to a tenant (insert or reactivate if soft-deleted)
 func (q *Queries) AddSharedUserToTenant(ctx context.Context, arg AddSharedUserToTenantParams) (CoreUserTenantMembership, error) {
 	row := q.db.QueryRow(ctx, addSharedUserToTenant,
 		arg.UserID,
@@ -210,14 +218,26 @@ new_membership AS (
         tenant_id, 
         roles,
         status,
+        invited_by,
+        invited_at,
         joined_at
     ) VALUES (
         $1,
         $4,
         $5::TEXT[],
         'active',
+        $6,
+        $7,
         NOW()
     )
+    ON CONFLICT (user_id, tenant_id) 
+    DO UPDATE SET
+        status = 'active',
+        roles = EXCLUDED.roles,
+        invited_by = COALESCE(core_user_tenant_memberships.invited_by, EXCLUDED.invited_by),
+        invited_at = COALESCE(core_user_tenant_memberships.invited_at, EXCLUDED.invited_at),
+        joined_at = NOW(),
+        updated_at = NOW()
     RETURNING roles as tenant_roles, status as membership_status, joined_at, tenant_id
 )
 SELECT 
@@ -236,6 +256,8 @@ type CreateSharedUserByTenantParams struct {
 	Email       string                `json:"email"`
 	TenantID    string                `json:"tenant_id"`
 	TenantRoles []string              `json:"tenant_roles"`
+	InvitedBy   pgtype.Text           `json:"invited_by"`
+	InvitedAt   pgtype.Timestamptz    `json:"invited_at"`
 }
 
 type CreateSharedUserByTenantRow struct {
@@ -259,6 +281,8 @@ func (q *Queries) CreateSharedUserByTenant(ctx context.Context, arg CreateShared
 		arg.Email,
 		arg.TenantID,
 		arg.TenantRoles,
+		arg.InvitedBy,
+		arg.InvitedAt,
 	)
 	var i CreateSharedUserByTenantRow
 	err := row.Scan(
@@ -565,7 +589,7 @@ func (q *Queries) GetUserTenantRoles(ctx context.Context, arg GetUserTenantRoles
 const isUserMemberOfTenant = `-- name: IsUserMemberOfTenant :one
 SELECT EXISTS(
     SELECT 1 FROM core_user_tenant_memberships
-    WHERE user_id = $1 AND tenant_id = $2
+    WHERE user_id = $1 AND tenant_id = $2 AND status = 'active'
 ) as is_member
 `
 
@@ -574,7 +598,7 @@ type IsUserMemberOfTenantParams struct {
 	TenantID string `json:"tenant_id"`
 }
 
-// Check if user is already a member of a specific tenant
+// Check if user is already an active member of a specific tenant
 func (q *Queries) IsUserMemberOfTenant(ctx context.Context, arg IsUserMemberOfTenantParams) (bool, error) {
 	row := q.db.QueryRow(ctx, isUserMemberOfTenant, arg.UserID, arg.TenantID)
 	var is_member bool
