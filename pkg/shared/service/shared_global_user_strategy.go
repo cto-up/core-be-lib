@@ -17,6 +17,10 @@ import (
 // GlobalUserStrategy handles operations for global users
 type GlobalUserStrategy struct{}
 
+func (g *GlobalUserStrategy) Strategy() StrategyType {
+	return StrategyTypeGlobal
+}
+
 func (g *GlobalUserStrategy) CreateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, userRecord *auth.UserRecord, req core.NewUser, password *string) (repository.CoreUser, error) {
 	claims := map[string]interface{}{}
 	for _, role := range req.Roles {
