@@ -10,6 +10,7 @@ import (
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	sharedauth "ctoup.com/coreapp/pkg/shared/auth"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
@@ -411,6 +412,12 @@ func (uh *UserSuperAdminHandler) AddUserMembershipFromSuperAdmin(c *gin.Context,
 		return
 	}
 
+	byUserId, exists := c.Get(auth.AUTH_USER_ID)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("ByUserID not found"))
+		return
+	}
+
 	var req core.AddUserMembershipFromSuperAdminJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Error().Err(err).Msg("Failed to bind JSON")
@@ -442,7 +449,7 @@ func (uh *UserSuperAdminHandler) AddUserMembershipFromSuperAdmin(c *gin.Context,
 	}
 
 	// Add user to tenant (create membership)
-	err = uh.userService.AddUserToTenant(c, baseAuthClient, tenant.TenantID, userid, req.Roles)
+	err = uh.userService.AddUserToTenant(c, baseAuthClient, tenant.TenantID, userid, req.Roles, byUserId.(string))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to add user to tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))

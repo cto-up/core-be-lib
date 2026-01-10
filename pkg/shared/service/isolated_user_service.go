@@ -388,6 +388,27 @@ func (uh *IsolatedUserService) UpdateUserStatus(c *gin.Context, authClient auth.
 }
 
 // AddUserToTenant is not applicable for IsolatedUserService
-func (uh *IsolatedUserService) AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role) error {
+func (uh *IsolatedUserService) AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role, invitedBy string) error {
 	return nil
+}
+
+func (uh *IsolatedUserService) GetUserByTenantIDByID(c *gin.Context, tenantID string, id string) (core.User, error) {
+
+	dbUser, err := uh.store.GetUserByTenantByID(c, repository.GetUserByTenantByIDParams{
+		TenantID: tenantID,
+		ID:       id,
+	})
+	if err != nil {
+		return core.User{}, err
+	}
+
+	user := core.User{
+		Id:        dbUser.ID,
+		Name:      dbUser.Profile.Name,
+		Email:     dbUser.Email.String,
+		Roles:     convertToRoleDTOs(dbUser.Roles),
+		CreatedAt: &dbUser.CreatedAt,
+	}
+
+	return user, err
 }

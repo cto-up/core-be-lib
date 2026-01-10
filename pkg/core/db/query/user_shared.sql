@@ -72,14 +72,26 @@ new_membership AS (
         tenant_id, 
         roles,
         status,
+        invited_by,
+        invited_at,
         joined_at
     ) VALUES (
         $1,
         sqlc.arg(tenant_id),
         sqlc.arg(tenant_roles)::TEXT[],
         'active',
+        sqlc.narg(invited_by),
+        sqlc.narg(invited_at),
         NOW()
     )
+    ON CONFLICT (user_id, tenant_id) 
+    DO UPDATE SET
+        status = 'active',
+        roles = EXCLUDED.roles,
+        invited_by = COALESCE(core_user_tenant_memberships.invited_by, EXCLUDED.invited_by),
+        invited_at = COALESCE(core_user_tenant_memberships.invited_at, EXCLUDED.invited_at),
+        joined_at = NOW(),
+        updated_at = NOW()
     RETURNING roles as tenant_roles, status as membership_status, joined_at, tenant_id
 )
 SELECT 
@@ -175,7 +187,7 @@ WHERE id = $1
 RETURNING id;
 
 -- name: AddSharedUserToTenant :one
--- Add an existing user to a tenant
+-- Add an existing user to a tenant (insert or reactivate if soft-deleted)
 INSERT INTO core_user_tenant_memberships (
     user_id,
     tenant_id,
@@ -193,6 +205,14 @@ INSERT INTO core_user_tenant_memberships (
     sqlc.narg(invited_at),
     NOW()
 )
+ON CONFLICT (user_id, tenant_id) 
+DO UPDATE SET
+    status = EXCLUDED.status,
+    roles = EXCLUDED.roles,
+    invited_by = COALESCE(core_user_tenant_memberships.invited_by, EXCLUDED.invited_by),
+    invited_at = COALESCE(core_user_tenant_memberships.invited_at, EXCLUDED.invited_at),
+    joined_at = NOW(),
+    updated_at = NOW()
 RETURNING *;
 
 -- name: UpdateSharedUserRolesInTenant :one
@@ -354,10 +374,10 @@ WHERE utm.user_id = $1 AND utm.status = 'pending'
 ORDER BY utm.invited_at DESC;
 
 -- name: IsUserMemberOfTenant :one
--- Check if user is already a member of a specific tenant
+-- Check if user is already an active member of a specific tenant
 SELECT EXISTS(
     SELECT 1 FROM core_user_tenant_memberships
-    WHERE user_id = $1 AND tenant_id = $2
+    WHERE user_id = $1 AND tenant_id = $2 AND status = 'active'
 ) as is_member;
 
 

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
@@ -257,7 +258,7 @@ func (uh *SharedUserService) UpdateUserStatus(c *gin.Context, authClient auth.Au
 }
 
 // AddUserToTenant adds an existing user to a tenant (creates membership)
-func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role) error {
+func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role, invitedBy string) error {
 	// Check if user exists
 	_, err := authClient.GetUser(c, userID)
 	if err != nil {
@@ -286,10 +287,36 @@ func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.
 		TenantID:    tenantID,
 		TenantRoles: roleStrings,
 		Status:      "active",
+		InvitedBy:   pgtype.Text{String: invitedBy, Valid: invitedBy != ""},
+		InvitedAt: pgtype.Timestamptz{
+			Time:  time.Now(),
+			Valid: true,
+		},
 	})
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (uh *SharedUserService) GetUserByTenantIDByID(c *gin.Context, tenantID string, id string) (core.User, error) {
+
+	dbUser, err := uh.store.GetSharedUserByTenantByID(c, repository.GetSharedUserByTenantByIDParams{
+		TenantID: tenantID,
+		ID:       id,
+	})
+	if err != nil {
+		return core.User{}, err
+	}
+
+	user := core.User{
+		Id:        dbUser.ID,
+		Name:      dbUser.Profile.Name,
+		Email:     dbUser.Email.String,
+		Roles:     convertToRoleDTOs(dbUser.Roles),
+		CreatedAt: &dbUser.CreatedAt,
+	}
+
+	return user, err
 }
