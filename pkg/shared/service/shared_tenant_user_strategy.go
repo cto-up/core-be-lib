@@ -18,6 +18,10 @@ type TenantUserStrategy struct {
 	tenantID string
 }
 
+func (g *TenantUserStrategy) Strategy() StrategyType {
+	return StrategyTypeTenant
+}
+
 func (g *TenantUserStrategy) CreateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, userRecord *auth.UserRecord, req core.NewUser, password *string) (repository.CoreUser, error) {
 	claims := map[string]interface{}{}
 	// For tenant-scoped users, add tenant_memberships to metadata_public which includes tenant_id and assigned roles

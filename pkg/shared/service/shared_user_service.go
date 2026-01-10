@@ -16,8 +16,16 @@ import (
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 )
 
+type StrategyType string
+
+const (
+	StrategyTypeGlobal StrategyType = "GLOBAL"
+	StrategyTypeTenant StrategyType = "TENANT"
+)
+
 // UserStrategy defines the interface for user operations
 type UserStrategy interface {
+	Strategy() StrategyType
 	CreateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, userRecord *auth.UserRecord, req core.NewUser, password *string) (repository.CoreUser, error)
 	UpdateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, req core.UpdateUserJSONRequestBody) error
 	UpdateSharedProfile(ctx context.Context, store *db.Store, userID string, req subentity.UserProfile) error
@@ -157,11 +165,20 @@ func (uh *SharedUserService) GetFullUserByID(c *gin.Context, authClient auth.Aut
 	if err != nil {
 		return fullUser, err
 	}
+
+	var roles []core.Role
+	strategy := uh.getStrategy(tenantID)
+	if strategy.Strategy() == StrategyTypeGlobal {
+		roles = convertToRoleDTOs(coreUser.Roles)
+	} else {
+		roles = convertToRoleDTOs(coreUser.TenantRoles)
+	}
+
 	user := core.User{
 		Id:        coreUser.ID,
 		Name:      coreUser.Profile.Name,
 		Email:     coreUser.Email.String,
-		Roles:     convertToRoleDTOs(coreUser.Roles),
+		Roles:     roles,
 		CreatedAt: &coreUser.CreatedAt,
 	}
 
@@ -177,21 +194,28 @@ func (uh *SharedUserService) GetFullUserByID(c *gin.Context, authClient auth.Aut
 	}, nil
 }
 
-func (uh *SharedUserService) GetUserByEmail(c *gin.Context, tenantId string, email string) (core.User, error) {
+func (uh *SharedUserService) GetUserByEmail(c *gin.Context, tenantID string, email string) (core.User, error) {
 	fullUser := core.User{}
 	dbUser, err := uh.store.GetSharedUserByTenantByEmail(c, repository.GetSharedUserByTenantByEmailParams{
 		Email:    email,
-		TenantID: tenantId,
+		TenantID: tenantID,
 	})
 	if err != nil {
 		return fullUser, err
 	}
 
+	var roles []core.Role
+	strategy := uh.getStrategy(tenantID)
+	if strategy.Strategy() == StrategyTypeGlobal {
+		roles = convertToRoleDTOs(dbUser.Roles)
+	} else {
+		roles = convertToRoleDTOs(dbUser.TenantRoles)
+	}
 	user := core.User{
 		Id:        dbUser.ID,
 		Name:      dbUser.Profile.Name,
 		Email:     dbUser.Email.String,
-		Roles:     convertToRoleDTOs(dbUser.Roles),
+		Roles:     roles,
 		CreatedAt: &dbUser.CreatedAt,
 	}
 	return user, nil
@@ -310,11 +334,19 @@ func (uh *SharedUserService) GetUserByTenantIDByID(c *gin.Context, tenantID stri
 		return core.User{}, err
 	}
 
+	var roles []core.Role
+	strategy := uh.getStrategy(tenantID)
+	if strategy.Strategy() == StrategyTypeGlobal {
+		roles = convertToRoleDTOs(dbUser.Roles)
+	} else {
+		roles = convertToRoleDTOs(dbUser.TenantRoles)
+	}
+
 	user := core.User{
 		Id:        dbUser.ID,
 		Name:      dbUser.Profile.Name,
 		Email:     dbUser.Email.String,
-		Roles:     convertToRoleDTOs(dbUser.Roles),
+		Roles:     roles,
 		CreatedAt: &dbUser.CreatedAt,
 	}
 
