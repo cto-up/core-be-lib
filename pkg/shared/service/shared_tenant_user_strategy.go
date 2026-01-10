@@ -133,7 +133,7 @@ func (g *TenantUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSq
 			Id:        membership.ID,
 			Name:      membership.Profile.Name,
 			Email:     membership.Email.String,
-			Roles:     convertToRoleDTOs(membership.Roles),
+			Roles:     convertToRoleDTOs(membership.TenantRoles),
 			CreatedAt: &membership.CreatedAt,
 		}
 		users[j] = user
