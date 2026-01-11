@@ -323,39 +323,30 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 		rawMemberships = []interface{}{}
 	}
 
-	// 2. Process the input slice
-	for _, c := range customClaims {
-		// Assert that 'c' is a map so we can index it
-		claimMap, ok := c.(map[string]interface{})
-		if !ok {
-			// Skip if the element isn't actually a map
-			continue
-		}
+	// 2. Process the customClaims map directly
+	// Handle global_roles
+	if globalRoles, exists := customClaims["global_roles"]; exists {
+		metadataPublic["global_roles"] = globalRoles
+	}
 
-		// Now you can safely index 'claimMap'
-		if val, exists := claimMap["global_roles"]; exists {
-			metadataPublic["global_roles"] = val
-		}
-
-		if val, exists := claimMap["tenant_membership"]; exists {
-			newMembership, ok := val.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			newTenantID := newMembership["tenant_id"].(string)
-
-			// Filter out the existing membership for this specific tenant_id (Replace logic)
-			updatedMemberships := []interface{}{}
-			for _, m := range rawMemberships {
-				mMap, isMap := m.(map[string]interface{})
-				if isMap && mMap["tenant_id"] != newTenantID {
-					updatedMemberships = append(updatedMemberships, m)
+	// Handle tenant_memberships (single membership passed as map)
+	if tenantMembership, exists := customClaims["tenant_memberships"]; exists {
+		newMembership, ok := tenantMembership.(map[string]interface{})
+		if ok {
+			newTenantID, hasTenantID := newMembership["tenant_id"].(string)
+			if hasTenantID {
+				// Filter out the existing membership for this specific tenant_id (Replace logic)
+				updatedMemberships := []interface{}{}
+				for _, m := range rawMemberships {
+					mMap, isMap := m.(map[string]interface{})
+					if isMap && mMap["tenant_id"] != newTenantID {
+						updatedMemberships = append(updatedMemberships, m)
+					}
 				}
+				// Add the new membership
+				updatedMemberships = append(updatedMemberships, newMembership)
+				rawMemberships = updatedMemberships
 			}
-			// Add the new membership
-			updatedMemberships = append(updatedMemberships, newMembership)
-			rawMemberships = updatedMemberships
 		}
 	}
 
