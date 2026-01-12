@@ -13,10 +13,7 @@ serve:
         - http://ctoup.localhost:5173
         - http://moncto.localhost:5173
         - http://corpb.ctoup.localhost:5173
-        - http://*.localhost:5173
-        - http://*.moncto.localhost:5173
-        - http://*.ctoup.localhost:5173
-        - http://*.localhost:4455
+        - http://corpc.ctoup.localhost:5173
       allowed_methods:
         - POST
         - GET
@@ -39,18 +36,19 @@ serve:
   admin:
     base_url: http://kratos:4434/
 
-# Don't set cookie domain - let Kratos set it based on the request origin
-# This allows cookies to work with any subdomain (moncto.localhost, ctoup.localhost, etc.)
-# cookies:
-#   domain: localhost
-#   path: /
-#   same_site: Lax
+# For multi-tenancy with subdomains, set cookie domain to parent
+# This allows session sharing across all tenant subdomains
+cookies:
+  domain: .localhost
+  path: /
+  same_site: Lax
 
-# session:
-#   cookie:
-#     domain: localhost
-#     path: /
-#     same_site: Lax
+session:
+  cookie:
+    domain: .localhost
+    path: /
+    same_site: Lax
+    persistent: true
 
 selfservice:
   default_browser_return_url: http://localhost:5173/
@@ -60,13 +58,11 @@ selfservice:
     - http://ctoup.localhost:5173
     - http://moncto.localhost:5173
     - http://corpb.ctoup.localhost:5173
-    - http://*.localhost:5173
-    - http://*.ctoup.localhost:5173
-    - http://*.moncto.localhost:5173
-    - http://*.localhost:19006/Callback
-    - http://*.ctoup.localhost:19006/Callback
-    - exp://*.localhost:8081/--/Callback
-    - exp://*.ctoup.localhost:8081/--/Callback
+    - http://corpc.ctoup.localhost:5173
+    - http://localhost:19006/Callback
+    - http://ctoup.localhost:19006/Callback
+    - exp://localhost:8081/--/Callback
+    - exp://ctoup.localhost:8081/--/Callback
 
   methods:
     password:
