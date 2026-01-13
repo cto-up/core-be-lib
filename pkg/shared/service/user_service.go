@@ -31,7 +31,7 @@ type UserService interface {
 
 	// Retrieval
 	GetFullUserByID(c *gin.Context, authClient auth.AuthClient, tenantID string, id string) (FullUser, error)
-	XGetUserByID(c *gin.Context, id string) (core.User, error)
+	GetUserByID(c *gin.Context, id string) (core.User, error)
 	GetUserByTenantIDByID(c *gin.Context, tenantID string, id string) (core.User, error)
 	GetUserByEmail(c *gin.Context, tenantId string, email string) (core.User, error)
 	ListUsers(c *gin.Context, tenantId string, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error)
@@ -58,7 +58,7 @@ func NewBaseUserService(store *db.Store) *BaseUserService {
 	}
 }
 
-func (uh *BaseUserService) XGetUserByID(c *gin.Context, id string) (core.User, error) {
+func (uh *BaseUserService) GetUserByID(c *gin.Context, id string) (core.User, error) {
 
 	dbUser, err := uh.store.GetSharedUserByID(c, id)
 	if err != nil {
