@@ -286,7 +286,7 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 	}
 
 	// Remove user from tenant (delete membership)
-	err = uh.userService.DeleteUser(c, uh.authProvider.GetAuthClient(), tenantID.(string), userid)
+	err = uh.userService.RemoveUserFromTenant(c, uh.authProvider.GetAuthClient(), tenantID.(string), userid)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to remove user from tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
