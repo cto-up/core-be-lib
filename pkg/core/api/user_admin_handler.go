@@ -3,7 +3,6 @@ package core
 import (
 	"encoding/csv"
 	"io"
-	"slices"
 	"strings"
 	"time"
 
@@ -49,21 +48,6 @@ func NewUserAdminHandler(store *db.Store, authProvider auth.AuthProvider) *UserA
 		userService:  userService}
 	return handler
 }
-func checkAuthorizedRoles(c *gin.Context, roles []core.Role) error {
-	// Check if new user has CUSTOMER_ADMIN role
-	if slices.Contains(roles, "CUSTOMER_ADMIN") && !access.IsCustomerAdmin(c) && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
-		return errors.New("must be an CUSTOMER_ADMIN to assign CUSTOMER_ADMIN role to a user")
-	}
-	// Check if new user has ADMIN role
-	if slices.Contains(roles, "ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
-		return errors.New("must be an ADMIN to assign ADMIN role to a user")
-	}
-	// Check if new user has SUPER_ADMIN role
-	if slices.Contains(roles, "SUPER_ADMIN") && !access.IsSuperAdmin(c) {
-		return errors.New("must be an SUPER_ADMIN to assign SUPER_ADMIN role to a user")
-	}
-	return nil
-}
 
 // AddUser implements openapi.ServerInterface.
 func (uh *UserAdminHandler) AddUser(c *gin.Context) {
@@ -79,7 +63,7 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		return
 	}
 
-	if err := checkAuthorizedRoles(c, req.Roles); err != nil {
+	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
@@ -131,7 +115,7 @@ func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-	if err := checkAuthorizedRoles(c, req.Roles); err != nil {
+	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
@@ -197,20 +181,10 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		}
 	}
 
-	// check if user is deleting another customer admin
-	// Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete CUSTOMER_ADMIN
-	if slices.Contains(user.Roles, "CUSTOMER_ADMIN") && access.HasRightsForRole(c, "CUSTOMER_ADMIN") != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete CUSTOMER_ADMIN. Must be ADMIN or SUPER_ADMIN."})
-		return
-	}
-	// Only ADMIN or SUPER_ADMIN can delete ADMIN
-	if slices.Contains(user.Roles, "ADMIN") && access.HasRightsForRole(c, "ADMIN") != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete ADMIN. Must be SUPER_ADMIN."})
-		return
-	}
-	// Only SUPER_ADMIN can delete SUPER_ADMIN
-	if slices.Contains(user.Roles, "SUPER_ADMIN") && access.HasRightsForRole(c, "SUPER_ADMIN") != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete SUPER_ADMIN. Must be SUPER_ADMIN."})
+	err = access.HasRightsForRoles(c, user.Roles)
+	if err != nil {
+		log.Error().Err(err).Msg("user does not have rights to be deleted")
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
 
@@ -281,21 +255,16 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 		return
 	}
 
-	// Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove CUSTOMER_ADMIN
-	if slices.Contains(roles, "CUSTOMER_ADMIN") && access.HasRightsForRole(c, "CUSTOMER_ADMIN") != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove CUSTOMER_ADMIN from tenant. Must be ADMIN or SUPER_ADMIN."})
-		return
+	result := make([]core.Role, len(roles))
+	for i, r := range roles {
+		result[i] = core.Role(r)
 	}
 
-	// Only ADMIN or SUPER_ADMIN can remove ADMIN
-	if slices.Contains(roles, "ADMIN") && access.HasRightsForRole(c, "ADMIN") != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove ADMIN from tenant. Must be SUPER_ADMIN."})
-		return
-	}
+	err = access.HasRightsForRoles(c, result)
 
-	// Only SUPER_ADMIN can remove SUPER_ADMIN
-	if slices.Contains(roles, "SUPER_ADMIN") && access.HasRightsForRole(c, "SUPER_ADMIN") != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove SUPER_ADMIN from tenant. Must be SUPER_ADMIN."})
+	if err != nil {
+		log.Error().Err(err).Msg("user does not have rights to be removed from tenant")
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
 
@@ -626,7 +595,7 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 	}
 
 	// Check authorization for roles
-	if err := checkAuthorizedRoles(c, req.Roles); err != nil {
+	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}

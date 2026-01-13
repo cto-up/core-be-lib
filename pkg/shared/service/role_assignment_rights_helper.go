@@ -38,6 +38,15 @@ func HasRightsForRole(c *gin.Context, role core.Role) error {
 	return nil
 }
 
+func HasRightsForRoles(c *gin.Context, roles []core.Role) error {
+	for _, role := range roles {
+		if err := HasRightsForRole(c, role); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func IsCustomerAdmin(c *gin.Context) bool {
 	claims, exist := c.Get(auth.AUTH_CLAIMS)
 	if !exist {
