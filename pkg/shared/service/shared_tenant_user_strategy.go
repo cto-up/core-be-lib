@@ -120,7 +120,7 @@ func (g *TenantUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSq
 }
 
 func (g *TenantUserStrategy) AssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
-	err := hasRightsForRole(c, role)
+	err := HasRightsForRole(c, role)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (g *TenantUserStrategy) AssignRole(qtx *repository.Queries, c *gin.Context,
 }
 
 func (g *TenantUserStrategy) UnAssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
-	err := hasRightsForRole(c, role)
+	err := HasRightsForRole(c, role)
 	if err != nil {
 		return err
 	}

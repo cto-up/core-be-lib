@@ -25,7 +25,7 @@ const (
 	TenantRoleUser          TenantRole = "USER"
 )
 
-func hasRightsForRole(c *gin.Context, role core.Role) error {
+func HasRightsForRole(c *gin.Context, role core.Role) error {
 	if role == "CUSTOMER_ADMIN" && (!IsCustomerAdmin(c) && !IsSuperAdmin(c) && !IsAdmin(c)) {
 		return errors.New("must be at a CUSTOMER_ADMIN or SUPER_ADMIN or ADMIN to perform such operation")
 	}
