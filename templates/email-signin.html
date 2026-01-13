@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign in to CTO Up</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css"
+    />
+    <style>
+      .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .logo {
+        max-width: 150px;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="email-container">
+      <div class="box">
+        <h1 class="title is-3">Sign in to CTO Up</h1>
+        <div class="content">
+          <p>
+            You have been identified as a member. Please click the button below to sign in:
+          </p>
+
+          <a href="{{.Link}}" class="button is-primary is-medium">Sign In</a>
+
+          <p class="mt-4">
+            If you're having trouble clicking the button, copy and paste the URL
+            below into your web browser:
+          </p>
+          <p><a href="{{.Link}}">{{.Link}}</a></p>
+        </div>
+      </div>
+
+      <div class="has-text-centered mt-4">
+        <p class="is-size-7">© 2024 CTO Up. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 
 	"ctoup.com/coreapp/pkg/shared/auth"
@@ -465,4 +466,122 @@ func (uh *UserHandler) GetUserByEmail(c *gin.Context, email string) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+// IdentifyUser implements openapi.ServerInterface.
+func (uh *UserHandler) IdentifyUser(c *gin.Context) {
+	if uh.authProvider.GetProviderName() != "kratos" {
+		log.Warn().Str("provider", uh.authProvider.GetProviderName()).Msg("Identify not implemented for this provider")
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Identification processed (not supported for provider)"})
+		return
+	}
+
+	var req core.Identify
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	origin := c.Request.Header.Get("Origin")
+	if origin == "" {
+		// Fallback to Referer if Origin is missing
+		referer := c.Request.Header.Get("Referer")
+		if referer != "" {
+			if u, err := url.Parse(referer); err == nil {
+				origin = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+			}
+		}
+	}
+
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		return
+	}
+
+	tenant, err := uh.store.GetTenantByTenantID(c, tenantID.(string))
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	if !tenant.AllowSignUp {
+		log.Error().Str("tenantID", tenantID.(string)).Msg("Signup not allowed for tenant")
+		// POLA: return 200 as requested
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Signup not allowed"})
+		return
+	}
+
+	subdomain, err := util.GetSubdomain(c)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get subdomain")
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+
+	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Check if user exists globally
+	globalUser, err := uh.userService.GetUserByEmailGlobal(c, string(req.Email))
+	if err != nil {
+		// User doesn't exist
+		log.Info().Str("email", string(req.Email)).Msg("User doesn't exist globally, creating new user")
+
+		newUserReq := core.NewUser{
+			Email: string(req.Email),
+			Name:  string(req.Email), // Default name to email
+			Roles: []core.Role{core.USER},
+		}
+		user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), newUserReq, nil)
+		if err != nil {
+			log.Error().Err(err).Str("email", string(req.Email)).Msg("Failed to create user during identification")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
+
+		// Send magic link
+		err = sendMagicLink(c, baseAuthClient, origin, string(req.Email))
+		if err != nil {
+			log.Error().Err(err).Str("email", string(req.Email)).Msg("Failed to send magic link")
+		}
+		log.Info().Str("email", user.Email.String).Msg("Magic link sent for new user")
+	} else {
+		// User exists globally
+		// Check if member of tenant
+		isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
+			UserID:   globalUser.Id,
+			TenantID: tenantID.(string),
+		})
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to check tenant membership")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
+
+		if !isMember {
+			log.Info().Str("email", string(req.Email)).Str("tenantID", tenantID.(string)).Msg("User exists globally but not a member, adding to tenant")
+			// Add to tenant
+			err = uh.userService.AddUserToTenant(c, baseAuthClient, tenantID.(string), globalUser.Id, []core.Role{core.USER}, "")
+			if err != nil {
+				log.Error().Err(err).Str("email", string(req.Email)).Msg("Failed to add user to tenant during identification")
+				c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+				return
+			}
+		}
+
+		// Send sign-in link
+		log.Info().Str("email", string(req.Email)).Msg("Sending sign-in link to existing user/member")
+		err = sendSigninEmail(c, origin, string(req.Email))
+		if err != nil {
+			log.Error().Err(err).Str("email", string(req.Email)).Msg("Failed to send sign-in email")
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Verification flow initiated"})
 }

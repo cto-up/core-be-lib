@@ -285,6 +285,11 @@ type HealthResponseChecksStatus string
 // HealthResponseStatus The overall health status of the API
 type HealthResponseStatus string
 
+// Identify defines model for Identify.
+type Identify struct {
+	Email openapi_types.Email `json:"email"`
+}
+
 // Migration defines model for Migration.
 type Migration struct {
 	// Dirty Whether the migration is in a dirty state

@@ -222,3 +222,67 @@ func sendTenantAddedEmail(c *gin.Context, baseAuthClient auth.AuthClient, url, t
 	log.Info().Str("email", toEmail).Str("tenant", tenantName).Msg("Tenant added notification sent successfully")
 	return nil
 }
+
+func sendMagicLink(c *gin.Context, baseAuthClient auth.AuthClient, origin, toEmail string) error {
+	fromEmail := os.Getenv("SYSTEM_EMAIL")
+	if fromEmail == "" {
+		fromEmail = "noreply@ctoup.com"
+	}
+
+	actionCodeSettings := &auth.ActionCodeSettings{
+		URL: origin + "/signin", // Redirect to signin after using the link
+	}
+
+	link, err := baseAuthClient.PasswordResetLinkWithSettings(c, toEmail, actionCodeSettings)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to generate magic link (recovery link)")
+		return err
+	}
+
+	templateData := struct {
+		Link string
+	}{
+		Link: link,
+	}
+
+	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Welcome! Access Your Account", "")
+	if err := r.ParseTemplateWithDomain(c, "email-magic-link.html", templateData); err != nil {
+		log.Error().Err(err).Msg("Failed to parse template for magic link")
+		return err
+	}
+
+	if err := r.SendEmail(); err != nil {
+		log.Error().Err(err).Msg("Failed to send magic link email")
+		return err
+	}
+	log.Info().Str("email", toEmail).Msg("Magic link email sent successfully")
+	return nil
+}
+
+func sendSigninEmail(c *gin.Context, origin, toEmail string) error {
+	fromEmail := os.Getenv("SYSTEM_EMAIL")
+	if fromEmail == "" {
+		fromEmail = "noreply@ctoup.com"
+	}
+
+	signinURL := origin + "/signin"
+
+	templateData := struct {
+		Link string
+	}{
+		Link: signinURL,
+	}
+
+	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Sign in to your account", "")
+	if err := r.ParseTemplateWithDomain(c, "email-signin.html", templateData); err != nil {
+		log.Error().Err(err).Msg("Failed to parse template for signin email")
+		return err
+	}
+
+	if err := r.SendEmail(); err != nil {
+		log.Error().Err(err).Msg("Failed to send signin email")
+		return err
+	}
+	log.Info().Str("email", toEmail).Msg("Signin email sent successfully")
+	return nil
+}

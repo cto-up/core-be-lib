@@ -1,0 +1,36 @@
+post:
+  summary: Identify user and initiate authentication flow
+  description: Checks if user exists and is a member of the tenant, then sends appropriate sign-in or magic link.
+  operationId: identifyUser
+  tags:
+    - auth
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/Identify"
+  responses:
+    "200":
+      description: Process completed successfully (even if signup is not allowed)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string
+    "400":
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
