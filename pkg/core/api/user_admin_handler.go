@@ -165,7 +165,12 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 	var err error
 
 	if tenantID == "" {
-		user, err = uh.userService.XGetUserByID(c, userid)
+		if !access.IsSuperAdmin(c) {
+			log.Error().Msg("Only SUPER_ADMIN can delete user without tenant")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Only SUPER_ADMIN can delete user without tenant"})
+			return
+		}
+		user, err = uh.userService.GetUserByID(c, userid)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to get user by ID")
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -288,8 +293,14 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 	}
 
 	// in case root domain is used
-	if tenantID == "" && access.IsSuperAdmin(c) {
-		user, err := uh.userService.XGetUserByID(c, id)
+	if tenantID == "" {
+		if !access.IsSuperAdmin(c) {
+			log.Error().Msg("Only SUPER_ADMIN can get user without tenant")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Only SUPER_ADMIN can get user without tenant"})
+			return
+		}
+
+		user, err := uh.userService.GetUserByID(c, id)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to get user by ID")
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
