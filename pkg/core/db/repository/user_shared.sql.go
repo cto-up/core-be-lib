@@ -672,10 +672,10 @@ SELECT
     profile, 
     roles, 
     created_at
-FROM core_users
+FROM core_users as u
 WHERE 
     -- Role overlap check
-    roles && $3::VARCHAR[]
+    u.roles && $3::VARCHAR[]
     -- Optional fuzzy search on email
     AND (
         u.email ILIKE '%' || $4::text || '%' 
