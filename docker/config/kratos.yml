@@ -48,7 +48,8 @@ session:
 selfservice:
   default_browser_return_url: http://auth.ctoup.localhost
   allowed_return_urls:
-    - http://auth.ctoup.localhost/callback
+    - http://auth.ctoup.localhost
+    - http://localhost:5173
 
   methods:
     password:

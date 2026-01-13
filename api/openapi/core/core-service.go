@@ -733,6 +733,9 @@ type ResetPasswordRequestByAdminJSONRequestBody ResetPasswordRequestByAdminJSONB
 // UpdateUserStatusJSONRequestBody defines body for UpdateUserStatus for application/json ContentType.
 type UpdateUserStatusJSONRequestBody UpdateUserStatusJSONBody
 
+// IdentifyUserJSONRequestBody defines body for IdentifyUser for application/json ContentType.
+type IdentifyUserJSONRequestBody = Identify
+
 // ResetPasswordRequestJSONRequestBody defines body for ResetPasswordRequest for application/json ContentType.
 type ResetPasswordRequestJSONRequestBody ResetPasswordRequestJSONBody
 
@@ -948,6 +951,9 @@ type ServerInterface interface {
 
 	// (POST /api/v1/users/{userid}/status)
 	UpdateUserStatus(c *gin.Context, userid string)
+	// Identify user and initiate authentication flow
+	// (POST /public-api/v1/auth/identify)
+	IdentifyUser(c *gin.Context)
 	// Handle password recovery
 	// (GET /public-api/v1/auth/recovery)
 	HandleRecovery(c *gin.Context, params HandleRecoveryParams)
@@ -2690,6 +2696,19 @@ func (siw *ServerInterfaceWrapper) UpdateUserStatus(c *gin.Context) {
 	siw.Handler.UpdateUserStatus(c, userid)
 }
 
+// IdentifyUser operation middleware
+func (siw *ServerInterfaceWrapper) IdentifyUser(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.IdentifyUser(c)
+}
+
 // HandleRecovery operation middleware
 func (siw *ServerInterfaceWrapper) HandleRecovery(c *gin.Context) {
 
@@ -3892,6 +3911,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:role/assign", wrapper.AssignRole)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:role/unassign", wrapper.UnassignRole)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/status", wrapper.UpdateUserStatus)
+	router.POST(options.BaseURL+"/public-api/v1/auth/identify", wrapper.IdentifyUser)
 	router.GET(options.BaseURL+"/public-api/v1/auth/recovery", wrapper.HandleRecovery)
 	router.GET(options.BaseURL+"/public-api/v1/health", wrapper.GetHealthCheck)
 	router.POST(options.BaseURL+"/public-api/v1/password-reset-request", wrapper.ResetPasswordRequest)
