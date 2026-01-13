@@ -24,6 +24,7 @@ type UserService interface {
 	CreateUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error)
 	UpdateUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string, req core.UpdateUserJSONRequestBody) error
 	DeleteUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error
+	RemoveUserFromTenant(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error
 
 	InitUserInDatabase(ctx context.Context, tenantId string, userID string) (repository.CoreUser, error)
 	UpdateUserProfileInDatabase(ctx context.Context, tenantId string, userID string, req subentity.UserProfile) error

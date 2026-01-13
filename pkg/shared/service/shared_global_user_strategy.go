@@ -11,7 +11,6 @@ import (
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/rs/zerolog/log"
 )
 
 // GlobalUserStrategy handles operations for global users
@@ -81,23 +80,6 @@ func (g *GlobalUserStrategy) UpdateSharedProfile(ctx context.Context, store *db.
 		Profile: req,
 	})
 	return err
-}
-
-func (g *GlobalUserStrategy) DeleteUser(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, userId string) error {
-	_, err := qtx.DeleteSharedUser(c, userId)
-	if err != nil {
-		return err
-	}
-	err = authClient.DeleteUser(c, userId)
-
-	if err != nil {
-		if auth.IsUserNotFound(err) {
-			log.Error().Err(err).Msgf("User does not exist: %v", userId)
-		} else {
-			return err
-		}
-	}
-	return nil
 }
 
 func (g *GlobalUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {

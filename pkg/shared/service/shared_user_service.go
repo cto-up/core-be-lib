@@ -12,6 +12,7 @@ import (
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/rs/zerolog/log"
 
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 )
@@ -29,7 +30,6 @@ type UserStrategy interface {
 	CreateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, userRecord *auth.UserRecord, req core.NewUser, password *string) (repository.CoreUser, error)
 	UpdateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, req core.UpdateUserJSONRequestBody) error
 	UpdateSharedProfile(ctx context.Context, store *db.Store, userID string, req subentity.UserProfile) error
-	DeleteUser(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, userId string) error
 	ListUsers(c *gin.Context, store *db.Store, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error)
 	AssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error
 	UnAssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error
@@ -137,7 +137,6 @@ func (uh *SharedUserService) UpdateUserProfileInDatabase(ctx context.Context, te
 }
 
 func (uh *SharedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error {
-	strategy := uh.getStrategy(tenantId)
 
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
@@ -146,7 +145,41 @@ func (uh *SharedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClie
 	defer tx.Rollback(c)
 	qtx := uh.store.Queries.WithTx(tx)
 
-	err = strategy.DeleteUser(qtx, c, authClient, userId)
+	_, err = qtx.DeleteSharedUser(c, userId)
+	if err != nil {
+		return err
+	}
+	err = authClient.DeleteUser(c, userId)
+
+	if err != nil {
+		if auth.IsUserNotFound(err) {
+			log.Error().Err(err).Msgf("User does not exist: %v", userId)
+		} else {
+			return err
+		}
+	}
+
+	err = tx.Commit(c)
+
+	return err
+}
+
+func (uh *SharedUserService) RemoveUserFromTenant(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error {
+
+	tx, err := uh.store.ConnPool.Begin(c)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(c)
+	qtx := uh.store.Queries.WithTx(tx)
+
+	_, err = qtx.DeleteSharedUserByTenant(c, repository.DeleteSharedUserByTenantParams{
+		UserID:   userId,
+		TenantID: tenantId,
+	})
+	if err != nil {
+		return err
+	}
 	if err != nil {
 		return err
 	}

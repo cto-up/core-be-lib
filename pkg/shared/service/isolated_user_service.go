@@ -191,6 +191,10 @@ func (uh *IsolatedUserService) DeleteUser(c *gin.Context, authClient auth.AuthCl
 	return err
 }
 
+func (uh *IsolatedUserService) RemoveUserFromTenant(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error {
+	return uh.DeleteUser(c, authClient, tenantId, userId)
+}
+
 func (uh *IsolatedUserService) GetFullUserByID(c *gin.Context, authClient auth.AuthClient, tenantID string, id string) (FullUser, error) {
 	fullUser := FullUser{}
 
