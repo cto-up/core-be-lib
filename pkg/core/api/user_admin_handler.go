@@ -177,25 +177,39 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user"})
 		return
 	}
-	// check if user is deleting another customer admin
-	user, err := uh.userService.GetUserByTenantIDByID(c, tenantID.(string), userid)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get user by ID")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
+	var user core.User
+	var err error
+
+	if tenantID == "" {
+		user, err = uh.userService.XGetUserByID(c, userid)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get user by ID")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
+	} else {
+
+		user, err = uh.userService.GetUserByTenantIDByID(c, tenantID.(string), userid)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get user by ID")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
 	}
+
+	// check if user is deleting another customer admin
 	// Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete CUSTOMER_ADMIN
-	if slices.Contains(user.Roles, "CUSTOMER_ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) && !access.IsCustomerAdmin(c) {
+	if slices.Contains(user.Roles, "CUSTOMER_ADMIN") && access.HasRightsForRole(c, "CUSTOMER_ADMIN") != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete CUSTOMER_ADMIN. Must be ADMIN or SUPER_ADMIN."})
 		return
 	}
 	// Only ADMIN or SUPER_ADMIN can delete ADMIN
-	if slices.Contains(user.Roles, "ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+	if slices.Contains(user.Roles, "ADMIN") && access.HasRightsForRole(c, "ADMIN") != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete ADMIN. Must be SUPER_ADMIN."})
 		return
 	}
 	// Only SUPER_ADMIN can delete SUPER_ADMIN
-	if slices.Contains(user.Roles, "SUPER_ADMIN") && !access.IsSuperAdmin(c) {
+	if slices.Contains(user.Roles, "SUPER_ADMIN") && access.HasRightsForRole(c, "SUPER_ADMIN") != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete SUPER_ADMIN. Must be SUPER_ADMIN."})
 		return
 	}
@@ -268,19 +282,19 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 	}
 
 	// Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove CUSTOMER_ADMIN
-	if slices.Contains(roles, "CUSTOMER_ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) && !access.IsCustomerAdmin(c) {
+	if slices.Contains(roles, "CUSTOMER_ADMIN") && access.HasRightsForRole(c, "CUSTOMER_ADMIN") != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove CUSTOMER_ADMIN from tenant. Must be ADMIN or SUPER_ADMIN."})
 		return
 	}
 
 	// Only ADMIN or SUPER_ADMIN can remove ADMIN
-	if slices.Contains(roles, "ADMIN") && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+	if slices.Contains(roles, "ADMIN") && access.HasRightsForRole(c, "ADMIN") != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove ADMIN from tenant. Must be SUPER_ADMIN."})
 		return
 	}
 
 	// Only SUPER_ADMIN can remove SUPER_ADMIN
-	if slices.Contains(roles, "SUPER_ADMIN") && !access.IsSuperAdmin(c) {
+	if slices.Contains(roles, "SUPER_ADMIN") && access.HasRightsForRole(c, "SUPER_ADMIN") != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove SUPER_ADMIN from tenant. Must be SUPER_ADMIN."})
 		return
 	}
