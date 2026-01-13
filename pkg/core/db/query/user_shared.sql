@@ -262,10 +262,10 @@ SELECT
     profile, 
     roles, 
     created_at
-FROM core_users
+FROM core_users as u
 WHERE 
     -- Role overlap check
-    roles && sqlc.arg(requested_roles)::VARCHAR[]
+    u.roles && sqlc.arg(requested_roles)::VARCHAR[]
     -- Optional fuzzy search on email
     AND (
         u.email ILIKE '%' || sqlc.narg('like')::text || '%' 
