@@ -91,29 +91,6 @@ func (g *TenantUserStrategy) UpdateSharedProfile(ctx context.Context, store *db.
 	return err
 }
 
-func (g *TenantUserStrategy) DeleteUser(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, userId string) error {
-	// Remove user only within the tenant context
-	_, err := qtx.DeleteSharedUserByTenant(c, repository.DeleteSharedUserByTenantParams{
-		UserID:   userId,
-		TenantID: g.tenantID,
-	})
-	if err != nil {
-		return err
-	}
-
-	/* Do not delete the global user record in auth system
-	err = authClient.DeleteUser(c, userId)
-
-	if err != nil {
-		if auth.IsUserNotFound(err) {
-			log.Error().Err(err).Msgf("User does not exist: %v", userId)
-		} else {
-			return err
-		}
-	}*/
-	return nil
-}
-
 func (g *TenantUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
 	// Query via user_tenant_memberships table
 	memberships, err := store.ListSharedUsersByTenant(c, repository.ListSharedUsersByTenantParams{

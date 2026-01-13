@@ -304,6 +304,18 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 		return
 	}
 
+	// in case root domain is used
+	if tenantID == "" && access.IsSuperAdmin(c) {
+		user, err := uh.userService.XGetUserByID(c, id)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to get user by ID")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
+		c.JSON(http.StatusOK, user)
+		return
+	}
+
 	user, err := uh.userService.GetUserByTenantIDByID(c, tenantID.(string), id)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get user by ID")
