@@ -31,7 +31,7 @@ type UserService interface {
 
 	// Retrieval
 	GetFullUserByID(c *gin.Context, authClient auth.AuthClient, tenantID string, id string) (FullUser, error)
-	GetUserByID(c *gin.Context, id string) (core.User, error)
+	GetUserByID(c context.Context, id string) (core.User, error)
 	GetUserByTenantIDByID(c *gin.Context, tenantID string, id string) (core.User, error)
 	GetUserByEmail(c *gin.Context, tenantId string, email string) (core.User, error)
 	ListUsers(c *gin.Context, tenantId string, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error)
@@ -45,6 +45,10 @@ type UserService interface {
 
 	// Membership (Crucial for the Multi-Tenant implementation)
 	AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role, invitedBy string) error
+
+	// Callbacks
+	SetUserCreatedCallback(callback UserCreatedCallback)
+	GetStore() *db.Store
 }
 
 type BaseUserService struct {
@@ -58,7 +62,7 @@ func NewBaseUserService(store *db.Store) *BaseUserService {
 	}
 }
 
-func (uh *BaseUserService) GetUserByID(c *gin.Context, id string) (core.User, error) {
+func (uh *BaseUserService) GetUserByID(c context.Context, id string) (core.User, error) {
 
 	dbUser, err := uh.store.GetSharedUserByID(c, id)
 	if err != nil {
@@ -99,4 +103,8 @@ func (uh *BaseUserService) GetUserByEmailGlobal(c context.Context, email string)
 // SetUserCreatedCallback sets an optional callback function that will be called after a user is successfully created.
 func (uh *BaseUserService) SetUserCreatedCallback(callback UserCreatedCallback) {
 	uh.onUserCreated = callback
+}
+
+func (uh *BaseUserService) GetStore() *db.Store {
+	return uh.store
 }
