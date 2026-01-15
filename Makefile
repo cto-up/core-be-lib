@@ -57,7 +57,7 @@ openapi:
 release:
 	@echo "Creating release"
 	@if [ -z "$(VERSION)" ]; then \
-		echo "Error: VERSION parameter is required. Use 'v.x.x.x' format."; \
+		echo "Error: VERSION parameter is required. Use 'vx.x.x' format."; \
 		exit 1; \
 	fi; \
 	gh release create $(VERSION) --title "$(VERSION)" --notes "$(NOTES)"
