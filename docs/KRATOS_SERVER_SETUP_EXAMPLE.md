@@ -61,9 +61,9 @@ func main() {
 	kratosTenantService := service.NewKratosTenantService(store, authProvider)
 
 	// Setup server
-	webPort := os.Getenv("WEBSITES_PORT")
+	webPort := os.Getenv("BACKEND_PORT")
 	if webPort == "" {
-		log.Fatal().Msg("WEBSITES_PORT environment variable required")
+		log.Fatal().Msg("BACKEND_PORT environment variable required")
 	}
 
 	// Start HTTP server
@@ -585,7 +585,7 @@ DB_NAME=coreapp
 DB_SSLMODE=disable
 
 # Server
-WEBSITES_PORT=8080
+BACKEND_PORT=8080
 INSTANCE_NAME=main
 LOG_FOLDER=/app/log
 

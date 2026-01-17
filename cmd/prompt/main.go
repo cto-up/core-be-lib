@@ -83,9 +83,9 @@ func main() {
 		log.Info().Msg("Pinged!")
 	}
 
-	webstitesPort := os.Getenv("WEBSITES_PORT")
+	webstitesPort := os.Getenv("BACKEND_PORT")
 	if webstitesPort == "" {
-		log.Fatal().Err(err).Msg("Please set WEBSITES_PORT")
+		log.Fatal().Err(err).Msg("Please set BACKEND_PORT")
 
 	}
 	// Timeout for server shutdown

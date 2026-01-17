@@ -83,12 +83,12 @@ func main() {
 		log.Info().Msg("Pinged!")
 	}
 
-	webstitesPort := os.Getenv("WEBSITES_PORT")
-	if webstitesPort == "" {
-		log.Fatal().Err(err).Msg("Please set WEBSITES_PORT")
+	backendPort := os.Getenv("BACKEND_PORT")
+	if backendPort == "" {
+		log.Fatal().Err(err).Msg("Please set BACKEND_PORT")
 
 	}
-	restAddress := ":" + webstitesPort
+	restAddress := ":" + backendPort
 	// Timeout for server shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
