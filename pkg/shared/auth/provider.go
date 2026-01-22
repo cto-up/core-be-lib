@@ -175,6 +175,11 @@ type AuthClient interface {
 	// Custom Claims (Roles/Permissions)
 	SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error
 
+	// BuildGlobalRoleClaims creates a provider-specific claims map for global roles
+	// Firebase: {"SUPER_ADMIN": true, "ADMIN": true}
+	// Kratos: {"global_roles": ["SUPER_ADMIN", "ADMIN"]}
+	BuildGlobalRoleClaims(roles []string) map[string]interface{}
+
 	// Email Actions
 	EmailVerificationLink(ctx context.Context, email string) (string, error)
 	PasswordResetLink(ctx context.Context, email string) (string, error)

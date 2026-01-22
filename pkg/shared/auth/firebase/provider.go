@@ -284,6 +284,16 @@ func (f *FirebaseAuthClient) SetCustomUserClaims(ctx context.Context, uid string
 	return nil
 }
 
+// BuildGlobalRoleClaims creates Firebase-specific claims format for global roles
+// Returns: {"SUPER_ADMIN": true, "ADMIN": true}
+func (f *FirebaseAuthClient) BuildGlobalRoleClaims(roles []string) map[string]interface{} {
+	claims := make(map[string]interface{})
+	for _, role := range roles {
+		claims[role] = true
+	}
+	return claims
+}
+
 func (f *FirebaseAuthClient) EmailVerificationLink(ctx context.Context, email string) (string, error) {
 	link, err := f.client.EmailVerificationLink(ctx, email)
 	if err != nil {

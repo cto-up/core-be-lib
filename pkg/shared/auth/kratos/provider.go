@@ -365,6 +365,14 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 	return convertKratosError(err)
 }
 
+// BuildGlobalRoleClaims creates Kratos-specific claims format for global roles
+// Returns: {"global_roles": ["SUPER_ADMIN", "ADMIN"]}
+func (k *KratosAuthClient) BuildGlobalRoleClaims(roles []string) map[string]interface{} {
+	return map[string]interface{}{
+		"global_roles": roles,
+	}
+}
+
 func (k *KratosAuthClient) EmailVerificationLink(ctx context.Context, email string) (string, error) {
 	// For Kratos, we need to use the Admin API to create verification links
 	// The browser flow approach doesn't work from backend because it requires CSRF tokens
