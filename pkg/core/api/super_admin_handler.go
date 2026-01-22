@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+/* TO REMOVE after Firebase migration !!!*/
 type SuperAdminHandler struct {
 	authProvider auth.AuthProvider
 }
@@ -26,6 +27,7 @@ func NewSuperAdminHandler(authProvider auth.AuthProvider) *SuperAdminHandler {
 }
 
 // AddAuthorizedDomains handles the request to add authorized domains for Firebase Authentication
+// Firebase specific
 func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
 	// Check if user has SUPER_ADMIN role
 	if !service.IsSuperAdmin(c) {
@@ -58,6 +60,7 @@ func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
 }
 
 // RemoveAuthorizedDomains handles the request to add authorized domains for Firebase Authentication
+// Firebase specific
 func (exh *SuperAdminHandler) RemoveAuthorizedDomains(c *gin.Context) {
 	// Check if user has SUPER_ADMIN role
 	if !service.IsSuperAdmin(c) {
