@@ -7,11 +7,17 @@ FILE ?= entity.json
 testme:
 	env
 
+kratosup:
+	docker compose -f docker/docker-compose-kratos.yml up
+
+kratosdown:
+	docker compose -f docker/docker-compose-kratos.yml down
+
 postgresup:
-	docker compose -f docker/postgresql.yml up
+	docker compose -f docker/docker-compose-postgresql.yml up
 
 postgresdown:
-	docker compose -f docker/postgresql.yml down
+	docker compose -f docker/docker-compose-postgresql.yml down
 
 migrateup:
 	@$(MAKE) migrate-module DIRECTION=up

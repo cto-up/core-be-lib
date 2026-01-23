@@ -44,6 +44,11 @@ session:
     path: /
     same_site: Lax
     persistent: true
+  # Default to AAL1 - MFA is optional
+  whoami:
+    required_aal: aal1
+  lifespan: 720h
+  earliest_possible_extend: 1h
 
 selfservice:
   default_browser_return_url: http://auth.ctoup.localhost
@@ -54,12 +59,25 @@ selfservice:
   methods:
     password:
       enabled: true
+    # TOTP (Authenticator App) - Google Authenticator, Authy, etc.
     totp:
-      config:
-        issuer: Kratos
       enabled: true
+      config:
+        issuer: ctoup # Change to your app name
+    # WebAuthn (Security Keys) - YubiKey, TouchID, Windows Hello, etc.
+    webauthn:
+      enabled: true
+      config:
+        rp:
+          display_name: ctoup # Change to your app name
+          id: localhost # Must match your domain (without protocol/port)
+          origins:
+            - http://localhost:5173
+            - http://auth.ctoup.localhost
+    # Recovery codes (backup codes)
     lookup_secret:
       enabled: true
+    # Keep existing methods
     link:
       enabled: true
     code:
@@ -71,7 +89,12 @@ selfservice:
 
     settings:
       ui_url: /recovery
+      # Require re-authentication for settings changes (security best practice)
       privileged_session_max_age: 15m
+      # Optional MFA - users decide
+      required_aal: aal1
+      after:
+        default_browser_return_url: http://localhost:5173/settings
 
     recovery:
       enabled: true
@@ -80,6 +103,8 @@ selfservice:
 
     login:
       ui_url: /signin
+      after:
+        default_browser_return_url: http://localhost:5173/
 
     verification:
       enabled: true
@@ -126,12 +151,6 @@ identity:
     - id: default
       url: file:///etc/config/kratos/identity.schema.json
 
-organizations:
-  - enabled: true
-
 courier:
   smtp:
     connection_uri: smtps://test:test@mailslurper:1025/?skip_ssl_verify=true
-
-feature_flags:
-  use_continue_with_transitions: true
