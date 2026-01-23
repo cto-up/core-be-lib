@@ -1,0 +1,15 @@
+get:
+  summary: Get MFA status
+  description: Get the current user's MFA configuration status
+  operationId: getMFAStatus
+  tags:
+    - MFA
+  security:
+    - BearerAuth: []
+  responses:
+    "200":
+      description: MFA status retrieved successfully
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/MFAStatus"

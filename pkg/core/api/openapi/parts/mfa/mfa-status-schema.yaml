@@ -1,0 +1,32 @@
+MFAStatus:
+  type: object
+  required:
+    - totp_enabled
+    - webauthn_enabled
+    - recovery_codes_set
+    - available_methods
+    - aal
+  properties:
+    totp_enabled:
+      type: boolean
+      description: Whether TOTP (Authenticator App) is enabled
+      example: false
+    webauthn_enabled:
+      type: boolean
+      description: Whether WebAuthn (Security Key) is enabled
+      example: false
+    recovery_codes_set:
+      type: boolean
+      description: Whether recovery codes have been generated
+      example: false
+    available_methods:
+      type: array
+      items:
+        type: string
+      description: List of available MFA methods
+      example: ["totp", "webauthn", "lookup_secret"]
+    aal:
+      type: string
+      description: Current Authenticator Assurance Level
+      enum: [aal1, aal2]
+      example: "aal1"

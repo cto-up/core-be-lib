@@ -1,0 +1,32 @@
+SettingsFlow:
+  type: object
+  description: Kratos settings flow object (simplified representation)
+  properties:
+    id:
+      type: string
+      description: Flow ID
+      example: "550e8400-e29b-41d4-a716-446655440000"
+    ui:
+      type: object
+      description: UI configuration for the flow
+      properties:
+        action:
+          type: string
+          description: URL to submit the flow to
+        method:
+          type: string
+          description: HTTP method to use
+          example: "POST"
+        nodes:
+          type: array
+          description: Form nodes for the UI
+          items:
+            type: object
+    expires_at:
+      type: string
+      format: date-time
+      description: When the flow expires
+    issued_at:
+      type: string
+      format: date-time
+      description: When the flow was issued

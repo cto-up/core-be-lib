@@ -12,6 +12,10 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+const (
+	BearerAuthScopes = "BearerAuth.Scopes"
+)
+
 // Defines values for ListClientApplicationsParamsOrder.
 const (
 	ListClientApplicationsParamsOrderAsc  ListClientApplicationsParamsOrder = "asc"
@@ -855,6 +859,12 @@ type ServerInterface interface {
 
 	// (POST /api/v1/me/profile/picture)
 	UploadProfilePicture(c *gin.Context)
+	// Initialize settings flow
+	// (POST /api/v1/mfa/settings/init)
+	InitializeSettingsFlow(c *gin.Context)
+	// Get MFA status
+	// (GET /api/v1/mfa/status)
+	GetMFAStatus(c *gin.Context)
 
 	// (GET /api/v1/prompts)
 	ListPrompts(c *gin.Context, params ListPromptsParams)
@@ -1731,6 +1741,36 @@ func (siw *ServerInterfaceWrapper) UploadProfilePicture(c *gin.Context) {
 	}
 
 	siw.Handler.UploadProfilePicture(c)
+}
+
+// InitializeSettingsFlow operation middleware
+func (siw *ServerInterfaceWrapper) InitializeSettingsFlow(c *gin.Context) {
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.InitializeSettingsFlow(c)
+}
+
+// GetMFAStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetMFAStatus(c *gin.Context) {
+
+	c.Set(BearerAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMFAStatus(c)
 }
 
 // ListPrompts operation middleware
@@ -3879,6 +3919,8 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/api/v1/me/profile", wrapper.GetMeProfile)
 	router.PUT(options.BaseURL+"/api/v1/me/profile", wrapper.UpdateMeProfile)
 	router.POST(options.BaseURL+"/api/v1/me/profile/picture", wrapper.UploadProfilePicture)
+	router.POST(options.BaseURL+"/api/v1/mfa/settings/init", wrapper.InitializeSettingsFlow)
+	router.GET(options.BaseURL+"/api/v1/mfa/status", wrapper.GetMFAStatus)
 	router.GET(options.BaseURL+"/api/v1/prompts", wrapper.ListPrompts)
 	router.POST(options.BaseURL+"/api/v1/prompts", wrapper.AddPrompt)
 	router.POST(options.BaseURL+"/api/v1/prompts/execute", wrapper.ExecutePrompt)

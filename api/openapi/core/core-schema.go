@@ -45,6 +45,12 @@ const (
 	Warn HealthResponseStatus = "warn"
 )
 
+// Defines values for MFAStatusAal.
+const (
+	Aal1 MFAStatusAal = "aal1"
+	Aal2 MFAStatusAal = "aal2"
+)
+
 // Defines values for NewPromptFormat.
 const (
 	NewPromptFormatJson     NewPromptFormat = "json"
@@ -290,6 +296,27 @@ type Identify struct {
 	Email openapi_types.Email `json:"email"`
 }
 
+// MFAStatus defines model for MFAStatus.
+type MFAStatus struct {
+	// Aal Current Authenticator Assurance Level
+	Aal MFAStatusAal `json:"aal"`
+
+	// AvailableMethods List of available MFA methods
+	AvailableMethods []string `json:"available_methods"`
+
+	// RecoveryCodesSet Whether recovery codes have been generated
+	RecoveryCodesSet bool `json:"recovery_codes_set"`
+
+	// TotpEnabled Whether TOTP (Authenticator App) is enabled
+	TotpEnabled bool `json:"totp_enabled"`
+
+	// WebauthnEnabled Whether WebAuthn (Security Key) is enabled
+	WebauthnEnabled bool `json:"webauthn_enabled"`
+}
+
+// MFAStatusAal Current Authenticator Assurance Level
+type MFAStatusAal string
+
 // Migration defines model for Migration.
 type Migration struct {
 	// Dirty Whether the migration is in a dirty state
@@ -516,6 +543,30 @@ type PublicTenantSchema struct {
 
 // Role defines model for Role.
 type Role string
+
+// SettingsFlow Kratos settings flow object (simplified representation)
+type SettingsFlow struct {
+	// ExpiresAt When the flow expires
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// Id Flow ID
+	Id *string `json:"id,omitempty"`
+
+	// IssuedAt When the flow was issued
+	IssuedAt *time.Time `json:"issued_at,omitempty"`
+
+	// Ui UI configuration for the flow
+	Ui *struct {
+		// Action URL to submit the flow to
+		Action *string `json:"action,omitempty"`
+
+		// Method HTTP method to use
+		Method *string `json:"method,omitempty"`
+
+		// Nodes Form nodes for the UI
+		Nodes *[]map[string]interface{} `json:"nodes,omitempty"`
+	} `json:"ui,omitempty"`
+}
 
 // Tenant defines model for Tenant.
 type Tenant struct {
