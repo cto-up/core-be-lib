@@ -80,6 +80,65 @@ components:
     UserActionSchema:
       $ref: "./parts/users/user-action-schema.yaml"
 
+    # MFA related schemas
+    MFAStatus:
+      type: object
+      required:
+        - totp_enabled
+        - webauthn_enabled
+        - recovery_codes_set
+        - available_methods
+        - aal
+      properties:
+        totp_enabled:
+          type: boolean
+          description: Whether TOTP (Authenticator App) is enabled
+        webauthn_enabled:
+          type: boolean
+          description: Whether WebAuthn (Security Key) is enabled
+        recovery_codes_set:
+          type: boolean
+          description: Whether recovery codes have been generated
+        available_methods:
+          type: array
+          items:
+            type: string
+          description: List of available MFA methods
+        aal:
+          type: string
+          description: Current Authenticator Assurance Level
+          enum: [aal1, aal2]
+    SettingsFlow:
+      type: object
+      description: Kratos settings flow object (simplified representation)
+      properties:
+        id:
+          type: string
+          description: Flow ID
+        ui:
+          type: object
+          description: UI configuration for the flow
+          properties:
+            action:
+              type: string
+              description: URL to submit the flow to
+            method:
+              type: string
+              description: HTTP method to use
+            nodes:
+              type: array
+              description: Form nodes for the UI
+              items:
+                type: object
+        expires_at:
+          type: string
+          format: date-time
+          description: When the flow expires
+        issued_at:
+          type: string
+          format: date-time
+          description: When the flow was issued
+
     # Client Application related schemas
     NewClientApplication:
       type: object

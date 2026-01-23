@@ -447,9 +447,9 @@ func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) 
 	return recoveryLink.RecoveryLink, nil
 }
 
-func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error) {
+func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, sessionToken string) (*auth.Token, error) {
 	// Construct the cookie string manually
-	cookieString := fmt.Sprintf("ory_kratos_session=%s", idToken)
+	cookieString := fmt.Sprintf("ory_kratos_session=%s", sessionToken)
 
 	// Use the SDK but inject the Cookie header into the context
 	// This keeps your code clean and leverages the SDK's built-in types

@@ -1,0 +1,15 @@
+post:
+  summary: Initialize settings flow
+  description: Initialize a Kratos settings flow for MFA configuration
+  operationId: initializeSettingsFlow
+  tags:
+    - MFA
+  security:
+    - BearerAuth: []
+  responses:
+    "200":
+      description: Settings flow initialized successfully
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/SettingsFlow"

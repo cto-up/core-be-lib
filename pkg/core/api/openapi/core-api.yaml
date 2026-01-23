@@ -79,6 +79,12 @@ paths:
   /api/v1/me/profile/picture:
     $ref: "./parts/users/me/users-me-profile-picture-path.yaml"
 
+  # mfa
+  /api/v1/mfa/status:
+    $ref: "./parts/mfa/mfa-status-path.yaml"
+  /api/v1/mfa/settings/init:
+    $ref: "./parts/mfa/mfa-settings-init-path.yaml"
+
   # password
   /api/v1/users/{userid}/password-reset-request:
     $ref: "./parts/users/password/users-id-password-reset-request-path.yaml"

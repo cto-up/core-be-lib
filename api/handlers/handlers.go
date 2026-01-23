@@ -24,6 +24,7 @@ type Handlers struct {
 	*core.TranslationHandler
 	*core.MigrationHandler
 	*core.RecoveryHandler
+	*core.MFAHandler
 }
 
 func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool auth.AuthProvider, multiTenantService *access.MultitenantService, clientAppService *access.ClientApplicationService) Handlers {
@@ -42,6 +43,7 @@ func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool auth.AuthProvider
 		TranslationHandler:       core.NewTranslationHandler(store),
 		MigrationHandler:         core.NewMigrationHandler(store),
 		RecoveryHandler:          core.NewRecoveryHandler(authClientPool),
+		MFAHandler:               core.NewMFAHandler(authClientPool),
 	}
 	return handlers
 }
