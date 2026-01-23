@@ -137,12 +137,11 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 	}
 
 	// Skip tenant validation for root domain or SUPER_ADMIN
+	if isSuperAdmin {
+		return user, nil
+	}
 	if tenantID == "" {
-		if isSuperAdmin {
-			return user, nil
-		} else {
-			return user, fmt.Errorf("Only SUPER_ADMIN can access root domain")
-		}
+		return user, fmt.Errorf("Only SUPER_ADMIN can access root domain")
 	}
 
 	if membershipsInterface, ok := token.Claims[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
