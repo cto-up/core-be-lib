@@ -18,6 +18,9 @@
               "password": {
                 "identifier": true
               },
+              "totp": {
+                "account_name": true
+              },
               "code": {
                 "identifier": true,
                 "via": "email"
@@ -59,12 +62,19 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "enum": ["CUSTOMER_ADMIN", "ADMIN", "USER"]
+                  "enum": [
+                    "CUSTOMER_ADMIN",
+                    "ADMIN",
+                    "USER"
+                  ]
                 },
                 "title": "Tenant Roles"
               }
             },
-            "required": ["tenant_id", "roles"]
+            "required": [
+              "tenant_id",
+              "roles"
+            ]
           },
           "title": "Tenant Memberships",
           "description": "List of tenant memberships with associated roles for efficient middleware validation"
@@ -73,7 +83,9 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["SUPER_ADMIN"]
+            "enum": [
+              "SUPER_ADMIN"
+            ]
           },
           "title": "Global Roles",
           "description": "Global system roles (SUPER_ADMIN only)"
