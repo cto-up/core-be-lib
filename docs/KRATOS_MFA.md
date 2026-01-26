@@ -2,6 +2,12 @@
 
 Each user will be able to opt-in
 
+Strategy,Web (Browser),Mobile (Native App),Key Technical Difference
+TOTP,✅ Full Support,✅ Full Support,"Web: User scans QR. Mobile: App can use ""Deep Links"" to open the Authenticator app automatically."
+Lookup Secrets,✅ Full Support,✅ Full Support,Purely text-based; works anywhere you can render a list of codes.
+Recovery (Email),✅ Full Support,✅ Full Support,Kratos sends a link/code; works everywhere.
+Passkeys (WebAuthn),✅ Full Support,⚠️ Limited/Complex,"Web: Standard browser API. Mobile: Native apps need a specialized ""Native API"" bridge (Kratos support for this is newer/experimental)."
+
 ## Architecture Overview
 
 Sample archecture:
@@ -59,7 +65,6 @@ Key points:
 - Enable TOTP, WebAuthn, and recovery codes (lookup_secret)
 - Set `required_aal: aal1` to make MFA optional
 - Configure privileged sessions for settings changes
-
 
 ## 3. Golang Backend Implementation
 

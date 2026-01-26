@@ -747,6 +747,9 @@ courier:
             "credentials": {
               "password": {
                 "identifier": true
+              },
+              "totp": {
+                "account_name": true
               }
             },
             "verification": {
