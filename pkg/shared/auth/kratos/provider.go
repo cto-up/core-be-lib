@@ -2,7 +2,6 @@ package kratos
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -224,7 +223,7 @@ func (k *KratosAuthClient) CreateUser(ctx context.Context, user *auth.UserToCrea
 
 	created, _, err := k.adminClient.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(identBody).Execute()
 	if err != nil {
-		return nil, convertKratosError(err)
+		return nil, auth.ConvertKratosError(err)
 	}
 
 	return convertKratosIdentityToUserRecord(created), nil
@@ -234,7 +233,7 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 	// Get existing
 	existing, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
-		return nil, convertKratosError(err)
+		return nil, auth.ConvertKratosError(err)
 	}
 
 	traits := existing.Traits.(map[string]interface{})
@@ -261,7 +260,7 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 
 	updated, _, err := k.adminClient.IdentityAPI.UpdateIdentity(ctx, uid).UpdateIdentityBody(updateBody).Execute()
 	if err != nil {
-		return nil, convertKratosError(err)
+		return nil, auth.ConvertKratosError(err)
 	}
 
 	return convertKratosIdentityToUserRecord(updated), nil
@@ -270,7 +269,7 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 func (k *KratosAuthClient) DeleteUser(ctx context.Context, uid string) error {
 	_, err := k.adminClient.IdentityAPI.DeleteIdentity(ctx, uid).Execute()
 	if err != nil {
-		return convertKratosError(err)
+		return auth.ConvertKratosError(err)
 	}
 	return nil
 }
@@ -278,7 +277,7 @@ func (k *KratosAuthClient) DeleteUser(ctx context.Context, uid string) error {
 func (k *KratosAuthClient) GetUser(ctx context.Context, uid string) (*auth.UserRecord, error) {
 	ident, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
-		return nil, convertKratosError(err)
+		return nil, auth.ConvertKratosError(err)
 	}
 	return convertKratosIdentityToUserRecord(ident), nil
 }
@@ -290,7 +289,7 @@ func (k *KratosAuthClient) GetUserByEmail(ctx context.Context, email string) (*a
 	// Implementing via ListIdentities for now
 	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
 	if err != nil {
-		return nil, convertKratosError(err)
+		return nil, auth.ConvertKratosError(err)
 	}
 	if len(idents) == 0 {
 		return nil, &auth.AuthError{Code: auth.ErrorCodeUserNotFound, Message: "user not found"}
@@ -301,7 +300,7 @@ func (k *KratosAuthClient) GetUserByEmail(ctx context.Context, email string) (*a
 func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error {
 	existing, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
-		return convertKratosError(err)
+		return auth.ConvertKratosError(err)
 	}
 
 	// Get existing traits (don't modify them for roles)
@@ -361,7 +360,7 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 	updateBody.MetadataPublic = metadataPublic
 
 	_, _, err = k.adminClient.IdentityAPI.UpdateIdentity(ctx, uid).UpdateIdentityBody(updateBody).Execute()
-	return convertKratosError(err)
+	return auth.ConvertKratosError(err)
 }
 
 // BuildGlobalRoleClaims creates Kratos-specific claims format for global roles
@@ -379,7 +378,7 @@ func (k *KratosAuthClient) EmailVerificationLink(ctx context.Context, email stri
 	// First, get the user by email to get their ID
 	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
 	if err != nil {
-		return "", convertKratosError(err)
+		return "", auth.ConvertKratosError(err)
 	}
 	if len(idents) == 0 {
 		return "", &auth.AuthError{Code: auth.ErrorCodeUserNotFound, Message: "user not found"}
@@ -410,7 +409,7 @@ func (k *KratosAuthClient) EmailVerificationLink(ctx context.Context, email stri
 		Execute()
 
 	if err != nil {
-		return "", convertKratosError(err)
+		return "", auth.ConvertKratosError(err)
 	}
 
 	log.Info().Str("email", email).Str("identity_id", identityID).Msg("Verification link created via Admin API")
@@ -424,7 +423,7 @@ func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) 
 	// First, get the user by email to get their ID
 	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
 	if err != nil {
-		return "", convertKratosError(err)
+		return "", auth.ConvertKratosError(err)
 	}
 	if len(idents) == 0 {
 		return "", &auth.AuthError{Code: auth.ErrorCodeUserNotFound, Message: "user not found"}
@@ -440,7 +439,7 @@ func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) 
 		Execute()
 
 	if err != nil {
-		return "", convertKratosError(err)
+		return "", auth.ConvertKratosError(err)
 	}
 
 	log.Info().Str("email", email).Str("identity_id", identityID).Str("recovery_link", recoveryLink.RecoveryLink).Msg("Recovery link created via Admin API")
@@ -458,7 +457,7 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, sessionToken strin
 		Execute()
 
 	if err != nil {
-		return nil, convertKratosError(err)
+		return nil, auth.ConvertKratosError(err)
 	}
 
 	if !*session.Active {
@@ -638,7 +637,7 @@ type MFAStatus struct {
 func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{}, error) {
 	cookieHeader := c.GetHeader("Cookie")
 	if cookieHeader == "" {
-		return nil, &AuthError{Code: "unauthorized", Message: "Not authenticated"}
+		return nil, &auth.AuthError{Code: "unauthorized", Message: "Not authenticated"}
 	}
 
 	// Create context with Cookie header
@@ -652,7 +651,7 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{
 	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
 	if err != nil || resp.StatusCode != 200 {
 		log.Error().Err(err).Msg("Failed to get session")
-		return nil, &AuthError{Code: "unauthorized", Message: "Failed to get session"}
+		return nil, auth.ConvertKratosError(err)
 	}
 
 	// Extract AAL from session
@@ -668,7 +667,8 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{
 
 	if err != nil || resp.StatusCode != 200 {
 		log.Error().Err(err).Msg("Failed to create settings flow")
-		return nil, &AuthError{Code: "internal", Message: "Failed to create settings flow"}
+
+		return nil, auth.ConvertKratosError(err)
 	}
 
 	// Parse the flow to determine MFA status
@@ -765,7 +765,7 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{
 func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.SettingsFlow, error) {
 	cookieHeader := c.GetHeader("Cookie")
 	if cookieHeader == "" {
-		return nil, &AuthError{Code: "unauthorized", Message: "Not authenticated"}
+		return nil, &auth.AuthError{Code: "unauthorized", Message: "Not authenticated"}
 	}
 
 	// Create context with Cookie header
@@ -780,19 +780,9 @@ func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.Settin
 
 	if err != nil || resp.StatusCode != 200 {
 		log.Error().Err(err).Msg("Failed to create settings flow")
-		return nil, &AuthError{Code: "internal", Message: "Failed to create settings flow"}
+		return nil, auth.ConvertKratosError(err)
 	}
 	return flow, nil
-}
-
-// AuthError represents an authentication error
-type AuthError struct {
-	Code    string
-	Message string
-}
-
-func (e *AuthError) Error() string {
-	return fmt.Sprintf("%s: %s", e.Code, e.Message)
 }
 
 // Helper function to check if slice contains string
@@ -827,57 +817,5 @@ func convertKratosIdentityToUserRecord(ident *ory.Identity) *auth.UserRecord {
 		EmailVerified: true, // Should check Kratos verifiable_addresses
 		CreatedAt:     createdAt,
 		CustomClaims:  traits, // Map traits to claims
-	}
-}
-
-func convertKratosError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	message := ""
-	var apiErr *ory.GenericOpenAPIError
-
-	if !errors.As(err, &apiErr) {
-		message = err.Error()
-		return &auth.AuthError{
-			Code:    "unknown-error",
-			Message: message,
-			Err:     err,
-		}
-	}
-
-	// HTTP status
-	fmt.Println("HTTP:", apiErr.Error())
-
-	// ✅ CALL Model() to get the error model
-	model := apiErr.Model()
-	if model == nil {
-		fmt.Println("No model in error")
-		return &auth.AuthError{
-			Code:    "unknown-error",
-			Message: err.Error(),
-			Err:     err,
-		}
-	}
-
-	// Kratos standard error payload
-	if eg, ok := model.(ory.ErrorGeneric); ok {
-		message = eg.Error.Message
-		if eg.Error.Reason != nil {
-			message += " reason: " + *eg.Error.Reason
-		}
-
-		return &auth.AuthError{
-			Code:    "kratos-error",
-			Message: message,
-			Err:     err,
-		}
-	}
-
-	return &auth.AuthError{
-		Code:    "kratos-error",
-		Message: err.Error(),
-		Err:     err,
 	}
 }
