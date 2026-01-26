@@ -625,12 +625,183 @@ func (k *KratosTenantManager) GetTenant(ctx context.Context, tenantID string) (*
 	}, nil
 }
 
+// MFAStatus represents the MFA configuration status for a user
+type MFAStatus struct {
+	TOTPEnabled      bool     `json:"totp_enabled"`
+	WebAuthnEnabled  bool     `json:"webauthn_enabled"`
+	RecoveryCodesSet bool     `json:"recovery_codes_set"`
+	AvailableMethods []string `json:"available_methods"`
+	AAL              string   `json:"aal"` // Current Authenticator Assurance Level
+}
+
+// GetMFAStatus returns the MFA configuration status for the current user
+func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{}, error) {
+	cookieHeader := c.GetHeader("Cookie")
+	if cookieHeader == "" {
+		return nil, &AuthError{Code: "unauthorized", Message: "Not authenticated"}
+	}
+
+	// Create context with Cookie header
+	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
+		"Cookie": {
+			Key: cookieHeader,
+		},
+	})
+
+	// Get current session to check AAL
+	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
+	if err != nil || resp.StatusCode != 200 {
+		log.Error().Err(err).Msg("Failed to get session")
+		return nil, &AuthError{Code: "unauthorized", Message: "Failed to get session"}
+	}
+
+	// Extract AAL from session
+	var aal string
+	if session.AuthenticatorAssuranceLevel != nil {
+		aal = string(*session.AuthenticatorAssuranceLevel)
+	} else {
+		aal = "aal1" // Default if not present
+	}
+
+	// Create settings flow - SDK automatically adds Cookie header from context
+	flow, resp, err := k.publicClient.FrontendAPI.CreateBrowserSettingsFlow(ctx).Cookie(cookieHeader).Execute()
+
+	if err != nil || resp.StatusCode != 200 {
+		log.Error().Err(err).Msg("Failed to create settings flow")
+		return nil, &AuthError{Code: "internal", Message: "Failed to create settings flow"}
+	}
+
+	// Parse the flow to determine MFA status
+	totpEnabled := false
+	webauthnEnabled := false
+	recoveryCodesSet := false
+	availableMethods := []string{}
+
+	log.Debug().
+		Int("node_count", len(flow.Ui.Nodes)).
+		Msg("Parsing settings flow for MFA status")
+
+	if flow.Ui.Nodes != nil {
+		for _, node := range flow.Ui.Nodes {
+			// Extract node name from attributes
+			// The Attributes field contains the actual node data
+			var nodeName string
+
+			// Try to get the name from UiNodeInputAttributes
+			if inputAttrs := node.Attributes.UiNodeInputAttributes; inputAttrs != nil {
+				nodeName = inputAttrs.Name
+			}
+
+			log.Debug().
+				Str("group", node.Group).
+				Str("type", node.Type).
+				Str("name", nodeName).
+				Msg("Processing settings flow node")
+
+			// Check TOTP status
+			if node.Group == "totp" {
+				if !containsString(availableMethods, "totp") {
+					availableMethods = append(availableMethods, "totp")
+				}
+				// totp_unlink button means TOTP is ENABLED
+				if nodeName == "totp_unlink" {
+					totpEnabled = true
+					log.Info().Msg("✅ TOTP is ENABLED (totp_unlink button found)")
+				}
+			}
+
+			// Check WebAuthn status
+			if node.Group == "webauthn" {
+				if !containsString(availableMethods, "webauthn") {
+					availableMethods = append(availableMethods, "webauthn")
+				}
+				// webauthn_remove button means WebAuthn is enabled
+				if strings.Contains(nodeName, "webauthn_remove") {
+					webauthnEnabled = true
+					log.Info().Msg("✅ WebAuthn is ENABLED (webauthn_remove button found)")
+				}
+			}
+
+			// Check recovery codes status
+			if node.Group == "lookup_secret" {
+				if !containsString(availableMethods, "lookup_secret") {
+					availableMethods = append(availableMethods, "lookup_secret")
+				}
+				// lookup_secret_confirm button means codes are set
+				if nodeName == "lookup_secret_confirm" {
+					recoveryCodesSet = true
+					log.Info().Msg("✅ Recovery codes are SET (lookup_secret_confirm button found)")
+				}
+			}
+		}
+	}
+
+	result := map[string]interface{}{
+		"totp_enabled":       totpEnabled,
+		"webauthn_enabled":   webauthnEnabled,
+		"recovery_codes_set": recoveryCodesSet,
+		"available_methods":  availableMethods,
+		"aal":                aal,
+	}
+
+	log.Info().
+		Bool("totp_enabled", totpEnabled).
+		Bool("webauthn_enabled", webauthnEnabled).
+		Bool("recovery_codes_set", recoveryCodesSet).
+		Msg("📊 MFA status determined from settings flow")
+
+	return result, nil
+}
+
+// InitializeSettingsFlow creates a new settings flow for MFA configuration
+func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.SettingsFlow, error) {
+	cookieHeader := c.GetHeader("Cookie")
+	if cookieHeader == "" {
+		return nil, &AuthError{Code: "unauthorized", Message: "Not authenticated"}
+	}
+
+	// Create context with Cookie header
+	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
+		"Cookie": {
+			Key: cookieHeader,
+		},
+	})
+
+	// Create settings flow - SDK automatically adds Cookie header from context
+	flow, resp, err := k.publicClient.FrontendAPI.CreateBrowserSettingsFlow(ctx).Cookie(cookieHeader).Execute()
+
+	if err != nil || resp.StatusCode != 200 {
+		log.Error().Err(err).Msg("Failed to create settings flow")
+		return nil, &AuthError{Code: "internal", Message: "Failed to create settings flow"}
+	}
+	return flow, nil
+}
+
+// AuthError represents an authentication error
+type AuthError struct {
+	Code    string
+	Message string
+}
+
+func (e *AuthError) Error() string {
+	return fmt.Sprintf("%s: %s", e.Code, e.Message)
+}
+
+// Helper function to check if slice contains string
+func containsString(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 func (k *KratosTenantManager) AuthForTenant(ctx context.Context, tenantID string) (auth.AuthClient, error) {
 	return k.provider.GetAuthClientForTenant(ctx, tenantID)
 }
 
 // Helpers
-
 func convertKratosIdentityToUserRecord(ident *ory.Identity) *auth.UserRecord {
 	traits := ident.Traits.(map[string]interface{})
 	email, _ := traits["email"].(string)
