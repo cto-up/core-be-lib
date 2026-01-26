@@ -13,6 +13,7 @@ import (
 	firebase "firebase.google.com/go"
 	fbauth "firebase.google.com/go/auth"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/api/option"
 )
 
@@ -162,10 +163,10 @@ func (f *FirebaseAuthProvider) GetAuthClientForTenant(ctx context.Context, tenan
 	// Create new tenant client
 	tenantClient, err := f.client.TenantManager.AuthForTenant(tenantID)
 	if err != nil {
+		log.Err(err).Msg("Failed to get tenant auth client")
 		return nil, &auth.AuthError{
 			Code:    auth.ErrorCodeTenantNotFound,
 			Message: "failed to get tenant auth client",
-			Err:     err,
 		}
 	}
 
@@ -366,10 +367,10 @@ func (f *FirebaseTenantManager) CreateTenant(ctx context.Context, config *auth.T
 
 	fbTenant, err := f.client.TenantManager.CreateTenant(ctx, tenantConfig)
 	if err != nil {
+		log.Err(err).Msg("Failed to create tenant")
 		return nil, &auth.AuthError{
 			Code:    "tenant-creation-failed",
 			Message: "failed to create tenant",
-			Err:     err,
 		}
 	}
 
@@ -387,10 +388,10 @@ func (f *FirebaseTenantManager) UpdateTenant(ctx context.Context, tenantID strin
 
 	fbTenant, err := f.client.TenantManager.UpdateTenant(ctx, tenantID, tenantConfig)
 	if err != nil {
+		log.Err(err).Msg("Failed to update tenant")
 		return nil, &auth.AuthError{
 			Code:    "tenant-update-failed",
 			Message: "failed to update tenant",
-			Err:     err,
 		}
 	}
 
@@ -405,10 +406,10 @@ func (f *FirebaseTenantManager) UpdateTenant(ctx context.Context, tenantID strin
 func (f *FirebaseTenantManager) DeleteTenant(ctx context.Context, tenantID string) error {
 	err := f.client.TenantManager.DeleteTenant(ctx, tenantID)
 	if err != nil {
+		log.Err(err).Msg("Failed to delete tenant")
 		return &auth.AuthError{
 			Code:    "tenant-deletion-failed",
 			Message: "failed to delete tenant",
-			Err:     err,
 		}
 	}
 
@@ -422,10 +423,10 @@ func (f *FirebaseTenantManager) DeleteTenant(ctx context.Context, tenantID strin
 func (f *FirebaseTenantManager) GetTenant(ctx context.Context, tenantID string) (*auth.Tenant, error) {
 	fbTenant, err := f.client.TenantManager.Tenant(ctx, tenantID)
 	if err != nil {
+		log.Err(err).Msg("Failed to get tenant")
 		return nil, &auth.AuthError{
 			Code:    auth.ErrorCodeTenantNotFound,
 			Message: "failed to get tenant",
-			Err:     err,
 		}
 	}
 
@@ -480,21 +481,18 @@ func convertFirebaseError(err error) error {
 		return &auth.AuthError{
 			Code:    auth.ErrorCodeUserNotFound,
 			Message: "user not found",
-			Err:     err,
 		}
 	}
 	if fbauth.IsEmailAlreadyExists(err) {
 		return &auth.AuthError{
 			Code:    auth.ErrorCodeEmailAlreadyExists,
 			Message: "email already exists",
-			Err:     err,
 		}
 	}
-
+	log.Err(err).Msg("Firebase authentication error")
 	return &auth.AuthError{
 		Code:    "unknown",
 		Message: "authentication error",
-		Err:     err,
 	}
 }
 

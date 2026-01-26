@@ -2,10 +2,14 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	ory "github.com/ory/kratos-client-go"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -302,18 +306,10 @@ const (
 type AuthError struct {
 	Code    string
 	Message string
-	Err     error
 }
 
 func (e *AuthError) Error() string {
-	if e.Err != nil {
-		return e.Message + ": " + e.Err.Error()
-	}
 	return e.Message
-}
-
-func (e *AuthError) Unwrap() error {
-	return e.Err
 }
 
 // Error codes
@@ -338,4 +334,65 @@ func IsEmailAlreadyExists(err error) bool {
 		return authErr.Code == ErrorCodeEmailAlreadyExists
 	}
 	return false
+}
+
+func ConvertKratosError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var apiErr *ory.GenericOpenAPIError
+	if !errors.As(err, &apiErr) {
+		log.Err(err).Msg("Non-Kratos error encountered")
+		return &AuthError{
+			Code:    "unknown-error",
+			Message: err.Error(),
+		}
+	}
+
+	// Default values
+	errorCode := "kratos-error"
+	message := apiErr.Error()
+
+	// 1. Try to get ID from the Model
+	model := apiErr.Model()
+	if model != nil {
+		// Kratos often uses ErrorGeneric for API errors
+		if eg, ok := model.(ory.ErrorGeneric); ok {
+			if eg.Error.Id != nil {
+				errorCode = *eg.Error.Id
+			}
+			message = eg.Error.Message
+			if eg.Error.Reason != nil {
+				message += " reason: " + *eg.Error.Reason
+			}
+		} else if fe, ok := model.(ory.FlowError); ok {
+			// Some flows (like settings/login) return FlowError
+			if fe.Id != "" {
+				errorCode = fe.Id
+			}
+		}
+	}
+
+	// 2. Fallback: If Code is still generic, try parsing the raw JSON body
+	// (Useful if the SDK model mapping fails)
+	if errorCode == "kratos-error" {
+		var raw struct {
+			Error struct {
+				ID string `json:"id"`
+			} `json:"error"`
+			ID string `json:"id"` // Some responses have ID at top level
+		}
+		if jsonErr := json.Unmarshal(apiErr.Body(), &raw); jsonErr == nil {
+			if raw.Error.ID != "" {
+				errorCode = raw.Error.ID
+			} else if raw.ID != "" {
+				errorCode = raw.ID
+			}
+		}
+	}
+
+	return &AuthError{
+		Code:    errorCode,
+		Message: message,
+	}
 }

@@ -20,7 +20,7 @@ type TenantMetadata struct {
 func (k *KratosAuthClient) SetTenantMetadata(ctx context.Context, uid string, metadata TenantMetadata) error {
 	existing, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
-		return convertKratosError(err)
+		return auth.ConvertKratosError(err)
 	}
 
 	// Get or create metadata_public with type assertion
@@ -59,14 +59,14 @@ func (k *KratosAuthClient) SetTenantMetadata(ctx context.Context, uid string, me
 	updateBody.MetadataPublic = metadataPublic
 
 	_, _, err = k.adminClient.IdentityAPI.UpdateIdentity(ctx, uid).UpdateIdentityBody(updateBody).Execute()
-	return convertKratosError(err)
+	return auth.ConvertKratosError(err)
 }
 
 // GetTenantMetadata retrieves tenant information from a Kratos identity
 func (k *KratosAuthClient) GetTenantMetadata(ctx context.Context, uid string) (*TenantMetadata, error) {
 	ident, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
-		return nil, convertKratosError(err)
+		return nil, auth.ConvertKratosError(err)
 	}
 
 	if ident.MetadataPublic == nil {
@@ -133,7 +133,7 @@ func (k *KratosAuthClient) ListUsersByTenant(ctx context.Context, tenantID strin
 
 	identities, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).Execute()
 	if err != nil {
-		return nil, convertKratosError(err)
+		return nil, auth.ConvertKratosError(err)
 	}
 
 	var users []*auth.UserRecord

@@ -39,20 +39,14 @@ func (h *MFAHandler) GetMFAStatus(c *gin.Context) {
 		log.Error().Err(err).Msg("Failed to get MFA status")
 
 		// Check error type
-		if authErr, ok := err.(*kratos.AuthError); ok {
+		if authErr, ok := err.(*auth.AuthError); ok {
 			if authErr.Code == "unauthorized" {
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"error":   authErr.Code,
-					"message": authErr.Message,
-				})
+				c.JSON(http.StatusUnauthorized, err)
 				return
 			}
 		}
 
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "internal_error",
-			"message": "Failed to retrieve MFA status",
-		})
+		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
 
@@ -77,20 +71,14 @@ func (h *MFAHandler) InitializeSettingsFlow(c *gin.Context) {
 		log.Error().Err(err).Msg("Failed to initialize settings flow")
 
 		// Check error type
-		if authErr, ok := err.(*kratos.AuthError); ok {
+		if authErr, ok := err.(*auth.AuthError); ok {
 			if authErr.Code == "unauthorized" {
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"error":   authErr.Code,
-					"message": authErr.Message,
-				})
+				c.JSON(http.StatusUnauthorized, err)
 				return
 			}
 		}
 
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "internal_error",
-			"message": "Failed to initialize settings flow",
-		})
+		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
 
