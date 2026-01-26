@@ -92,7 +92,7 @@ selfservice:
       # Require re-authentication for settings changes (security best practice)
       privileged_session_max_age: 15m
       # Optional MFA - users decide
-      required_aal: aal1
+      required_aal: highest_available
       after:
         default_browser_return_url: http://localhost:5173/settings
 
