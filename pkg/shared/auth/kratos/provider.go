@@ -727,10 +727,18 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{
 				if !containsString(availableMethods, "lookup_secret") {
 					availableMethods = append(availableMethods, "lookup_secret")
 				}
-				// lookup_secret_confirm button means codes are set
-				if nodeName == "lookup_secret_confirm" {
+				// Recovery codes are SET if we see:
+				// - lookup_secret_regenerate button (codes already exist)
+				// - lookup_secret_confirm button (codes just generated, not yet confirmed)
+				// - lookup_secret_reveal button (codes exist and can be revealed)
+				if nodeName == "lookup_secret_regenerate" ||
+					nodeName == "lookup_secret_confirm" ||
+					nodeName == "lookup_secret_reveal" ||
+					nodeName == "lookup_secret_disable" {
 					recoveryCodesSet = true
-					log.Info().Msg("✅ Recovery codes are SET (lookup_secret_confirm button found)")
+					log.Info().
+						Str("button_type", nodeName).
+						Msg("✅ Recovery codes are SET")
 				}
 			}
 		}
