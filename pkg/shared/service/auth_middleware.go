@@ -107,11 +107,6 @@ func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *auth.Authen
 	c.Set(auth.AUTH_USER_ID, user.UserID)
 	c.Set(auth.AUTH_CLAIMS, user.Claims)
 
-	// Set custom claims for easy role checking
-	if len(user.CustomClaims) > 0 {
-		c.Set("custom_claims", user.CustomClaims)
-	}
-
 	// Set tenant context if available
 	if user.TenantID != "" {
 		c.Set(auth.AUTH_TENANT_ID_KEY, user.TenantID)
@@ -228,13 +223,11 @@ func GetAuthenticatedUser(c *gin.Context) *auth.AuthenticatedUser {
 	tenantIDStr, _ := tenantID.(string)
 	tenantMembershipsSlice, _ := tenantMemberships.([]auth.TenantMembership)
 
-	customClaims := util.FilterMapToArray(claimsMap, util.UppercaseOnly)
 
 	return &auth.AuthenticatedUser{
 		UserID:            userIDStr,
 		Email:             emailStr,
 		Claims:            claimsMap,
-		CustomClaims:      customClaims,
 		TenantID:          tenantIDStr,
 		TenantMemberships: tenantMembershipsSlice,
 	}
