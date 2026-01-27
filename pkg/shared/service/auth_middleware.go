@@ -41,6 +41,8 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			return
 		}
 
+		// Check for API token first
+		// API token auth is only valid for non-user-management endpoints
 		if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users/by-email") ||
 			(!strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
 				!strings.HasPrefix(c.Request.URL.Path, "/admin-api") &&
