@@ -634,10 +634,10 @@ type MFAStatus struct {
 }
 
 // GetMFAStatus returns the MFA configuration status for the current user
-func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{}, error) {
+func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
 	cookieHeader := c.GetHeader("Cookie")
 	if cookieHeader == "" {
-		return nil, &auth.AuthError{Code: "unauthorized", Message: "Not authenticated"}
+		return MFAStatus{}, &auth.AuthError{Code: "unauthorized", Message: "Not authenticated"}
 	}
 
 	// Create context with Cookie header for public API
@@ -649,7 +649,7 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{
 	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
 	if err != nil || resp.StatusCode != 200 {
 		log.Error().Err(err).Msg("Failed to get session")
-		return nil, auth.ConvertKratosError(err)
+		return MFAStatus{}, auth.ConvertKratosError(err)
 	}
 
 	identityID := session.Identity.Id
@@ -673,20 +673,17 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{
 
 	if err != nil || adminResp.StatusCode != 200 {
 		log.Error().Err(err).Msg("Failed to get identity from admin API")
-		return nil, auth.ConvertKratosError(err)
+		return MFAStatus{}, auth.ConvertKratosError(err)
 	}
 
 	// Step 3: Parse credentials to determine MFA status
-	status := parseMFAStatusFromIdentity(identity)
-
-	// Add AAL from session to the status
-	status["aal"] = aal
+	status := parseMFAStatusFromIdentity(identity, aal)
 
 	log.Info().
 		Str("identity_id", identityID).
-		Bool("totp_enabled", status["totp_enabled"].(bool)).
-		Bool("webauthn_enabled", status["webauthn_enabled"].(bool)).
-		Bool("recovery_codes_set", status["recovery_codes_set"].(bool)).
+		Bool("totp_enabled", status.TOTPEnabled).
+		Bool("webauthn_enabled", status.WebAuthnEnabled).
+		Bool("recovery_codes_set", status.RecoveryCodesSet).
 		Str("aal", aal).
 		Msg("📊 MFA status retrieved via admin API (no AAL2 required)")
 
@@ -694,17 +691,18 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{
 }
 
 // parseMFAStatusFromIdentity extracts MFA configuration from identity credentials
-func parseMFAStatusFromIdentity(identity *ory.Identity) map[string]interface{} {
+func parseMFAStatusFromIdentity(identity *ory.Identity, aal string) MFAStatus {
 	totpEnabled := false
 	webauthnEnabled := false
 	recoveryCodesSet := false
 
 	// Default response if credentials are not available
-	defaultStatus := map[string]interface{}{
-		"totp_enabled":       false,
-		"webauthn_enabled":   false,
-		"recovery_codes_set": false,
-		"available_methods":  []string{"totp", "webauthn", "lookup_secret"},
+	defaultStatus := MFAStatus{
+		TOTPEnabled:      false,
+		WebAuthnEnabled:  false,
+		RecoveryCodesSet: false,
+		AvailableMethods: []string{"totp", "webauthn", "lookup_secret"},
+		AAL:              aal,
 	}
 
 	if identity.Credentials == nil {
@@ -760,11 +758,12 @@ func parseMFAStatusFromIdentity(identity *ory.Identity) map[string]interface{} {
 		}
 	}
 
-	return map[string]interface{}{
-		"totp_enabled":       totpEnabled,
-		"webauthn_enabled":   webauthnEnabled,
-		"recovery_codes_set": recoveryCodesSet,
-		"available_methods":  []string{"totp", "webauthn", "lookup_secret"},
+	return MFAStatus{
+		TOTPEnabled:      totpEnabled,
+		WebAuthnEnabled:  webauthnEnabled,
+		RecoveryCodesSet: recoveryCodesSet,
+		AvailableMethods: []string{"totp", "webauthn", "lookup_secret"},
+		AAL:              aal,
 	}
 }
 
