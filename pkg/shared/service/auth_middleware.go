@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"ctoup.com/coreapp/pkg/shared/auth"
+	"ctoup.com/coreapp/pkg/shared/auth/kratos"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
@@ -56,8 +57,6 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					// API token is valid, store info and continue
 					c.Set("api_token", tokenRow)
 					c.Set("api_token_scopes", tokenRow.Scopes)
-					// c.Set(auth.AUTH_EMAIL,)
-					// c.Set(auth.AUTH_CLAIMS, idToken.Claims)
 					c.Set(auth.AUTH_USER_ID, tokenRow.CreatedBy)
 					c.Next()
 					return
@@ -93,9 +92,12 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-
+		// Check AAL requirements
+		if !am.checkAALRequirements(c) {
+			c.Abort()
+			return
+		}
 		c.Next()
-
 	}
 }
 
@@ -164,6 +166,49 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.Authentica
 		})
 		c.Abort()
 		return false
+	}
+
+	return true
+}
+
+// checkAALRequirements validates AAL-based access control
+func (am *AuthMiddleware) checkAALRequirements(c *gin.Context) bool {
+	// Check AAL requirements for Kratos provider
+	kratosProvider, ok := am.authProvider.(*kratos.KratosAuthProvider)
+	if !ok {
+		return true
+	}
+
+	// Applies to mutating methods only
+	if !util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
+		return true
+	}
+
+	// Only admin users can alter users
+	if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") ||
+		strings.HasPrefix(c.Request.URL.Path, "/admin-api") ||
+		strings.HasPrefix(c.Request.URL.Path, "/superadmin-api") {
+		// Check AAL requirements for Kratos provider
+		// Get AAL info (current + available)
+		aalInfo, err := kratosProvider.GetSessionAALInfo(c)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to get AAL info")
+			return false
+		}
+
+		// Check if current AAL equals available AAL
+		// This ensures user has verified their highest available authentication level
+		if aalInfo.Current != aalInfo.Available {
+			authErr := auth.NewAuthError(
+				auth.ErrorCodeSessionAAL2Required,
+				"MFA verification required for this operation",
+			)
+			// Include AAL info in error details
+			c.JSON(http.StatusForbidden, authErr)
+			c.Abort()
+			return false
+		}
+		return true
 	}
 
 	return true

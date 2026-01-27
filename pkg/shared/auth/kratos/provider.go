@@ -633,19 +633,124 @@ type MFAStatus struct {
 	AAL              string   `json:"aal"` // Current Authenticator Assurance Level
 }
 
-// GetMFAStatus returns the MFA configuration status for the current user
-func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
-	cookieHeader := c.GetHeader("Cookie")
-	if cookieHeader == "" {
-		return MFAStatus{}, &auth.AuthError{Code: "unauthorized", Message: "Not authenticated"}
+// hasAnyMFAConfigured checks if user has any MFA method configured
+func hasAnyMFAConfigured(credentials map[string]ory.IdentityCredentials) bool {
+	// Check TOTP
+	if totpCred, exists := credentials["totp"]; exists {
+		if len(totpCred.Identifiers) > 0 {
+			return true
+		}
 	}
 
-	// Create context with Cookie header for public API
+	// Check WebAuthn
+	if webauthnCred, exists := credentials["webauthn"]; exists {
+		if len(webauthnCred.Identifiers) > 0 {
+			return true
+		}
+	}
+
+	// Check lookup_secret (recovery codes)
+	if lookupCred, exists := credentials["lookup_secret"]; exists {
+		if len(lookupCred.Identifiers) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetSessionAALInfo returns both current and available AAL levels
+// This is the single source of truth for AAL information
+func (k *KratosAuthProvider) GetSessionAALInfo(c *gin.Context) (*auth.AALInfo, error) {
+	// Check cache first
+	if aalInfo, exists := c.Get(auth.AUTH_AAL_INFO_KEY); exists {
+		if info, ok := aalInfo.(*auth.AALInfo); ok {
+			return info, nil
+		}
+	}
+
+	cookieHeader := c.GetHeader("Cookie")
+	if cookieHeader == "" {
+		// Return default AAL1 info when not authenticated
+		defaultInfo := &auth.AALInfo{
+			Current:    "aal1",
+			Available:  "aal1",
+			CanUpgrade: false,
+		}
+		return defaultInfo, nil
+	}
+
 	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
 		"Cookie": {Key: cookieHeader},
 	})
 
-	// Step 1: Get session from public API (to verify user is authenticated and get identity ID + AAL)
+	// Get session from Kratos
+	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
+	if err != nil || resp.StatusCode != 200 {
+		return nil, auth.ConvertKratosError(err)
+	}
+
+	// Extract current AAL from session
+	currentAAL := "aal1"
+	if session.AuthenticatorAssuranceLevel != nil {
+		currentAAL = string(*session.AuthenticatorAssuranceLevel)
+	}
+
+	// Determine available AAL by checking if user has MFA methods configured
+	// We need to check the identity's credentials via Admin API
+	identityID := session.Identity.Id
+	adminCtx := context.Background()
+
+	identity, adminResp, err := k.adminClient.IdentityAPI.GetIdentity(adminCtx, identityID).
+		IncludeCredential([]string{"totp", "webauthn", "lookup_secret"}).
+		Execute()
+
+	availableAAL := "aal1"
+	if err == nil && adminResp.StatusCode == 200 && identity.Credentials != nil {
+		if hasAnyMFAConfigured(*identity.Credentials) {
+			availableAAL = "aal2"
+		}
+	}
+
+	aalInfo := &auth.AALInfo{
+		Current:    currentAAL,
+		Available:  availableAAL,
+		CanUpgrade: availableAAL == "aal2" && currentAAL == "aal1",
+	}
+
+	// Cache in context
+	c.Set(auth.AUTH_AAL_INFO_KEY, aalInfo)
+	c.Set(auth.AUTH_CURRENT_AAL_KEY, currentAAL)
+	c.Set(auth.AUTH_AVAILABLE_AAL_KEY, availableAAL)
+
+	log.Debug().
+		Str("identity_id", session.Identity.Id).
+		Str("current_aal", currentAAL).
+		Str("available_aal", availableAAL).
+		Bool("can_upgrade", aalInfo.CanUpgrade).
+		Msg("AAL info retrieved")
+
+	return aalInfo, nil
+}
+
+// GetMFAStatus returns the MFA configuration status for the current user
+func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
+	// Get AAL info (reuses cached value if available)
+	aalInfo, err := k.GetSessionAALInfo(c)
+	if err != nil {
+		return MFAStatus{}, auth.NewAuthError(auth.ErrorCodeUnauthorized, "Not authenticated")
+	}
+
+	// Get session to extract identity ID
+	cookieHeader := c.GetHeader("Cookie")
+	if cookieHeader == "" {
+		return MFAStatus{}, auth.NewAuthError(auth.ErrorCodeUnauthorized, "Not authenticated")
+	}
+
+	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
+		"Cookie": {Key: cookieHeader},
+	})
+
 	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
 	if err != nil || resp.StatusCode != 200 {
 		log.Error().Err(err).Msg("Failed to get session")
@@ -654,17 +759,8 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
 
 	identityID := session.Identity.Id
 
-	// Extract AAL from session
-	var aal string
-	if session.AuthenticatorAssuranceLevel != nil {
-		aal = string(*session.AuthenticatorAssuranceLevel)
-	} else {
-		aal = "aal1"
-	}
-
-	// Step 2: Use Admin API to get full identity with credentials
+	// Use Admin API to get full identity with credentials
 	// Admin API does NOT require AAL2 - it authenticates via admin credentials
-	// Create a fresh context for admin API (not tied to user's cookie)
 	adminCtx := context.Background()
 
 	identity, adminResp, err := k.adminClient.IdentityAPI.GetIdentity(adminCtx, identityID).
@@ -676,15 +772,15 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
 		return MFAStatus{}, auth.ConvertKratosError(err)
 	}
 
-	// Step 3: Parse credentials to determine MFA status
-	status := parseMFAStatusFromIdentity(identity, aal)
+	// Parse credentials to determine MFA status
+	status := parseMFAStatusFromIdentity(identity, aalInfo.Current)
 
 	log.Info().
 		Str("identity_id", identityID).
 		Bool("totp_enabled", status.TOTPEnabled).
 		Bool("webauthn_enabled", status.WebAuthnEnabled).
 		Bool("recovery_codes_set", status.RecoveryCodesSet).
-		Str("aal", aal).
+		Str("aal", aalInfo.Current).
 		Msg("📊 MFA status retrieved via admin API (no AAL2 required)")
 
 	return status, nil
