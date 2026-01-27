@@ -104,21 +104,19 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 	}
 
 	email, _ := token.Claims["email"].(string)
-
-	customClaims := []string{}
-
+	claims := map[string]interface{}{}
 	// Extract global roles from metadata_public
 	if globalRolesArr, ok := token.Claims["global_roles"].([]interface{}); ok {
 		for _, role := range globalRolesArr {
 			if roleStr, ok := role.(string); ok {
-				customClaims = append(customClaims, roleStr)
+				claims[roleStr] = true
 			}
 		}
 	}
 
 	// if customClaims containts SUPER_ADMIN
 	isSuperAdmin := false
-	for _, claim := range customClaims {
+	for _, claim := range claims {
 		if claim == "SUPER_ADMIN" {
 			isSuperAdmin = true
 			break // Exit loop once found
@@ -129,8 +127,7 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 		UserID:            token.UID,
 		Email:             email,
 		EmailVerified:     true, // Should check verifiable_addresses if needed
-		Claims:            token.Claims,
-		CustomClaims:      customClaims,
+		Claims:            claims,
 		TenantID:          tenantID,
 		TenantMemberships: []auth.TenantMembership{},
 	}
@@ -156,10 +153,12 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 					if rolesInterface, ok := membershipMap["roles"].([]interface{}); ok {
 						for _, r := range rolesInterface {
 							if roleStr, ok := r.(string); ok {
-								customClaims = append(customClaims, roleStr)
+								claims[roleStr] = true
 							}
 						}
 					}
+					user.TenantMemberships = append(user.TenantMemberships, membership)
+
 					return user, nil
 				}
 			}

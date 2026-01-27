@@ -115,15 +115,11 @@ func (f *FirebaseAuthProvider) VerifyTokenWithTenantID(c context.Context, tenant
 	emailVerified, _ := idToken.Claims["email_verified"].(bool)
 	userID := idToken.UID
 
-	// Extract custom claims (uppercase only)
-	customClaims := util.FilterMapToArray(idToken.Claims, util.UppercaseOnly)
-
 	return &auth.AuthenticatedUser{
 		UserID:        userID,
 		Email:         email,
 		EmailVerified: emailVerified,
 		Claims:        idToken.Claims,
-		CustomClaims:  customClaims,
 	}, nil
 }
 

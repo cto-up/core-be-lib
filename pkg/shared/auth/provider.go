@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,9 +30,13 @@ type AuthenticatedUser struct {
 	Email             string                 `json:"email"`
 	EmailVerified     bool                   `json:"email_verified"`
 	Claims            map[string]interface{} `json:"claims"`
-	CustomClaims      []string               `json:"custom_claims"`
 	TenantID          string                 `json:"tenant_id,omitempty"`
 	TenantMemberships []TenantMembership     `json:"tenant_memberships,omitempty"` // List of tenant memberships with roles
+}
+
+func (au *AuthenticatedUser) GetClaimsArray() []string {
+	customClaims := util.FilterMapToArray(au.Claims, util.UppercaseOnly)
+	return customClaims
 }
 
 // UserRecord represents a user in the authentication system
