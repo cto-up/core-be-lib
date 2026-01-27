@@ -640,125 +640,132 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (map[string]interface{
 		return nil, &auth.AuthError{Code: "unauthorized", Message: "Not authenticated"}
 	}
 
-	// Create context with Cookie header
+	// Create context with Cookie header for public API
 	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
-		"Cookie": {
-			Key: cookieHeader,
-		},
+		"Cookie": {Key: cookieHeader},
 	})
 
-	// Get current session to check AAL
+	// Step 1: Get session from public API (to verify user is authenticated and get identity ID + AAL)
 	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
 	if err != nil || resp.StatusCode != 200 {
 		log.Error().Err(err).Msg("Failed to get session")
 		return nil, auth.ConvertKratosError(err)
 	}
 
+	identityID := session.Identity.Id
+
 	// Extract AAL from session
 	var aal string
 	if session.AuthenticatorAssuranceLevel != nil {
 		aal = string(*session.AuthenticatorAssuranceLevel)
 	} else {
-		aal = "aal1" // Default if not present
+		aal = "aal1"
 	}
 
-	// Create settings flow - SDK automatically adds Cookie header from context
-	flow, resp, err := k.publicClient.FrontendAPI.CreateBrowserSettingsFlow(ctx).Cookie(cookieHeader).Execute()
+	// Step 2: Use Admin API to get full identity with credentials
+	// Admin API does NOT require AAL2 - it authenticates via admin credentials
+	// Create a fresh context for admin API (not tied to user's cookie)
+	adminCtx := context.Background()
 
-	if err != nil || resp.StatusCode != 200 {
-		log.Error().Err(err).Msg("Failed to create settings flow")
+	identity, adminResp, err := k.adminClient.IdentityAPI.GetIdentity(adminCtx, identityID).
+		IncludeCredential([]string{"totp", "webauthn", "lookup_secret"}).
+		Execute()
 
+	if err != nil || adminResp.StatusCode != 200 {
+		log.Error().Err(err).Msg("Failed to get identity from admin API")
 		return nil, auth.ConvertKratosError(err)
 	}
 
-	// Parse the flow to determine MFA status
+	// Step 3: Parse credentials to determine MFA status
+	status := parseMFAStatusFromIdentity(identity)
+
+	// Add AAL from session to the status
+	status["aal"] = aal
+
+	log.Info().
+		Str("identity_id", identityID).
+		Bool("totp_enabled", status["totp_enabled"].(bool)).
+		Bool("webauthn_enabled", status["webauthn_enabled"].(bool)).
+		Bool("recovery_codes_set", status["recovery_codes_set"].(bool)).
+		Str("aal", aal).
+		Msg("📊 MFA status retrieved via admin API (no AAL2 required)")
+
+	return status, nil
+}
+
+// parseMFAStatusFromIdentity extracts MFA configuration from identity credentials
+func parseMFAStatusFromIdentity(identity *ory.Identity) map[string]interface{} {
 	totpEnabled := false
 	webauthnEnabled := false
 	recoveryCodesSet := false
-	availableMethods := []string{}
 
-	log.Debug().
-		Int("node_count", len(flow.Ui.Nodes)).
-		Msg("Parsing settings flow for MFA status")
+	// Default response if credentials are not available
+	defaultStatus := map[string]interface{}{
+		"totp_enabled":       false,
+		"webauthn_enabled":   false,
+		"recovery_codes_set": false,
+		"available_methods":  []string{"totp", "webauthn", "lookup_secret"},
+	}
 
-	if flow.Ui.Nodes != nil {
-		for _, node := range flow.Ui.Nodes {
-			// Extract node name from attributes
-			// The Attributes field contains the actual node data
-			var nodeName string
+	if identity.Credentials == nil {
+		log.Debug().Msg("No credentials found in identity")
+		return defaultStatus
+	}
 
-			// Try to get the name from UiNodeInputAttributes
-			if inputAttrs := node.Attributes.UiNodeInputAttributes; inputAttrs != nil {
-				nodeName = inputAttrs.Name
-			}
+	credentials := *identity.Credentials
 
+	// Check TOTP credential
+	if totpCred, exists := credentials["totp"]; exists {
+		// TOTP is enabled if it has identifiers (the TOTP secret is configured)
+		if totpCred.Identifiers != nil && len(totpCred.Identifiers) > 0 {
+			totpEnabled = true
 			log.Debug().
-				Str("group", node.Group).
-				Str("type", node.Type).
-				Str("name", nodeName).
-				Msg("Processing settings flow node")
-
-			// Check TOTP status
-			if node.Group == "totp" {
-				if !containsString(availableMethods, "totp") {
-					availableMethods = append(availableMethods, "totp")
-				}
-				// totp_unlink button means TOTP is ENABLED
-				if nodeName == "totp_unlink" {
-					totpEnabled = true
-					log.Info().Msg("✅ TOTP is ENABLED (totp_unlink button found)")
-				}
-			}
-
-			// Check WebAuthn status
-			if node.Group == "webauthn" {
-				if !containsString(availableMethods, "webauthn") {
-					availableMethods = append(availableMethods, "webauthn")
-				}
-				// webauthn_remove button means WebAuthn is enabled
-				if strings.Contains(nodeName, "webauthn_remove") {
-					webauthnEnabled = true
-					log.Info().Msg("✅ WebAuthn is ENABLED (webauthn_remove button found)")
-				}
-			}
-
-			// Check recovery codes status
-			if node.Group == "lookup_secret" {
-				if !containsString(availableMethods, "lookup_secret") {
-					availableMethods = append(availableMethods, "lookup_secret")
-				}
-				// Recovery codes are SET if we see:
-				// - lookup_secret_regenerate button (codes already exist)
-				// - lookup_secret_confirm button (codes just generated, not yet confirmed)
-				// - lookup_secret_reveal button (codes exist and can be revealed)
-				if nodeName == "lookup_secret_regenerate" ||
-					nodeName == "lookup_secret_confirm" ||
-					nodeName == "lookup_secret_reveal" ||
-					nodeName == "lookup_secret_disable" {
-					recoveryCodesSet = true
-					log.Info().
-						Str("button_type", nodeName).
-						Msg("✅ Recovery codes are SET")
-				}
-			}
+				Interface("identifiers", totpCred.Identifiers).
+				Msg("✅ TOTP enabled")
 		}
 	}
 
-	result := map[string]interface{}{
+	// Check WebAuthn credential
+	if webauthnCred, exists := credentials["webauthn"]; exists {
+		// Method 1: Check identifiers
+		if webauthnCred.Identifiers != nil && len(webauthnCred.Identifiers) > 0 {
+			webauthnEnabled = true
+			log.Debug().
+				Interface("identifiers", webauthnCred.Identifiers).
+				Msg("✅ WebAuthn enabled (identifiers)")
+		}
+
+		// Method 2: Check config.credentials array (contains registered devices)
+		// This is a more detailed check that shows how many devices are registered
+		if !webauthnEnabled && webauthnCred.Config != nil {
+			configMap := webauthnCred.Config
+			if credsArray, hasCreds := configMap["credentials"].([]interface{}); hasCreds && len(credsArray) > 0 {
+				webauthnEnabled = true
+				log.Debug().
+					Int("device_count", len(credsArray)).
+					Msg("✅ WebAuthn enabled (devices)")
+			}
+		}
+
+	}
+
+	// Check lookup_secret credential (recovery codes)
+	if lookupCred, exists := credentials["lookup_secret"]; exists {
+		// Recovery codes are set if identifiers exist
+		if lookupCred.Identifiers != nil && len(lookupCred.Identifiers) > 0 {
+			recoveryCodesSet = true
+			log.Debug().
+				Interface("identifiers", lookupCred.Identifiers).
+				Msg("✅ Recovery codes set")
+		}
+	}
+
+	return map[string]interface{}{
 		"totp_enabled":       totpEnabled,
 		"webauthn_enabled":   webauthnEnabled,
 		"recovery_codes_set": recoveryCodesSet,
-		"available_methods":  availableMethods,
-		"aal":                aal,
+		"available_methods":  []string{"totp", "webauthn", "lookup_secret"},
 	}
-
-	log.Info().
-		Bool("totp_enabled", totpEnabled).
-		Bool("webauthn_enabled", webauthnEnabled).
-		Bool("recovery_codes_set", recoveryCodesSet).
-		Msg("📊 MFA status determined from settings flow")
-
-	return result, nil
 }
 
 // InitializeSettingsFlow creates a new settings flow for MFA configuration
