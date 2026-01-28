@@ -710,11 +710,28 @@ func (k *KratosAuthProvider) GetSessionAALInfo(c *gin.Context) (*auth.AALInfo, e
 			availableAAL = "aal2"
 		}
 	}
+	// Check 'Age' of the MFA method
+	isRecent := false
+	if (availableAAL == "aal2") && (currentAAL == "aal2") {
+		// Verify if the MFA method used was recent enough (e.g., within 15 minutes)
+		maxAge := 15 * time.Minute
+
+		for _, method := range session.AuthenticationMethods {
+			if method.Method != nil &&
+				method.CompletedAt != nil &&
+				(*method.Method == "totp" || *method.Method == "webauthn") &&
+				time.Since(*method.CompletedAt) < maxAge {
+				isRecent = true
+				break
+			}
+		}
+	}
 
 	aalInfo := &auth.AALInfo{
-		Current:    currentAAL,
-		Available:  availableAAL,
-		CanUpgrade: availableAAL == "aal2" && currentAAL == "aal1",
+		Current:      currentAAL,
+		Available:    availableAAL,
+		CanUpgrade:   availableAAL == "aal2" && currentAAL == "aal1",
+		IsAAL2Recent: isRecent,
 	}
 
 	// Cache in context
