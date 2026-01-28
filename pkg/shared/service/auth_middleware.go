@@ -193,7 +193,8 @@ func (am *AuthMiddleware) checkAALRequirements(c *gin.Context) bool {
 
 		// Check if current AAL equals available AAL
 		// This ensures user has verified their highest available authentication level
-		if aalInfo.Current != aalInfo.Available {
+		if aalInfo.Current != aalInfo.Available ||
+			(aalInfo.Current == "aal2" && aalInfo.IsAAL2Recent == false) {
 			authErr := auth.NewAuthError(
 				auth.ErrorCodeSessionAAL2Required,
 				"MFA verification required for this operation",
@@ -222,7 +223,6 @@ func GetAuthenticatedUser(c *gin.Context) *auth.AuthenticatedUser {
 	claimsMap, _ := claims.(map[string]interface{})
 	tenantIDStr, _ := tenantID.(string)
 	tenantMembershipsSlice, _ := tenantMemberships.([]auth.TenantMembership)
-
 
 	return &auth.AuthenticatedUser{
 		UserID:            userIDStr,

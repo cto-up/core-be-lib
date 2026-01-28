@@ -10,9 +10,10 @@ const (
 
 // AALInfo contains both current and available AAL levels
 type AALInfo struct {
-	Current    string // Current session AAL (aal1 or aal2)
-	Available  string // Highest AAL user can achieve (aal1 or aal2)
-	CanUpgrade bool   // True if user has MFA configured but not verified in session
+	Current      string // Current session AAL (aal1 or aal2)
+	Available    string // Highest AAL user can achieve (aal1 or aal2)
+	CanUpgrade   bool   // True if user has MFA configured but not verified in session
+	IsAAL2Recent bool   // True if user recently verified AAL2 (used for grace periods)
 }
 
 // GetAALInfo retrieves the AAL information from context
