@@ -70,7 +70,7 @@ selfservice:
       config:
         rp:
           display_name: ctoup # Change to your app name
-          id: localhost # Must match your domain (without protocol/port)
+          id: ctoup.localhost # Parent domain for multi-tenant subdomains
           origins:
             - http://localhost:5173
             - http://auth.ctoup.localhost

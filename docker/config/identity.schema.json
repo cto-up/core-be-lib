@@ -21,6 +21,9 @@
               "totp": {
                 "account_name": true
               },
+              "webauthn": {
+                "identifier": true
+              },
               "code": {
                 "identifier": true,
                 "via": "email"
