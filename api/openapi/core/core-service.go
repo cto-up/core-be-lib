@@ -14,6 +14,7 @@ import (
 
 const (
 	BearerAuthScopes = "BearerAuth.Scopes"
+	CookieAuthScopes = "cookieAuth.Scopes"
 )
 
 // Defines values for ListClientApplicationsParamsOrder.
@@ -865,6 +866,9 @@ type ServerInterface interface {
 	// Get MFA status
 	// (GET /api/v1/mfa/status)
 	GetMFAStatus(c *gin.Context)
+	// Disable WebAuthn
+	// (DELETE /api/v1/mfa/webauthn)
+	DisableWebAuthn(c *gin.Context)
 
 	// (GET /api/v1/prompts)
 	ListPrompts(c *gin.Context, params ListPromptsParams)
@@ -1771,6 +1775,21 @@ func (siw *ServerInterfaceWrapper) GetMFAStatus(c *gin.Context) {
 	}
 
 	siw.Handler.GetMFAStatus(c)
+}
+
+// DisableWebAuthn operation middleware
+func (siw *ServerInterfaceWrapper) DisableWebAuthn(c *gin.Context) {
+
+	c.Set(CookieAuthScopes, []string{})
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DisableWebAuthn(c)
 }
 
 // ListPrompts operation middleware
@@ -3921,6 +3940,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/api/v1/me/profile/picture", wrapper.UploadProfilePicture)
 	router.POST(options.BaseURL+"/api/v1/mfa/settings/init", wrapper.InitializeSettingsFlow)
 	router.GET(options.BaseURL+"/api/v1/mfa/status", wrapper.GetMFAStatus)
+	router.DELETE(options.BaseURL+"/api/v1/mfa/webauthn", wrapper.DisableWebAuthn)
 	router.GET(options.BaseURL+"/api/v1/prompts", wrapper.ListPrompts)
 	router.POST(options.BaseURL+"/api/v1/prompts", wrapper.AddPrompt)
 	router.POST(options.BaseURL+"/api/v1/prompts/execute", wrapper.ExecutePrompt)

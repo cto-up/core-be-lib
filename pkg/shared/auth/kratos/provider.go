@@ -787,7 +787,8 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
 		log.Error().Err(err).Msg("Failed to get identity from admin API")
 		return MFAStatus{}, auth.ConvertKratosError(err)
 	}
-
+	rawJson, _ := identity.MarshalJSON()
+	fmt.Printf("DEBUG RAW IDENTITY: %s\n", string(rawJson))
 	// Parse credentials to determine MFA status
 	status := parseMFAStatusFromIdentity(identity, aalInfo.Current)
 
@@ -837,15 +838,8 @@ func parseMFAStatusFromIdentity(identity *ory.Identity, aal string) MFAStatus {
 
 	// Check WebAuthn credential
 	if webauthnCred, exists := credentials["webauthn"]; exists {
-		// Method 1: Check identifiers
-		if webauthnCred.Identifiers != nil && len(webauthnCred.Identifiers) > 0 {
-			webauthnEnabled = true
-			log.Debug().
-				Interface("identifiers", webauthnCred.Identifiers).
-				Msg("✅ WebAuthn enabled (identifiers)")
-		}
 
-		// Method 2: Check config.credentials array (contains registered devices)
+		// Check config.credentials array (contains registered devices)
 		// This is a more detailed check that shows how many devices are registered
 		if !webauthnEnabled && webauthnCred.Config != nil {
 			configMap := webauthnCred.Config
@@ -901,6 +895,72 @@ func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.Settin
 		return nil, auth.ConvertKratosError(err)
 	}
 	return flow, nil
+}
+
+// DisableWebAuthn completely removes all WebAuthn credentials using Admin API
+func (k *KratosAuthProvider) DisableWebAuthn(c *gin.Context) error {
+	// Get session to extract identity ID
+	cookieHeader := c.GetHeader("Cookie")
+	if cookieHeader == "" {
+		return auth.NewAuthError(auth.ErrorCodeUnauthorized, "Not authenticated")
+	}
+
+	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
+		"Cookie": {Key: cookieHeader},
+	})
+
+	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
+	if err != nil || resp.StatusCode != 200 {
+		log.Error().Err(err).Msg("Failed to get session")
+		return auth.ConvertKratosError(err)
+	}
+
+	identityID := session.Identity.Id
+
+	// Use Admin API to get full identity with credentials
+	adminCtx := context.Background()
+
+	identity, adminResp, err := k.adminClient.IdentityAPI.GetIdentity(adminCtx, identityID).
+		IncludeCredential([]string{"webauthn"}).
+		Execute()
+
+	if err != nil || adminResp.StatusCode != 200 {
+		log.Error().Err(err).Msg("Failed to get identity from admin API")
+		return auth.ConvertKratosError(err)
+	}
+
+	// Check if WebAuthn credentials exist
+	if identity.Credentials == nil {
+		log.Info().Str("identity_id", identityID).Msg("No credentials found")
+		return nil // Already disabled
+	}
+
+	credentials := *identity.Credentials
+	_, exists := credentials["webauthn"]
+	if !exists {
+		log.Info().Str("identity_id", identityID).Msg("No WebAuthn credential found")
+		return nil // Already disabled
+	}
+
+	// Delete the WebAuthn credential using Admin API
+	log.Info().
+		Str("identity_id", identityID).
+		Msg("🔐 Removing WebAuthn credential via Admin API")
+
+	// Use the DeleteIdentityCredentials endpoint
+	deleteResp, err := k.adminClient.IdentityAPI.DeleteIdentityCredentials(adminCtx, identityID, "webauthn").
+		Execute()
+
+	if err != nil || deleteResp.StatusCode != 204 {
+		log.Error().Err(err).Msg("Failed to delete WebAuthn credential")
+		return auth.ConvertKratosError(err)
+	}
+
+	log.Info().
+		Str("identity_id", identityID).
+		Msg("✅ WebAuthn credential removed successfully")
+
+	return nil
 }
 
 // Helper function to check if slice contains string

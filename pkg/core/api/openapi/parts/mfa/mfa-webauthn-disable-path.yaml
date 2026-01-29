@@ -1,0 +1,23 @@
+delete:
+  summary: Disable WebAuthn
+  description: Completely removes all WebAuthn credentials for the current user using Admin API
+  operationId: disableWebAuthn
+  tags:
+    - MFA
+  security:
+    - cookieAuth: []
+  responses:
+    "200":
+      description: WebAuthn disabled successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "WebAuthn disabled successfully"
+    "401":
+      $ref: "../../core-schema.yaml#/components/responses/UnauthorizedError"
+    "500":
+      $ref: "../../core-schema.yaml#/components/responses/InternalServerError"
