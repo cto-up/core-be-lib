@@ -718,3 +718,15 @@ type UserProfileSchema struct {
 	SocialMedias         *[]string `json:"socialMedias,omitempty"`
 	Title                *string   `json:"title,omitempty"`
 }
+
+// InternalServerError defines model for InternalServerError.
+type InternalServerError struct {
+	Error   *string `json:"error,omitempty"`
+	Message *string `json:"message,omitempty"`
+}
+
+// UnauthorizedError defines model for UnauthorizedError.
+type UnauthorizedError struct {
+	Error   *string `json:"error,omitempty"`
+	Message *string `json:"message,omitempty"`
+}

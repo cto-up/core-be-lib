@@ -84,3 +84,40 @@ func (h *MFAHandler) InitializeSettingsFlow(c *gin.Context) {
 
 	c.JSON(http.StatusOK, flow)
 }
+
+// DisableWebAuthn completely removes all WebAuthn credentials for the current user
+// (DELETE /api/v1/mfa/webauthn)
+func (h *MFAHandler) DisableWebAuthn(c *gin.Context) {
+	// Check if provider is Kratos
+	kratosProvider, ok := h.authProvider.(*kratos.KratosAuthProvider)
+	if !ok {
+		c.JSON(http.StatusNotImplemented, gin.H{
+			"error":   "not_supported",
+			"message": "MFA is only supported with Kratos authentication provider",
+		})
+		return
+	}
+
+	err := kratosProvider.DisableWebAuthn(c)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to disable WebAuthn")
+
+		// Check error type
+		if authErr, ok := err.(*auth.AuthError); ok {
+			if authErr.Code == "unauthorized" {
+				c.JSON(http.StatusUnauthorized, err)
+				return
+			}
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "internal_error",
+			"message": "Failed to disable WebAuthn",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "WebAuthn disabled successfully",
+	})
+}
