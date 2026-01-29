@@ -510,7 +510,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useKratosAuth } from "@/composables/kratos-auth.composable";
+import { useKratosAuth } from "@/composables/useKratosAuth";
 import axios from "axios";
 
 interface TenantMembership {
@@ -643,7 +643,7 @@ async function switchTenant(subdomain: string) {
 
 ```typescript
 import { computed } from "vue";
-import { useKratosAuth } from "./kratos-auth.composable";
+import { useKratosAuth } from "./useKratosAuth";
 
 export function useTenant() {
   const { session } = useKratosAuth();

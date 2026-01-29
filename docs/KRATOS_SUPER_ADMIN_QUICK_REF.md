@@ -393,4 +393,4 @@ func DeleteResource(c *gin.Context) {
 
 - [Full Multi-Tenancy Guide](./KRATOS_MULTI_TENANCY.md)
 - [Server Setup Example](./KRATOS_SERVER_SETUP_EXAMPLE.md)
-- [Frontend Guide](../../hub/frontend-shadcn/KRATOS_TENANT_GUIDE.md)
+- [Frontend Guide](../../hub/frontend/KRATOS_TENANT_GUIDE.md)
