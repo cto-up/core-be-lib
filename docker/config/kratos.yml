@@ -73,7 +73,13 @@ selfservice:
           id: ctoup.localhost # Parent domain for multi-tenant subdomains
           origins:
             - http://localhost:5173
+            - http://ctoup.localhost:5173
+            - http://auth.ctoup.localhost:5173
+            - http://corpb.ctoup.localhost:5173
+            - http://localhost
+            - http://ctoup.localhost
             - http://auth.ctoup.localhost
+            - http://corpb.ctoup.localhost
     # Recovery codes (backup codes)
     lookup_secret:
       enabled: true

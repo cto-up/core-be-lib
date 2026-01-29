@@ -395,7 +395,7 @@ func getCurrentUser(c *gin.Context) {
 		"email":     user.Email,
 		"tenant_id": user.TenantID,
 		"subdomain": user.Subdomain,
-		"roles":     user.CustomClaims,
+		"roles":     user.GetClaimsArray(),
 	})
 }
 
@@ -443,7 +443,7 @@ func getTenantUsers(c *gin.Context) {
 
 	// Check if user has admin role
 	user := service.GetAuthenticatedUser(c)
-	if !contains(user.CustomClaims, "ADMIN") && !contains(user.CustomClaims, "SUPER_ADMIN") {
+	if !contains(user.GetClaimsArray(), "ADMIN") && !contains(user.GetClaimsArray(), "SUPER_ADMIN") {
 		c.JSON(403, gin.H{"error": "Admin access required"})
 		return
 	}
@@ -466,7 +466,7 @@ func inviteUserToTenant(c *gin.Context) {
 func listAllTenants(c *gin.Context) {
 	// Admin only - list all tenants
 	user := service.GetAuthenticatedUser(c)
-	if !contains(user.CustomClaims, "ADMIN") && !contains(user.CustomClaims, "SUPER_ADMIN") {
+	if !contains(user.GetClaimsArray(), "ADMIN") && !contains(user.GetClaimsArray(), "SUPER_ADMIN") {
 		c.JSON(403, gin.H{"error": "Admin access required"})
 		return
 	}
@@ -481,7 +481,7 @@ func listAllTenants(c *gin.Context) {
 
 func createTenant(c *gin.Context) {
 	user := service.GetAuthenticatedUser(c)
-	if !contains(user.CustomClaims, "ADMIN") && !contains(user.CustomClaims, "SUPER_ADMIN") {
+	if !contains(user.GetClaimsArray(), "ADMIN") && !contains(user.GetClaimsArray(), "SUPER_ADMIN") {
 		c.JSON(403, gin.H{"error": "Admin access required"})
 		return
 	}
@@ -508,7 +508,7 @@ func createTenant(c *gin.Context) {
 
 func updateTenant(c *gin.Context) {
 	user := service.GetAuthenticatedUser(c)
-	if !contains(user.CustomClaims, "ADMIN") && !contains(user.CustomClaims, "SUPER_ADMIN") {
+	if !contains(user.GetClaimsArray(), "ADMIN") && !contains(user.GetClaimsArray(), "SUPER_ADMIN") {
 		c.JSON(403, gin.H{"error": "Admin access required"})
 		return
 	}
@@ -535,7 +535,7 @@ func updateTenant(c *gin.Context) {
 
 func getSystemStats(c *gin.Context) {
 	user := service.GetAuthenticatedUser(c)
-	if !contains(user.CustomClaims, "SUPER_ADMIN") {
+	if !contains(user.GetClaimsArray(), "SUPER_ADMIN") {
 		c.JSON(403, gin.H{"error": "Super admin access required"})
 		return
 	}
@@ -549,7 +549,7 @@ func getSystemStats(c *gin.Context) {
 
 func disableTenant(c *gin.Context) {
 	user := service.GetAuthenticatedUser(c)
-	if !contains(user.CustomClaims, "SUPER_ADMIN") {
+	if !contains(user.GetClaimsArray(), "SUPER_ADMIN") {
 		c.JSON(403, gin.H{"error": "Super admin access required"})
 		return
 	}

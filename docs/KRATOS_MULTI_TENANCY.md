@@ -1,6 +1,6 @@
 # Kratos Soft Multi-Tenancy Implementation
 
-This document describes the soft multi-tenancy implementation for Ory Kratos in the core-be-lib backend and frontend-shadcn frontend.
+This document describes the soft multi-tenancy implementation for Ory Kratos in the core-be-lib backend and frontend.
 
 ## Overview
 
@@ -184,7 +184,7 @@ router.Use(tenantMiddleware.MiddlewareFunc())
 
 ### 1. API Client Configuration
 
-**File**: `hub/frontend-shadcn/src/boot/api.ts`
+**File**: `hub/frontend/src/boot/api.ts`
 
 Configured to send Kratos session cookies and tenant headers:
 
@@ -214,7 +214,7 @@ export function initializeApiClient() {
 
 ### 2. Tenant Composable
 
-**File**: `hub/frontend-shadcn/src/composables/useTenant.ts`
+**File**: `hub/frontend/src/composables/useTenant.ts`
 
 Provides tenant context from Kratos session:
 
@@ -244,7 +244,7 @@ export function useTenant() {
 
 ### 3. Registration with Tenant
 
-**File**: `hub/frontend-shadcn/src/composables/kratos-auth.composable.ts`
+**File**: `hub/frontend/src/composables/useKratosAuth.ts`
 
 Registration flow includes tenant subdomain:
 
@@ -253,7 +253,7 @@ const signMeUp = async (
   email: string,
   password: string,
   name?: string,
-  tenantSubdomain?: string
+  tenantSubdomain?: string,
 ) => {
   // Store tenant context for post-registration
   if (tenantSubdomain) {
@@ -415,7 +415,7 @@ const { tenantID, subdomain, hasTenant } = useTenant();
 ### Frontend: Register with Tenant
 
 ```typescript
-import { useKratosAuth } from "@/composables/kratos-auth.composable";
+import { useKratosAuth } from "@/composables/useKratosAuth";
 
 const { signMeUp } = useKratosAuth();
 
@@ -594,7 +594,7 @@ err = kratosClient.SetTenantMetadata(ctx, kratosUser.UID, kratos.TenantMetadata{
 })
 
 // Set roles
-err = kratosClient.SetCustomUserClaims(ctx, kratosUser.UID, firebaseUser.CustomClaims)
+err = kratosClient.SetCustomUserClaims(ctx, kratosUser.UID, firebaseUser.GetClaimsArray())
 ```
 
 ### 3. Update Frontend
