@@ -92,10 +92,11 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 	if sessionToken == "" {
 		return nil, fmt.Errorf("missing session token")
 	}
-	return k.VerifyTokenWithTenantID(c.Request.Context(), tenantID, sessionToken)
+	return k.verifyTokenWithTenantID(c, tenantID, sessionToken)
 }
 
-func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenantID string, sessionToken string) (*auth.AuthenticatedUser, error) {
+func (k *KratosAuthProvider) verifyTokenWithTenantID(c *gin.Context, tenantID string, sessionToken string) (*auth.AuthenticatedUser, error) {
+	ctx := c.Request.Context()
 	authClient := k.GetAuthClient()
 
 	token, err := authClient.VerifyIDToken(ctx, sessionToken)
@@ -138,6 +139,11 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 	}
 	if tenantID == "" {
 		return user, fmt.Errorf("Only SUPER_ADMIN can access root domain")
+	}
+
+	// if /verify/webauthn, skip tenant membership check
+	if strings.Contains(c.Request.URL.Path, "/verify/webauthn") {
+		return user, nil
 	}
 
 	if membershipsInterface, ok := token.Claims[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
