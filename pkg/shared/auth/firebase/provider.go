@@ -362,7 +362,7 @@ type FirebaseTenantManager struct {
 
 func (f *FirebaseTenantManager) CreateTenant(ctx context.Context, config *auth.TenantConfig) (*auth.Tenant, error) {
 	tenantConfig := (&fbauth.TenantToCreate{}).
-		DisplayName(config.DisplayName)
+		DisplayName(config.DisplayName).AllowPasswordSignUp(config.AllowPasswordSignUp)
 
 	fbTenant, err := f.client.TenantManager.CreateTenant(ctx, tenantConfig)
 	if err != nil {
