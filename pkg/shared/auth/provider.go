@@ -242,8 +242,6 @@ type AuthProvider interface {
 	// Token Verification (Middleware use)
 	VerifyToken(c *gin.Context) (*AuthenticatedUser, error)
 
-	VerifyTokenWithTenantID(ctx context.Context, subdomain string, token string) (*AuthenticatedUser, error)
-
 	// Get the base auth client (for non-tenant operations)
 	GetAuthClient() AuthClient
 
