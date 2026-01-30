@@ -56,7 +56,7 @@ INSERT INTO core_users (
 )
 RETURNING *;
 
--- name: CreateSharedUserByTenant :one
+-- name: CreateSharedUserWithTenant :one
 -- USED
 WITH new_user AS (
     INSERT INTO core_users (

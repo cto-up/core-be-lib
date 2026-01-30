@@ -203,7 +203,7 @@ func (q *Queries) CreateSharedUser(ctx context.Context, arg CreateSharedUserPara
 	return i, err
 }
 
-const createSharedUserByTenant = `-- name: CreateSharedUserByTenant :one
+const createSharedUserWithTenant = `-- name: CreateSharedUserWithTenant :one
 WITH new_user AS (
     INSERT INTO core_users (
         "id", "email", "profile"
@@ -250,7 +250,7 @@ FROM new_user
 CROSS JOIN new_membership
 `
 
-type CreateSharedUserByTenantParams struct {
+type CreateSharedUserWithTenantParams struct {
 	ID          string                `json:"id"`
 	Profile     subentity.UserProfile `json:"profile"`
 	Email       string                `json:"email"`
@@ -260,7 +260,7 @@ type CreateSharedUserByTenantParams struct {
 	InvitedAt   pgtype.Timestamptz    `json:"invited_at"`
 }
 
-type CreateSharedUserByTenantRow struct {
+type CreateSharedUserWithTenantRow struct {
 	ID               string             `json:"id"`
 	Profile          []byte             `json:"profile"`
 	Email            pgtype.Text        `json:"email"`
@@ -274,8 +274,8 @@ type CreateSharedUserByTenantRow struct {
 }
 
 // USED
-func (q *Queries) CreateSharedUserByTenant(ctx context.Context, arg CreateSharedUserByTenantParams) (CreateSharedUserByTenantRow, error) {
-	row := q.db.QueryRow(ctx, createSharedUserByTenant,
+func (q *Queries) CreateSharedUserWithTenant(ctx context.Context, arg CreateSharedUserWithTenantParams) (CreateSharedUserWithTenantRow, error) {
+	row := q.db.QueryRow(ctx, createSharedUserWithTenant,
 		arg.ID,
 		arg.Profile,
 		arg.Email,
@@ -284,7 +284,7 @@ func (q *Queries) CreateSharedUserByTenant(ctx context.Context, arg CreateShared
 		arg.InvitedBy,
 		arg.InvitedAt,
 	)
-	var i CreateSharedUserByTenantRow
+	var i CreateSharedUserWithTenantRow
 	err := row.Scan(
 		&i.ID,
 		&i.Profile,

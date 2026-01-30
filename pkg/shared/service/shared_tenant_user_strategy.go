@@ -39,8 +39,8 @@ func (g *TenantUserStrategy) CreateUser(c context.Context, authClient auth.AuthC
 		Name: req.Name,
 	}
 
-	sharedUser, err := qtx.CreateSharedUserByTenant(c,
-		repository.CreateSharedUserByTenantParams{
+	sharedUser, err := qtx.CreateSharedUserWithTenant(c,
+		repository.CreateSharedUserWithTenantParams{
 			ID:          userRecord.UID,
 			Email:       req.Email,
 			Profile:     profile,
