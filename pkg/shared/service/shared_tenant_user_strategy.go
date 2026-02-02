@@ -94,10 +94,10 @@ func (g *TenantUserStrategy) UpdateSharedProfile(ctx context.Context, store *db.
 func (g *TenantUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
 	// Query via user_tenant_memberships table
 	memberships, err := store.ListSharedUsersByTenant(c, repository.ListSharedUsersByTenantParams{
-		TenantID: g.tenantID,
-		Limit:    pagingSql.PageSize,
-		Offset:   pagingSql.Offset,
-		Like:     like,
+		TenantID:     g.tenantID,
+		Limit:        pagingSql.PageSize,
+		Offset:       pagingSql.Offset,
+		SearchPrefix: like,
 	})
 	if err != nil {
 		return []core.User{}, err

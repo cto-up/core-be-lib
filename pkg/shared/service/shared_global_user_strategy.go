@@ -88,7 +88,7 @@ func (g *GlobalUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSq
 		RequestedRoles: []string{"SUPER_ADMIN", "ADMIN"},
 		Limit:          pagingSql.PageSize,
 		Offset:         pagingSql.Offset,
-		Like:           like,
+		SearchPrefix:   like,
 	})
 	if err != nil {
 		return []core.User{}, err
