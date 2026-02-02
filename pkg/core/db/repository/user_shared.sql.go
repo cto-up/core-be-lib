@@ -16,7 +16,7 @@ import (
 
 const addRoleToUserTenantMembership = `-- name: AddRoleToUserTenantMembership :one
 UPDATE core_user_tenant_memberships
-SET roles = array_append(roles, $1::TEXT), updated_at = clock_timestamp()
+SET roles = array_append(roles, $1::TEXT), updated_at = NOW()
 WHERE user_id = $2 
   AND tenant_id = $3 
   AND NOT ($1::TEXT = ANY(roles))
@@ -317,7 +317,8 @@ func (q *Queries) DeleteSharedUser(ctx context.Context, id string) (string, erro
 const deleteSharedUserByTenant = `-- name: DeleteSharedUserByTenant :one
 UPDATE core_user_tenant_memberships
 SET status = 'inactive',
-    updated_at = NOW()
+    updated_at = NOW(),
+    left_at = NOW()
 WHERE user_id = $1 
     AND tenant_id = $2
 RETURNING user_id as id
@@ -507,9 +508,13 @@ SELECT
         '[]'
     ) as tenants
 FROM core_users u
-LEFT JOIN core_user_tenant_memberships utm ON u.id = utm.user_id AND utm.status = 'active'
+LEFT JOIN core_user_tenant_memberships utm 
+    ON u.id = utm.user_id 
+    AND utm.status = 'active'
+LEFT JOIN core_tenants t 
+    ON utm.tenant_id = t.tenant_id
 WHERE u.id = $1
-GROUP BY u.id, u.email, u.profile, u.roles, u.created_at
+GROUP BY u.id
 `
 
 type GetSharedUserWithAllTenantsRow struct {
@@ -672,13 +677,13 @@ SELECT
     profile, 
     roles, 
     created_at
-FROM core_users as u
+FROM core_users
 WHERE 
-    -- Role overlap check
-    u.roles && $3::VARCHAR[]
-    -- Optional fuzzy search on email
+    -- Use GIN index for array overlap
+    roles && $3::VARCHAR[]
+    -- Optimize email search
     AND (
-        u.email ILIKE '%' || $4::text || '%' 
+        email ILIKE $4::text || '%'
         OR $4 IS NULL
     )
 ORDER BY email ASC
@@ -690,7 +695,7 @@ type ListSharedUsersByRolesParams struct {
 	Limit          int32       `json:"limit"`
 	Offset         int32       `json:"offset"`
 	RequestedRoles []string    `json:"requested_roles"`
-	Like           pgtype.Text `json:"like"`
+	SearchPrefix   pgtype.Text `json:"search_prefix"`
 }
 
 type ListSharedUsersByRolesRow struct {
@@ -706,7 +711,7 @@ func (q *Queries) ListSharedUsersByRoles(ctx context.Context, arg ListSharedUser
 		arg.Limit,
 		arg.Offset,
 		arg.RequestedRoles,
-		arg.Like,
+		arg.SearchPrefix,
 	)
 	if err != nil {
 		return nil, err
@@ -742,17 +747,20 @@ FROM core_users u
 INNER JOIN core_user_tenant_memberships utm ON u.id = utm.user_id
 WHERE utm.tenant_id = $3
     AND utm.status = 'active'
-    AND (UPPER(u.email) LIKE UPPER($4) OR $4 IS NULL)
+    AND (
+        email ILIKE $4::text || '%'
+        OR $4 IS NULL
+    )
 ORDER BY u.created_at
 LIMIT $1
 OFFSET $2
 `
 
 type ListSharedUsersByTenantParams struct {
-	Limit    int32       `json:"limit"`
-	Offset   int32       `json:"offset"`
-	TenantID string      `json:"tenant_id"`
-	Like     interface{} `json:"like"`
+	Limit        int32       `json:"limit"`
+	Offset       int32       `json:"offset"`
+	TenantID     string      `json:"tenant_id"`
+	SearchPrefix pgtype.Text `json:"search_prefix"`
 }
 
 type ListSharedUsersByTenantRow struct {
@@ -772,7 +780,7 @@ func (q *Queries) ListSharedUsersByTenant(ctx context.Context, arg ListSharedUse
 		arg.Limit,
 		arg.Offset,
 		arg.TenantID,
-		arg.Like,
+		arg.SearchPrefix,
 	)
 	if err != nil {
 		return nil, err
@@ -911,7 +919,7 @@ func (q *Queries) ListUserTenantMemberships(ctx context.Context, arg ListUserTen
 
 const removeRoleFromUserTenantMembership = `-- name: RemoveRoleFromUserTenantMembership :one
 UPDATE core_user_tenant_memberships
-SET roles = array_remove(roles, $1::TEXT), updated_at = clock_timestamp()
+SET roles = array_remove(roles, $1::TEXT), updated_at = NOW()
 WHERE user_id = $2 
   AND tenant_id = $3 
   AND $1::TEXT = ANY(roles)
@@ -1141,7 +1149,7 @@ func (q *Queries) UpdateSharedUserRolesInTenant(ctx context.Context, arg UpdateS
 
 const updateUserTenantMembershipJoinedAt = `-- name: UpdateUserTenantMembershipJoinedAt :one
 UPDATE core_user_tenant_memberships
-SET joined_at = $3, status = 'active', updated_at = clock_timestamp()
+SET joined_at = $3, status = 'active', updated_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2
 RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
 `
@@ -1172,7 +1180,7 @@ func (q *Queries) UpdateUserTenantMembershipJoinedAt(ctx context.Context, arg Up
 
 const updateUserTenantMembershipRoles = `-- name: UpdateUserTenantMembershipRoles :one
 UPDATE core_user_tenant_memberships
-SET roles = $3, updated_at = clock_timestamp()
+SET roles = $3, updated_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2
 RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
 `
@@ -1203,7 +1211,7 @@ func (q *Queries) UpdateUserTenantMembershipRoles(ctx context.Context, arg Updat
 
 const updateUserTenantMembershipStatus = `-- name: UpdateUserTenantMembershipStatus :one
 UPDATE core_user_tenant_memberships
-SET status = $3, updated_at = clock_timestamp()
+SET status = $3, updated_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2
 RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles
 `

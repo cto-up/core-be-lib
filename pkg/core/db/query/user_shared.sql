@@ -41,7 +41,10 @@ FROM core_users u
 INNER JOIN core_user_tenant_memberships utm ON u.id = utm.user_id
 WHERE utm.tenant_id = sqlc.arg(tenant_id)
     AND utm.status = 'active'
-    AND (UPPER(u.email) LIKE UPPER(sqlc.narg('like')) OR sqlc.narg('like') IS NULL)
+    AND (
+        email ILIKE sqlc.narg('search_prefix')::text || '%'
+        OR sqlc.narg('search_prefix') IS NULL
+    )
 ORDER BY u.created_at
 LIMIT $1
 OFFSET $2;
@@ -174,7 +177,8 @@ FULL OUTER JOIN updated_membership ON updated_user.id = updated_membership.user_
 -- The user record itself remains (they may belong to other tenants)
 UPDATE core_user_tenant_memberships
 SET status = 'inactive',
-    updated_at = NOW()
+    updated_at = NOW(),
+    left_at = NOW()
 WHERE user_id = $1 
     AND tenant_id = sqlc.arg(tenant_id)
 RETURNING user_id as id;
@@ -234,7 +238,7 @@ RETURNING id;
 
 -- name: UpdateUserTenantMembershipRoles :one
 UPDATE core_user_tenant_memberships
-SET roles = $3, updated_at = clock_timestamp()
+SET roles = $3, updated_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2
 RETURNING *;
 
@@ -262,24 +266,23 @@ SELECT
     profile, 
     roles, 
     created_at
-FROM core_users as u
+FROM core_users
 WHERE 
-    -- Role overlap check
-    u.roles && sqlc.arg(requested_roles)::VARCHAR[]
-    -- Optional fuzzy search on email
+    -- Use GIN index for array overlap
+    roles && sqlc.arg(requested_roles)::VARCHAR[]
+    -- Optimize email search
     AND (
-        u.email ILIKE '%' || sqlc.narg('like')::text || '%' 
-        OR sqlc.narg('like') IS NULL
+        email ILIKE sqlc.narg('search_prefix')::text || '%'
+        OR sqlc.narg('search_prefix') IS NULL
     )
 ORDER BY email ASC
 LIMIT $1
 OFFSET $2;
 
 
-
 -- name: UpdateUserTenantMembershipStatus :one
 UPDATE core_user_tenant_memberships
-SET status = $3, updated_at = clock_timestamp()
+SET status = $3, updated_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2
 RETURNING *;
 
@@ -300,7 +303,7 @@ WHERE user_id = $1
 
 -- name: UpdateUserTenantMembershipJoinedAt :one
 UPDATE core_user_tenant_memberships
-SET joined_at = $3, status = 'active', updated_at = clock_timestamp()
+SET joined_at = $3, status = 'active', updated_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2
 RETURNING *;
 
@@ -312,7 +315,7 @@ LIMIT 1;
 
 -- name: AddRoleToUserTenantMembership :one
 UPDATE core_user_tenant_memberships
-SET roles = array_append(roles, sqlc.arg(role)::TEXT), updated_at = clock_timestamp()
+SET roles = array_append(roles, sqlc.arg(role)::TEXT), updated_at = NOW()
 WHERE user_id = sqlc.arg(user_id) 
   AND tenant_id = sqlc.arg(tenant_id) 
   AND NOT (sqlc.arg(role)::TEXT = ANY(roles))
@@ -320,7 +323,7 @@ RETURNING *;
 
 -- name: RemoveRoleFromUserTenantMembership :one
 UPDATE core_user_tenant_memberships
-SET roles = array_remove(roles, sqlc.arg(role)::TEXT), updated_at = clock_timestamp()
+SET roles = array_remove(roles, sqlc.arg(role)::TEXT), updated_at = NOW()
 WHERE user_id = sqlc.arg(user_id) 
   AND tenant_id = sqlc.arg(tenant_id) 
   AND sqlc.arg(role)::TEXT = ANY(roles)
@@ -353,9 +356,13 @@ SELECT
         '[]'
     ) as tenants
 FROM core_users u
-LEFT JOIN core_user_tenant_memberships utm ON u.id = utm.user_id AND utm.status = 'active'
+LEFT JOIN core_user_tenant_memberships utm 
+    ON u.id = utm.user_id 
+    AND utm.status = 'active'
+LEFT JOIN core_tenants t 
+    ON utm.tenant_id = t.tenant_id
 WHERE u.id = $1
-GROUP BY u.id, u.email, u.profile, u.roles, u.created_at;
+GROUP BY u.id;
 
 
 -- name: GetSharedUserTenantMembership :one
