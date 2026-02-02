@@ -106,21 +106,21 @@ func (k *KratosAuthProvider) verifyTokenWithTenantID(c *gin.Context, tenantID st
 
 	email, _ := token.Claims["email"].(string)
 	claims := map[string]interface{}{}
+
+	// if customClaims containts SUPER_ADMIN
+	isSuperAdmin := false
+
 	// Extract global roles from metadata_public
 	if globalRolesArr, ok := token.Claims["global_roles"].([]interface{}); ok {
 		for _, role := range globalRolesArr {
 			if roleStr, ok := role.(string); ok {
 				claims[roleStr] = true
-			}
-		}
-	}
 
-	// if customClaims containts SUPER_ADMIN
-	isSuperAdmin := false
-	for _, claim := range claims {
-		if claim == "SUPER_ADMIN" {
-			isSuperAdmin = true
-			break // Exit loop once found
+				if roleStr == "SUPER_ADMIN" {
+					isSuperAdmin = true
+				}
+
+			}
 		}
 	}
 
