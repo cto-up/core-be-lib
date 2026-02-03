@@ -1,3 +1,4 @@
+-- +goose Up
 -- User-Tenant Membership Table
 CREATE TABLE core_user_tenant_memberships (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -26,3 +27,6 @@ EXECUTE FUNCTION update_modified_column();
 
 -- Possible roles: USER, ADMIN, CUSTOMER_ADMIN
 -- Possible statuses: pending, active, suspended, removed
+
+-- +goose Down
+DROP TABLE IF EXISTS core_user_tenant_memberships;

@@ -11,17 +11,12 @@ import (
 	standardlog "log"
 
 	"ctoup.com/coreapp/internal/example"
-	"ctoup.com/coreapp/pkg/shared/repository"
-	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
-	_ "github.com/golang-migrate/migrate/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	connectionRepository "ctoup.com/coreapp/pkg/shared/repository"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	_ "github.com/golang-migrate/migrate/source/file"
 	// pgx/v5 with sqlc you get its implicit support for prepared statements. No additional sqlc configuration is required.
 
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -65,9 +60,9 @@ func main() {
 
 	log.Print("Application started...")
 
-	connectionString := repository.GetConnectionString()
+	connectionString := connectionRepository.GetConnectionString()
 
-	connector := sqlservice.ConnectorRetryDecorator{Connector: sqlservice.NewPostgresConnector(connectionString), Attempts: 1000, Delay: 5 * time.Second, IncreaseDelay: 20 * time.Millisecond, MaxDelay: 1 * time.Minute}
+	connector := connectionRepository.ConnectorRetryDecorator{Connector: connectionRepository.NewPostgresConnector(connectionString), Attempts: 1000, Delay: 5 * time.Second, IncreaseDelay: 20 * time.Millisecond, MaxDelay: 1 * time.Minute}
 	log.Info().Msg("Creating Connection Pool")
 
 	connPool, err := connector.ConnectWithRetry(context.Background())

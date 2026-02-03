@@ -1,3 +1,4 @@
+-- +goose Up
 -- Remove the old core_roles column
 ALTER TABLE core_users DROP COLUMN core_roles;
 
@@ -8,3 +9,7 @@ DROP CONSTRAINT IF EXISTS core_tenant_configs_name_key;
 -- 2. Add a new UNIQUE constraint on (name, tenant_id)
 ALTER TABLE core_tenant_configs
 ADD CONSTRAINT core_tenant_configs_name_tenant_id_key UNIQUE (name, tenant_id);
+-- +goose Down
+-- Remove the old core_roles column
+ALTER TABLE core_users ADD COLUMN core_roles uuid[] NULL;
+

@@ -1,3 +1,4 @@
+-- +goose Up
 -- Create email verification tokens table
 CREATE TABLE core_email_verification_tokens (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -26,6 +27,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_modified_column();
 
 -- Create function to clean up expired tokens
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION cleanup_expired_email_verification_tokens()
 RETURNS void AS $$
 BEGIN
@@ -33,3 +35,20 @@ BEGIN
     WHERE expires_at < clock_timestamp() - INTERVAL '7 days';
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
+
+-- +goose Down
+-- Drop function
+DROP FUNCTION IF EXISTS cleanup_expired_email_verification_tokens();
+
+-- Drop trigger
+DROP TRIGGER IF EXISTS update_email_verification_tokens_modtime ON core_email_verification_tokens;
+
+-- Drop indexes
+DROP INDEX IF EXISTS idx_email_verification_tokens_tenant_id;
+DROP INDEX IF EXISTS idx_email_verification_tokens_expires_at;
+DROP INDEX IF EXISTS idx_email_verification_tokens_token;
+DROP INDEX IF EXISTS idx_email_verification_tokens_user_id;
+
+-- Drop email verification tokens table
+DROP TABLE IF EXISTS core_email_verification_tokens;

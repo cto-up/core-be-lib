@@ -7,19 +7,15 @@ import (
 	"ctoup.com/coreapp/pkg/shared/server/core"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/golang-migrate/migrate/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog/log"
 
-	_ "github.com/golang-migrate/migrate/source/file"
 	// pgx/v5 with sqlc you get its implicit support for prepared statements. No additional sqlc configuration is required.
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func RunRESTServer(ctx context.Context, connPool *pgxpool.Pool, address string, dbConnection string) {
-	// MigrateUp Core
+
 	cors := func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		if origin != "" {
@@ -37,7 +33,7 @@ func RunRESTServer(ctx context.Context, connPool *pgxpool.Pool, address string, 
 		c.Next()
 	}
 
-	serverConfig := core.NewServerConfig(connPool, dbConnection, cors)
+	serverConfig := core.NewServerConfig(connPool, cors)
 
 	// Create the connection pool
 	pool, err := pgxpool.New(context.Background(), dbConnection)

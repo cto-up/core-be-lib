@@ -1,3 +1,5 @@
+-- +goose Up
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION update_modified_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -5,7 +7,7 @@ BEGIN
     RETURN NEW;   
 END;
 $$ language 'plpgsql';
-
+-- +goose StatementEnd
 
 -- core_users definition
 
@@ -19,3 +21,10 @@ CREATE TABLE core_users (
 	tenant_id varchar(64),
 	CONSTRAINT users_pk PRIMARY KEY (id)
 );
+
+-- +goose Down
+-- core_users definition
+
+-- Drop table
+
+DROP TABLE if exists core_users;

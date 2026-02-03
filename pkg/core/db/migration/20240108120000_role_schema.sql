@@ -1,3 +1,4 @@
+-- +goose Up
 -- core_roles definition
 
 CREATE TABLE core_roles (
@@ -13,3 +14,10 @@ CREATE TRIGGER update_roles_modtime
 BEFORE UPDATE ON core_roles
 FOR EACH ROW
 EXECUTE FUNCTION update_modified_column();
+
+-- +goose Down
+-- core_roles definition
+
+-- Drop table
+
+DROP TABLE if exists core_roles;

@@ -1,7 +1,7 @@
 //go:build testutils
 // +build testutils
 
-/*
+/*************************************************************
 This needs to be added in VS code settings.json
 {
     "go.testTags": "testutils",
@@ -13,23 +13,20 @@ package testutils
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"ctoup.com/coreapp/pkg/core/db"
+	coreDB "ctoup.com/coreapp/pkg/core/db"
+	connectionRepository "ctoup.com/coreapp/pkg/shared/repository"
+	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog/log"
 
-	"github.com/golang-migrate/migrate"
-	_ "github.com/golang-migrate/migrate/database/postgres"
-	_ "github.com/golang-migrate/migrate/source/file"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -142,7 +139,7 @@ func waitForDatabase(connPool *pgxpool.Pool) error {
 	return fmt.Errorf("unable to connect to the database after retries")
 }
 
-func RunMigrations(migrationPath string) error {
+func RunMigrations(db *sql.DB) error {
 	// Get the current working directory
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -167,24 +164,17 @@ func RunMigrations(migrationPath string) error {
 	if _, err := os.Stat(migrationsDir); err != nil {
 		return fmt.Errorf("migrations directory not found at %s: %w", migrationsDir, err)
 	}
-
-	migrationURI := "file://" + filepath.ToSlash(migrationsDir)
-
 	// Create migrate instance
-	m, err := migrate.New(migrationURI, DB_CONNECTION)
-	if err != nil {
-		return fmt.Errorf("failed to create migrate instance: %w", err)
-	}
-
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("failed to run migrate up: %w", err)
+	// Run goose migrations
+	if err := goose.Up(db, migrationsDir); err != nil {
+		return fmt.Errorf("failed to run goose migration up: %w", err)
 	}
 
 	return nil
 }
 
 // NewTestStore creates a new test store using a Postgres test container
-func NewTestStore(t *testing.T) *db.Store {
+func NewTestStore(t *testing.T) *coreDB.Store {
 	connPool, cleanup, err := SetupPostgresContainer()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to set up test container")
@@ -193,16 +183,16 @@ func NewTestStore(t *testing.T) *db.Store {
 	// Register cleanup to be called when the test completes
 	t.Cleanup(cleanup)
 
-	// Run migrations
-	// Assuming migrations are in backend/src/db/migration relative to the test files
-	basePath := filepath.Join("..", "..", "..", "db", "migration")
+	db, err := connectionRepository.ConnectDB(DB_CONNECTION)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to connect to database for migrations")
+	}
+	defer db.Close()
 
-	// Convert to URI format required by golang-migrate
-	migrationURI := "file://" + filepath.ToSlash(basePath)
-	if err := RunMigrations(migrationURI); err != nil {
+	if err := RunMigrations(db); err != nil {
 		log.Fatal().Err(err).Msg("Failed to run migrations")
 	}
 
 	// Create and return the store
-	return db.NewStore(connPool)
+	return coreDB.NewStore(connPool)
 }
