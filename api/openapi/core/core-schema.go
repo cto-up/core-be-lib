@@ -317,15 +317,6 @@ type MFAStatus struct {
 // MFAStatusAal Current Authenticator Assurance Level
 type MFAStatusAal string
 
-// Migration defines model for Migration.
-type Migration struct {
-	// Dirty Whether the migration is in a dirty state
-	Dirty bool `json:"dirty"`
-
-	// Version The current migration version
-	Version int `json:"version"`
-}
-
 // NewAPIToken defines model for NewAPIToken.
 type NewAPIToken struct {
 	// ClientApplicationId ID of the client application this token belongs to

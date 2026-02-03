@@ -1,3 +1,4 @@
+-- +goose Up
 -- Client Applications schema
 CREATE TABLE core_client_applications (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -74,3 +75,8 @@ CREATE TABLE core_api_token_audit_logs (
 -- Create index for faster queries
 CREATE INDEX idx_api_token_audit_logs_token_id ON core_api_token_audit_logs (token_id);
 CREATE INDEX idx_api_token_audit_logs_timestamp ON core_api_token_audit_logs (timestamp);
+-- +goose Down
+-- Drop tables in reverse order to avoid foreign key constraint errors
+DROP TABLE IF EXISTS core_api_token_audit_logs;
+DROP TABLE IF EXISTS core_api_tokens;
+DROP TABLE IF EXISTS core_client_applications;

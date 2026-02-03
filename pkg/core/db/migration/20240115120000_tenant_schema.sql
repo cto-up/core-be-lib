@@ -1,3 +1,4 @@
+-- +goose Up
 
 -- core_tenants definition
 CREATE TABLE core_tenants (
@@ -19,3 +20,15 @@ CREATE TRIGGER update_tenants_modtime
 BEFORE UPDATE ON core_tenants
 FOR EACH ROW
 EXECUTE FUNCTION update_modified_column();
+
+-- +goose Down
+
+-- Drop trigger
+DROP TRIGGER IF EXISTS update_tenants_modtime ON core_tenants;
+
+-- Drop indexes
+DROP INDEX IF EXISTS idx_tenants_name;
+DROP INDEX IF EXISTS idx_tenants_subdomain;
+
+-- Drop table
+DROP TABLE IF EXISTS core_tenants;

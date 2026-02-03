@@ -1,3 +1,4 @@
+-- +goose Up
 -- Create a translations table for all entities
 CREATE TABLE core_translations (
     id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -17,4 +18,16 @@ CREATE INDEX idx_core_translations_entity ON core_translations (entity_type, ent
 CREATE INDEX idx_core_translations_language ON core_translations (language);
 CREATE INDEX idx_core_translations_field ON core_translations (field);
 CREATE INDEX idx_core_translations_tenant ON core_translations (tenant_id);
+
+
+-- +goose Down
+
+-- Drop indexes first
+DROP INDEX IF EXISTS idx_core_translations_tenant;
+DROP INDEX IF EXISTS idx_core_translations_field;
+DROP INDEX IF EXISTS idx_core_translations_language;
+DROP INDEX IF EXISTS idx_core_translations_entity;
+
+-- Drop the translations table
+DROP TABLE IF EXISTS core_translations;
 

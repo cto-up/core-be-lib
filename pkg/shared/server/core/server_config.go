@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"database/sql"
 	"sync"
 
 	"ctoup.com/coreapp/api/handlers"
@@ -21,17 +20,15 @@ import (
 	"ctoup.com/coreapp/pkg/shared/seedservice"
 
 	"github.com/go-playground/validator/v10"
-	_ "github.com/golang-migrate/migrate/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+
 	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog/log"
 	healthcheck "github.com/tavsec/gin-healthcheck"
 	"github.com/tavsec/gin-healthcheck/checks"
 	"github.com/tavsec/gin-healthcheck/config"
 
-	_ "github.com/golang-migrate/migrate/source/file"
 	// pgx/v5 with sqlc you get its implicit support for prepared statements. No additional sqlc configuration is required.
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -49,9 +46,9 @@ var (
 	serverConfigOnce     sync.Once
 )
 
-func NewServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gin.HandlerFunc, additionalChecks ...checks.Check) *ServerConfig {
+func NewServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additionalChecks ...checks.Check) *ServerConfig {
 	serverConfigOnce.Do(func() {
-		serverConfigInstance = initializeServerConfig(connPool, dbConnection, cors, additionalChecks...)
+		serverConfigInstance = initializeServerConfig(connPool, cors, additionalChecks...)
 	})
 	return serverConfigInstance
 }
@@ -67,8 +64,8 @@ func setupHealthCheck(router *gin.Engine, defaultChecks ...checks.Check) {
 	healthcheck.New(router, config.DefaultConfig(), allChecks)
 }
 
-func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gin.HandlerFunc, additionalChecks ...checks.Check) *ServerConfig {
-	coreStore := db.NewStore(connPool, true)
+func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additionalChecks ...checks.Check) *ServerConfig {
+	coreStore := db.NewStore(connPool)
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterCustomTypeFunc(helpers.CustomTypeUUID, uuid.UUID{})
@@ -77,17 +74,15 @@ func initializeServerConfig(connPool *pgxpool.Pool, dbConnection string, cors gi
 	router := gin.Default()
 	router.Use(cors)
 
-	// to be removed when https://github.com/jackc/pgx/pull/1718 can inclide sql
-	db, err := sql.Open("postgres", dbConnection)
-	if err != nil {
-		log.Error().Err(err).Msg("Open failed")
-	}
-
-	err = db.Ping()
+	err := connPool.Ping(context.Background())
 	if err != nil {
 		log.Error().Err(err).Msg("Ping DB failed")
 	}
 
+	defer connPool.Close()
+
+	// Convert pgxpool.Pool to *sql.DB for SqlCheck
+	db := stdlib.OpenDBFromPool(connPool)
 	defer db.Close()
 
 	// Setup health checks

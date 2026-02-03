@@ -1,3 +1,4 @@
+-- +goose Up
 
 -- core_prompts definition
 CREATE TABLE core_prompts (
@@ -22,3 +23,14 @@ CREATE TRIGGER update_core_prompts_modtime
 BEFORE UPDATE ON core_prompts
 FOR EACH ROW
 EXECUTE FUNCTION update_modified_column();
+
+-- +goose Down
+
+-- Drop trigger
+DROP TRIGGER IF EXISTS update_prompts_modtime ON core_prompts;
+
+-- Drop indexes
+DROP INDEX IF EXISTS idx_prompts_tenant_id;
+
+-- Drop table
+DROP TABLE IF EXISTS core_prompts;

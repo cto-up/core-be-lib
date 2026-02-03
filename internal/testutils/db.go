@@ -13,22 +13,18 @@ package testutils
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog/log"
 
-	"github.com/golang-migrate/migrate"
-	_ "github.com/golang-migrate/migrate/database/postgres"
-	_ "github.com/golang-migrate/migrate/source/file"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/lib/pq"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -109,7 +105,7 @@ func waitForDatabase(connPool *pgxpool.Pool) error {
 	return fmt.Errorf("unable to connect to the database after retries")
 }
 
-func RunMigrations(migrationPath string) error {
+func RunMigrations(db *sql.DB) error {
 	// Get the current working directory
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -131,16 +127,10 @@ func RunMigrations(migrationPath string) error {
 
 	// Construct the absolute path to the migrations directory
 	migrationsDir := filepath.Join(srcDir, "db", "migration")
-	migrationURI := "file://" + filepath.ToSlash(migrationsDir)
 
-	// Create migrate instance
-	m, err := migrate.New(migrationURI, DB_CONNECTION)
-	if err != nil {
-		return fmt.Errorf("failed to create migrate instance: %w", err)
-	}
-
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("failed to run migrate up: %w", err)
+	// Run goose migrations
+	if err := goose.Up(db, migrationsDir); err != nil {
+		return fmt.Errorf("failed to run goose migration up: %w", err)
 	}
 
 	return nil
