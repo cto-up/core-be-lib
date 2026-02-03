@@ -77,11 +77,11 @@ func (m *MockDirInfo) IsDir() bool        { return true }
 func (m *MockDirInfo) Sys() interface{}   { return nil }
 
 func MigrateFromGoMigrateToGoose(db *sql.DB, versions []int64) error {
-	// Check if schema_migrations (go-migrate) exists and goose_db_version does not
+	// Check if core_migrations (go-migrate) exists and goose_db_version does not
 	var needsMigration bool
 	err := db.QueryRow(`
 		SELECT 
-			EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'schema_migrations')
+			EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'core_migrations')
 			AND
 			NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'goose_db_version')
 	`).Scan(&needsMigration)
@@ -125,9 +125,9 @@ func MigrateFromGoMigrateToGoose(db *sql.DB, versions []int64) error {
 	}
 
 	// Drop the old go-migrate table
-	_, err = tx.Exec(`DROP TABLE schema_migrations`)
+	_, err = tx.Exec(`DROP TABLE core_migrations`)
 	if err != nil {
-		return fmt.Errorf("failed to drop schema_migrations: %w", err)
+		return fmt.Errorf("failed to drop core_migrations: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
