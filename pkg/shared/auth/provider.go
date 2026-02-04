@@ -16,6 +16,7 @@ const (
 	AUTH_CLAIMS             = "auth_claims"
 	AUTH_TENANT_ID_KEY      = "auth_tenant_id"
 	AUTH_TENANT_MEMBERSHIPS = "tenant_memberships"
+	REQUEST_URL_PATH        = "request_url_path"
 )
 
 // TenantMembership represents a user's membership in a tenant with roles
@@ -241,6 +242,7 @@ type Tenant struct {
 type AuthProvider interface {
 	// Token Verification (Middleware use)
 	VerifyToken(c *gin.Context) (*AuthenticatedUser, error)
+	VerifyTokenWithTenantID(ctx context.Context, tenantID string, token string) (*AuthenticatedUser, error)
 
 	// Get the base auth client (for non-tenant operations)
 	GetAuthClient() AuthClient
