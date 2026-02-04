@@ -79,11 +79,8 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 		log.Error().Err(err).Msg("Ping DB failed")
 	}
 
-	defer connPool.Close()
-
 	// Convert pgxpool.Pool to *sql.DB for SqlCheck
 	db := stdlib.OpenDBFromPool(connPool)
-	defer db.Close()
 
 	// Setup health checks
 	sqlCheck := checks.SqlCheck{Sql: db}
