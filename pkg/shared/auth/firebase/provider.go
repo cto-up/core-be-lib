@@ -93,19 +93,18 @@ func (f *FirebaseAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedU
 		return nil, err
 	}
 
-	return f.verifyTokenWithTenantID(c, tenantID, token)
+	return f.VerifyTokenWithTenantID(c, tenantID, token)
 }
 
-func (f *FirebaseAuthProvider) verifyTokenWithTenantID(c context.Context, tenantID string, token string) (*auth.AuthenticatedUser, error) {
-
+func (f *FirebaseAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenantID string, token string) (*auth.AuthenticatedUser, error) {
 	// Get tenant-specific auth client
-	authClient, err := f.GetAuthClientForTenant(c, tenantID)
+	authClient, err := f.GetAuthClientForTenant(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Verify the ID token
-	idToken, err := authClient.VerifyIDToken(c, token)
+	idToken, err := authClient.VerifyIDToken(ctx, token)
 	if err != nil {
 		return nil, err
 	}

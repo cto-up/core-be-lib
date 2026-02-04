@@ -36,6 +36,7 @@ func NewAuthMiddleware(
 // MiddlewareFunc implements OR authentication logic
 func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		c.Set(auth.REQUEST_URL_PATH, c.Request.URL.Path)
 		// Skip auth for public endpoints
 		if strings.HasPrefix(c.Request.URL.Path, "/public") {
 			c.Next()
