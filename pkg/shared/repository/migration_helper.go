@@ -11,8 +11,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// MapFS est un wrapper qui "ment" à Goose en lui faisant croire
-// que tous les fichiers sont au même niveau.
+// MapFS is a custom implementation of fs.FS
+// that allows us to treat multiple embedded folders as if they were one,
+// ensuring that all migration files are read in a single pass and sorted by name,
+// regardless of their original folder.
 type MapFS struct {
 	src     embed.FS
 	folders []string
@@ -25,13 +27,15 @@ func NewMapFS(src embed.FS, folders []string) *MapFS {
 	}
 }
 
-// FIX: Ajouter cette méthode Stat pour que Goose valide l'existence du dossier "."
+// FIX: Stat for Goose to valid validate "."
 func (m *MapFS) Stat(name string) (fs.FileInfo, error) {
 	if name == "." || name == "/" {
-		// On simule un répertoire racine
+		// simulate a directory info for the root,
+		// since we're treating multiple folders as one
 		return &MockDirInfo{name: name}, nil
 	}
-	// Pour les fichiers individuels, on délègue au système source
+	// For any other name,
+	// we check each folder for the file and return its info if found
 	for _, dir := range m.folders {
 		if info, err := fs.Stat(m.src, dir+"/"+name); err == nil {
 			return info, nil
@@ -46,7 +50,7 @@ func (m *MapFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		entries, _ := m.src.ReadDir(dir)
 		allEntries = append(allEntries, entries...)
 	}
-	// C'est ICI que l'ordre global par timestamp se crée !
+	// Sort all entries by name to ensure correct migration order
 	sort.Slice(allEntries, func(i, j int) bool {
 		return allEntries[i].Name() < allEntries[j].Name()
 	})
@@ -54,7 +58,7 @@ func (m *MapFS) ReadDir(name string) ([]fs.DirEntry, error) {
 }
 
 func (m *MapFS) Open(name string) (fs.File, error) {
-	// On cherche le fichier dans chaque dossier jusqu'à le trouver
+	// Search for the file in each folder and return it if found
 	for _, dir := range m.folders {
 		f, err := m.src.Open(dir + "/" + name)
 		if err == nil {
@@ -64,7 +68,8 @@ func (m *MapFS) Open(name string) (fs.File, error) {
 	return nil, fs.ErrNotExist
 }
 
-// Structure auxiliaire pour simuler les infos du répertoire racine
+// Structure to simulate root directory info for MapFS,
+// since we're treating multiple folders as one.
 type MockDirInfo struct {
 	name string
 }
