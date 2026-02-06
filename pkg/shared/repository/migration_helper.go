@@ -2,10 +2,10 @@ package repository
 
 import (
 	"database/sql"
-	"embed"
 	"fmt"
 	"io/fs"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -16,54 +16,103 @@ import (
 // ensuring that all migration files are read in a single pass and sorted by name,
 // regardless of their original folder.
 type MapFS struct {
-	src     embed.FS
-	folders []string
+	sources []fs.FS
+	files   map[string]fs.FS // filename -> owning FS
 }
 
-func NewMapFS(src embed.FS, folders []string) *MapFS {
-	return &MapFS{
-		src:     src,
-		folders: folders,
+func NewMapFS(sources ...fs.FS) (*MapFS, error) {
+	m := &MapFS{
+		sources: sources,
+		files:   make(map[string]fs.FS),
 	}
+
+	for idx, src := range sources {
+		entries, err := fs.ReadDir(src, ".")
+		if err != nil {
+			log.Debug().
+				Int("source_index", idx).
+				Err(err).
+				Msg("Migration FS skipped (unable to read root)")
+			continue
+		}
+
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+
+			name := e.Name()
+
+			// Collision detection
+			if _, exists := m.files[name]; exists {
+				return nil, fmt.Errorf(
+					"migration filename conflict detected: %q exists in multiple modules",
+					name,
+				)
+			}
+
+			m.files[name] = src
+
+			log.Debug().
+				Str("migration", name).
+				Int("source_index", idx).
+				Msg("Registered migration file")
+		}
+	}
+
+	if len(m.files) == 0 {
+		log.Warn().Msg("No migration files registered in MapFS")
+	}
+
+	return m, nil
 }
 
 // FIX: Stat for Goose to valid validate "."
 func (m *MapFS) Stat(name string) (fs.FileInfo, error) {
 	if name == "." || name == "/" {
-		// simulate a directory info for the root,
-		// since we're treating multiple folders as one
 		return &MockDirInfo{name: name}, nil
 	}
-	// For any other name,
-	// we check each folder for the file and return its info if found
-	for _, dir := range m.folders {
-		if info, err := fs.Stat(m.src, dir+"/"+name); err == nil {
-			return info, nil
-		}
+
+	if src, ok := m.files[name]; ok {
+		return fs.Stat(src, name)
 	}
+
 	return nil, fs.ErrNotExist
 }
 
 func (m *MapFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	var allEntries []fs.DirEntry
-	for _, dir := range m.folders {
-		entries, _ := m.src.ReadDir(dir)
-		allEntries = append(allEntries, entries...)
+	var entries []fs.DirEntry
+
+	for filename, src := range m.files {
+		info, err := fs.Stat(src, filename)
+		if err != nil {
+			continue
+		}
+
+		entries = append(entries, fs.FileInfoToDirEntry(info))
 	}
-	// Sort all entries by name to ensure correct migration order
-	sort.Slice(allEntries, func(i, j int) bool {
-		return allEntries[i].Name() < allEntries[j].Name()
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
 	})
-	return allEntries, nil
+
+	log.Debug().
+		Int("count", len(entries)).
+		Str("files", strings.Join(func() []string {
+			names := make([]string, 0, len(entries))
+			for _, e := range entries {
+				names = append(names, e.Name())
+			}
+			return names
+		}(), ", ")).
+		Msg("Resolved merged migration directory")
+
+	return entries, nil
 }
 
 func (m *MapFS) Open(name string) (fs.File, error) {
-	// Search for the file in each folder and return it if found
-	for _, dir := range m.folders {
-		f, err := m.src.Open(dir + "/" + name)
-		if err == nil {
-			return f, nil
-		}
+	if src, ok := m.files[name]; ok {
+		return src.Open(name)
 	}
 	return nil, fs.ErrNotExist
 }
