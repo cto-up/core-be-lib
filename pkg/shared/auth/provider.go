@@ -59,12 +59,18 @@ type MultitenantService interface {
 
 // UserToCreate represents parameters for creating a new user
 type UserToCreate struct {
+	uid           string
 	email         string
 	emailVerified bool
 	displayName   string
 	photoURL      string
 	disabled      bool
 	password      *string
+}
+
+func (u *UserToCreate) UID(uid string) *UserToCreate {
+	u.uid = uid
+	return u
 }
 
 func (u *UserToCreate) Email(email string) *UserToCreate {
@@ -97,6 +103,7 @@ func (u *UserToCreate) Password(password string) *UserToCreate {
 	return u
 }
 
+func (u *UserToCreate) GetUID() string         { return u.uid }
 func (u *UserToCreate) GetEmail() string       { return u.email }
 func (u *UserToCreate) GetEmailVerified() bool { return u.emailVerified }
 func (u *UserToCreate) GetDisplayName() string { return u.displayName }

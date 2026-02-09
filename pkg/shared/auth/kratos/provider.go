@@ -13,12 +13,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Global roles stored in Kratos metadata_public
-var globalRoles = []string{"SUPER_ADMIN"}
-
-// Tenant-specific roles (CUSTOMER_ADMIN, ADMIN, USER) are stored in core_user_tenant_memberships table
-var tenantRoles = []string{"CUSTOMER_ADMIN", "ADMIN", "USER"}
-
 func init() {
 	auth.RegisterProvider(auth.ProviderTypeKratos, func(ctx context.Context, config auth.ProviderConfig) (auth.AuthProvider, error) {
 		multitenantService, ok := config.Options["multitenantService"].(auth.MultitenantService)
@@ -64,7 +58,7 @@ func NewKratosAuthProvider(ctx context.Context, adminClient *ory.APIClient, publ
 }
 
 func (k *KratosAuthProvider) GetAuthClient() auth.AuthClient {
-	return &KratosAuthClient{adminClient: k.adminClient, publicClient: k.publicClient}
+	return NewKratosAuthClient(k.adminClient, k.publicClient)
 }
 
 func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUser, error) {
@@ -186,7 +180,7 @@ func (k *KratosAuthProvider) GetAuthClientForSubdomain(ctx context.Context, subd
 }
 
 func (k *KratosAuthProvider) GetAuthClientForTenant(ctx context.Context, tenantID string) (auth.AuthClient, error) {
-	return &KratosAuthClient{adminClient: k.adminClient, publicClient: k.publicClient}, nil
+	return NewKratosAuthClient(k.adminClient, k.publicClient), nil
 }
 
 func (k *KratosAuthProvider) GetProviderName() string {
@@ -197,6 +191,14 @@ func (k *KratosAuthProvider) GetProviderName() string {
 type KratosAuthClient struct {
 	adminClient  *ory.APIClient
 	publicClient *ory.APIClient
+}
+
+// NewKratosAuthClient creates a new Kratos auth client
+func NewKratosAuthClient(adminClient *ory.APIClient, publicClient *ory.APIClient) *KratosAuthClient {
+	return &KratosAuthClient{
+		adminClient:  adminClient,
+		publicClient: publicClient,
+	}
 }
 
 // GetAdminClient returns the admin API client
