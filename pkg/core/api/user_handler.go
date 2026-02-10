@@ -55,15 +55,8 @@ func NewUserHandler(store *db.Store, authProvider auth.AuthProvider) *UserHandle
 	return handler
 }
 
-func getProfilePictureFilePath(tenantId string, userId any) string {
-	var tenantPart string
-	if tenantId != "" {
-		tenantPart = tenantId
-	} else {
-		tenantPart = "www"
-	}
-
-	newFilePath := `/tenants/` + tenantPart + `/core/users/` + userId.(string) + "/profile-picture.jpg"
+func getProfilePictureFilePath(userId any) string {
+	newFilePath := `/core/users/` + userId.(string) + "/profile-picture.jpg"
 	return newFilePath
 }
 
@@ -181,8 +174,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 			return
 		}
 	}
-	tenantId, _ := c.Get(auth.AUTH_TENANT_ID_KEY)
-	newFilePath := getProfilePictureFilePath(tenantId.(string), userId)
+	newFilePath := getProfilePictureFilePath(userId)
 
 	fileContent, err := file.Open()
 	if err != nil {
@@ -212,8 +204,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 }
 
 func (s *UserHandler) GetProfilePicture(c *gin.Context, userId string, params core.GetProfilePictureParams) {
-	tenantId, _ := c.Get(auth.AUTH_TENANT_ID_KEY)
-	filePath := getProfilePictureFilePath(tenantId.(string), userId)
+	filePath := getProfilePictureFilePath(userId)
 
 	s.fileService.GetFile(c, filePath)
 }

@@ -17,10 +17,22 @@ use .env
    create roles with roles
 
 4. Migrate all foreign keys
-find them
+   Find them using:
+
 ```sql
-SELECT table_name, column_name
+SELECT
+  format(
+    '{Table: "%s", Column: "%s"},',
+    table_name,
+    column_name
+  ) AS result
 FROM information_schema.columns
-WHERE (column_name LIKE '%user_id%' OR column_name LIKE '%owner_id%' OR column_name = 'created_by')
-  AND table_schema = 'public';
+WHERE (
+    column_name LIKE '%user_id%'
+ OR column_name LIKE '%owner_id%'
+ OR column_name IN ('created_by', 'updated_by')
+)
+AND table_schema = 'public'
+order by table_name;
+
 ```
