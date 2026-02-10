@@ -272,6 +272,33 @@ func (fs *FileService) DeleteFile(ctx context.Context, filename string) error {
 	return nil
 }
 
+// CopyFile copies a file from src to dst within the same bucket.
+func (fs *FileService) CopyFile(ctx context.Context, dst, src string) error {
+	if err := fs.bucket.Copy(ctx, dst, src, nil); err != nil {
+		log.Error().Err(err).Msgf("Failed to copy file from %s to %s", src, dst)
+		return err
+	}
+	return nil
+}
+
+// RenameFile moves a file from src to dst by copying then deleting.
+func (fs *FileService) RenameFile(ctx context.Context, dst, src string) error {
+	if err := fs.CopyFile(ctx, dst, src); err != nil {
+		return err
+	}
+	return fs.DeleteFile(ctx, src)
+}
+
+// FileExists checks if a file exists in the bucket.
+func (fs *FileService) FileExists(ctx context.Context, filename string) (bool, error) {
+	exists, err := fs.bucket.Exists(ctx, filename)
+	if err != nil {
+		log.Error().Err(err).Msgf("Failed to check existence of file %s", filename)
+		return false, err
+	}
+	return exists, nil
+}
+
 // GetFile retrieves a file from the specified bucket and writes its contents to the HTTP response.
 // It supports ETag-based caching for improved performance.
 func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {

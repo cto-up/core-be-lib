@@ -3,18 +3,16 @@ package migration
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"time"
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
-	"ctoup.com/coreapp/pkg/shared/auth/kratos"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
-	ory "github.com/ory/kratos-client-go"
+	"github.com/rs/zerolog/log"
+
+	fileservice "ctoup.com/coreapp/pkg/shared/fileservice"
 )
 
 // MigrationUserMapping represents the mapping between Firebase UID and Kratos UUID
@@ -25,11 +23,18 @@ type MigrationUserMapping struct {
 	MigratedAt  time.Time
 }
 
+type ColInfo struct {
+	Table  string
+	Column string
+	Type   string
+}
+
 // FirebaseToKratosMigrator handles the migration of users from Firebase to Kratos
 type FirebaseToKratosMigrator struct {
-	store      *db.Store
-	authClient auth.AuthClient
-	ctx        context.Context
+	store       *db.Store
+	authClient  auth.AuthClient
+	fileService *fileservice.FileService
+	ctx         context.Context
 }
 
 const migrationMappingSQL = `
@@ -43,17 +48,18 @@ CREATE TABLE IF NOT EXISTS migration_user_mapping (
 `
 
 // NewFirebaseToKratosMigrator creates a new migrator instance
-func NewFirebaseToKratosMigrator(ctx context.Context, store *db.Store, authClient auth.AuthClient) *FirebaseToKratosMigrator {
+func NewFirebaseToKratosMigrator(ctx context.Context, store *db.Store, authClient auth.AuthClient, fileService *fileservice.FileService) *FirebaseToKratosMigrator {
 	return &FirebaseToKratosMigrator{
-		store:      store,
-		authClient: authClient,
-		ctx:        ctx,
+		store:       store,
+		authClient:  authClient,
+		fileService: fileService,
+		ctx:         ctx,
 	}
 }
 
 // EnsureMigrationTable ensures that the migration mapping table exists in the database
 func (m *FirebaseToKratosMigrator) EnsureMigrationTable() error {
-	log.Println("Ensuring migration mapping table exists...")
+	log.Info().Msg("Ensuring migration mapping table exists...")
 	_, err := m.store.ConnPool.Exec(m.ctx, migrationMappingSQL)
 	if err != nil {
 		return fmt.Errorf("failed to create migration mapping table: %w", err)
@@ -86,7 +92,7 @@ func (m *FirebaseToKratosMigrator) createMapping(tx pgx.Tx, firebaseUID string, 
 		return fmt.Errorf("failed to create mapping: %w", err)
 	}
 
-	log.Printf("Created/Updated mapping: %s (%s) -> Kratos UUID %s", firebaseUID, email, kratosUUID)
+	log.Info().Msgf("Created/Updated mapping: %s (%s) -> Kratos UUID %s", firebaseUID, email, kratosUUID)
 	return nil
 }
 
@@ -94,7 +100,7 @@ func (m *FirebaseToKratosMigrator) createMapping(tx pgx.Tx, firebaseUID string, 
 func (m *FirebaseToKratosMigrator) migrateUser(user repository.CoreUser) error {
 	// Check if user ID is a Firebase UID
 	if !isFirebaseUID(user.ID) {
-		log.Printf("Skipping user %s - not a Firebase UID", user.ID)
+		log.Info().Msgf("Skipping user %s - not a Firebase UID", user.ID)
 		return nil
 	}
 
@@ -105,7 +111,7 @@ func (m *FirebaseToKratosMigrator) migrateUser(user repository.CoreUser) error {
 		if err != nil {
 			// If user not found, create it
 			if authErr, ok := err.(*auth.AuthError); ok && authErr.Code == auth.ErrorCodeUserNotFound {
-				log.Printf("Kratos identity not found for %s, creating...", user.Email.String)
+				log.Info().Msgf("Kratos identity not found for %s, creating...", user.Email.String)
 
 				userToCreate := (&auth.UserToCreate{}).
 					Email(user.Email.String)
@@ -114,12 +120,12 @@ func (m *FirebaseToKratosMigrator) migrateUser(user repository.CoreUser) error {
 				if err != nil {
 					return fmt.Errorf("failed to create Kratos user: %w", err)
 				}
-				log.Printf("Successfully created Kratos identity: %s -> %s", user.Email.String, kratosUser.UID)
+				log.Info().Msgf("Successfully created Kratos identity: %s -> %s", user.Email.String, kratosUser.UID)
 			} else {
 				return fmt.Errorf("failed to check Kratos identity: %w", err)
 			}
 		} else {
-			log.Printf("Kratos identity already exists for %s: %s", user.Email.String, kratosUser.UID)
+			log.Info().Msgf("Kratos identity already exists for %s: %s", user.Email.String, kratosUser.UID)
 		}
 		kratosUUID = kratosUser.UID
 	} else {
@@ -148,7 +154,7 @@ func (m *FirebaseToKratosMigrator) migrateUser(user repository.CoreUser) error {
 	existingUser := false
 	_, err = qtx.GetSharedUserByID(m.ctx, kratosUUID)
 	if err == nil {
-		log.Printf("User already exists in core_users with UID %s, skipping DB creation", kratosUUID)
+		log.Info().Msgf("User already exists in core_users with UID %s, skipping DB creation", kratosUUID)
 		existingUser = true
 	}
 
@@ -176,7 +182,7 @@ func (m *FirebaseToKratosMigrator) migrateUser(user repository.CoreUser) error {
 			return fmt.Errorf("failed to create user with tenant: %w", err)
 		}
 
-		log.Printf("Created user with tenant membership: %s (tenant: %s, roles: %v)",
+		log.Info().Msgf("Created user with tenant membership: %s (tenant: %s, roles: %v)",
 			kratosUUID, user.TenantID.String, tenantRoles)
 	}
 	if hasTenant && existingUser {
@@ -202,7 +208,7 @@ func (m *FirebaseToKratosMigrator) migrateUser(user repository.CoreUser) error {
 			return fmt.Errorf("failed to add tenant membership to existing user: %w", err)
 		}
 
-		log.Printf("Added tenant membership to existing user: %s (tenant: %s, roles: %v)",
+		log.Info().Msgf("Added tenant membership to existing user: %s (tenant: %s, roles: %v)",
 			kratosUUID, user.TenantID.String, tenantRoles)
 	}
 
@@ -224,7 +230,7 @@ func (m *FirebaseToKratosMigrator) migrateUser(user repository.CoreUser) error {
 			return fmt.Errorf("failed to create global user: %w", err)
 		}
 
-		log.Printf("Created global user: %s (roles: %v)", kratosUUID, globalRoles)
+		log.Info().Msgf("Created global user: %s (roles: %v)", kratosUUID, globalRoles)
 	}
 
 	// Commit transaction
@@ -232,13 +238,13 @@ func (m *FirebaseToKratosMigrator) migrateUser(user repository.CoreUser) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Printf("Successfully migrated user: %s -> %s", user.ID, kratosUUID)
+	log.Info().Msgf("Successfully migrated user: %s -> %s", user.ID, kratosUUID)
 	return nil
 }
 
 // MigrateAllUsers migrates all Firebase users to Kratos
 func (m *FirebaseToKratosMigrator) MigrateAllUsers() error {
-	log.Println("Starting Firebase to Kratos user migration...")
+	log.Info().Msg("Starting Firebase to Kratos user migration...")
 
 	// Get all users
 	rows, err := m.store.ConnPool.Query(m.ctx,
@@ -263,7 +269,7 @@ func (m *FirebaseToKratosMigrator) MigrateAllUsers() error {
 			&user.Roles,
 		)
 		if err != nil {
-			log.Printf("Error scanning user: %v", err)
+			log.Info().Msgf("Error scanning user: %v", err)
 			errorCount++
 			continue
 		}
@@ -275,7 +281,7 @@ func (m *FirebaseToKratosMigrator) MigrateAllUsers() error {
 
 		err = m.migrateUser(user)
 		if err != nil {
-			log.Printf("Error migrating user %s in tenant %s: %v", user.ID, user.TenantID.String, err)
+			log.Info().Msgf("Error migrating user %s in tenant %s: %v", user.ID, user.TenantID.String, err)
 			errorCount++
 			continue
 		}
@@ -287,10 +293,10 @@ func (m *FirebaseToKratosMigrator) MigrateAllUsers() error {
 		return fmt.Errorf("error iterating users: %w", err)
 	}
 
-	log.Printf("\nMigration complete!")
-	log.Printf("Successfully migrated: %d users", successCount)
-	log.Printf("Skipped (non-Firebase): %d users", skipCount)
-	log.Printf("Errors: %d users", errorCount)
+	log.Info().Msgf("\nMigration complete!")
+	log.Info().Msgf("Successfully migrated: %d users", successCount)
+	log.Info().Msgf("Skipped (non-Firebase): %d users", skipCount)
+	log.Info().Msgf("Errors: %d users", errorCount)
 
 	return nil
 }
@@ -345,96 +351,201 @@ func (m *FirebaseToKratosMigrator) ListMappings() ([]MigrationUserMapping, error
 	return mappings, nil
 }
 
-func main() {
-	// Example usage
-	ctx := context.Background()
+// MigrateForeignKeys finds all columns that likely contain user IDs and updates them to use Kratos UUIDs
+func (m *FirebaseToKratosMigrator) MigrateForeignKeys(columns []ColInfo) error {
+	log.Info().Msg("Starting granular foreign key migration...")
 
-	// Initialize database connection
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("DATABASE_URL environment variable is required")
-	}
-
-	connPool, err := pgxpool.New(ctx, dbURL)
+	// 1. Build a local cache of mappings
+	mappings, err := m.ListMappings()
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Err(err).Msg("Failed to list mappings")
+		return fmt.Errorf("failed to list mappings: %w", err)
 	}
-	defer connPool.Close()
-
-	store := db.NewStore(connPool)
-
-	// Initialize auth client
-	adminURL := os.Getenv("KRATOS_ADMIN_URL")
-	if adminURL == "" {
-		adminURL = "http://localhost:4434"
-	}
-	publicURL := os.Getenv("KRATOS_PUBLIC_URL")
-	if publicURL == "" {
-		publicURL = "http://localhost:4433"
+	mappingCache := make(map[string]string)
+	for _, mapping := range mappings {
+		mappingCache[mapping.FirebaseUID] = mapping.KratosUUID
 	}
 
-	adminCfg := ory.NewConfiguration()
-	adminCfg.Servers = ory.ServerConfigurations{{URL: adminURL}}
-	adminClient := ory.NewAPIClient(adminCfg)
+	// 2. Iterate over columns
+	for _, ci := range columns {
+		log.Info().Msgf("Processing %s.%s (type: %s)...", ci.Table, ci.Column, ci.Type)
 
-	publicCfg := ory.NewConfiguration()
-	publicCfg.Servers = ory.ServerConfigurations{{URL: publicURL}}
-	publicClient := ory.NewAPIClient(publicCfg)
-
-	authClient := kratos.NewKratosAuthClient(adminClient, publicClient)
-
-	// Create migrator
-	migrator := NewFirebaseToKratosMigrator(ctx, store, authClient)
-
-	// Ensure migration table exists
-	if err := migrator.EnsureMigrationTable(); err != nil {
-		log.Fatalf("Failed to ensure migration table: %v", err)
-	}
-
-	// Run migration
-	if len(os.Args) > 1 {
-		command := os.Args[1]
-		switch command {
-		case "migrate-all":
-			if err := migrator.MigrateAllUsers(); err != nil {
-				log.Fatalf("Migration failed: %v", err)
-			}
-		case "migrate-user":
-			if len(os.Args) < 3 {
-				log.Fatal("Usage: migrate-user <firebase_uid>")
-			}
-			firebaseUID := os.Args[2]
-			if err := migrator.MigrateSingleUser(firebaseUID); err != nil {
-				log.Fatalf("Migration failed: %v", err)
-			}
-		case "get-mapping":
-			if len(os.Args) < 3 {
-				log.Fatal("Usage: get-mapping <uid_or_email>")
-			}
-			identifier := os.Args[2]
-			kratosUUID, err := migrator.GetMapping(identifier)
-			if err != nil {
-				log.Fatalf("Failed to get mapping: %v", err)
-			}
-			fmt.Printf("Identifier: %s -> Kratos UUID: %s\n", identifier, kratosUUID)
-		case "list-mappings":
-			mappings, err := migrator.ListMappings()
-			if err != nil {
-				log.Fatalf("Failed to list mappings: %v", err)
-			}
-			fmt.Printf("Total mappings: %d\n\n", len(mappings))
-			for _, m := range mappings {
-				fmt.Printf("%s (%s) -> %s (migrated at: %s)\n",
-					m.FirebaseUID, m.Email, m.KratosUUID, m.MigratedAt.Format(time.RFC3339))
-			}
-		default:
-			log.Fatalf("Unknown command: %s\nAvailable commands: migrate-all, migrate-user, get-mapping, list-mappings", command)
+		// We fetch all potential tuples in one go to free the connection for updates
+		query := fmt.Sprintf("SELECT ctid::text, %s FROM %s", ci.Column, ci.Table)
+		rows, err := m.store.ConnPool.Query(m.ctx, query)
+		if err != nil {
+			log.Err(err).Msgf("Error querying %s.%s", ci.Table, ci.Column)
+			continue
 		}
-	} else {
-		log.Println("Usage:")
-		log.Println("  migrate-all              - Migrate all Firebase users")
-		log.Println("  migrate-user <uid>       - Migrate a specific user")
-		log.Println("  get-mapping <uid>        - Get Kratos UUID for Firebase UID")
-		log.Println("  list-mappings            - List all migration mappings")
+
+		// Collect rows into memory to allow updating on the same connection pool
+		type rowData struct {
+			ctid   string
+			val    pgtype.Text
+			arrVal []string
+		}
+		var results []rowData
+		for rows.Next() {
+			var r rowData
+			var err error
+			if ci.Type == "array" {
+				err = rows.Scan(&r.ctid, &r.arrVal)
+			} else {
+				err = rows.Scan(&r.ctid, &r.val)
+			}
+			if err != nil {
+				log.Err(err).Msgf("Error scanning row in %s.%s", ci.Table, ci.Column)
+				continue
+			}
+			results = append(results, r)
+		}
+		rows.Close()
+
+		// 3. Process each tuple
+		successCount := 0
+		for _, r := range results {
+			if ci.Type == "array" {
+				changed := false
+				newArr := make([]string, len(r.arrVal))
+				copy(newArr, r.arrVal)
+
+				for i, v := range newArr {
+					if isFirebaseUID(v) {
+						if kratosUUID, found := mappingCache[v]; found {
+							newArr[i] = kratosUUID
+							changed = true
+						}
+					}
+				}
+
+				if changed {
+					updateSQL := fmt.Sprintf("UPDATE %s SET %s = $1 WHERE ctid = $2", ci.Table, ci.Column)
+					_, err := m.store.ConnPool.Exec(m.ctx, updateSQL, newArr, r.ctid)
+					if err != nil {
+						log.Err(err).Msgf("Error updating array row %s", r.ctid)
+						continue
+					}
+					successCount++
+				}
+			} else {
+				// Scalar field
+				if !r.val.Valid || !isFirebaseUID(r.val.String) {
+					continue
+				}
+
+				kratosUUID, found := mappingCache[r.val.String]
+				if !found {
+					continue
+				}
+
+				updateSQL := fmt.Sprintf("UPDATE %s SET %s = $1 WHERE ctid = $2", ci.Table, ci.Column)
+				_, err := m.store.ConnPool.Exec(m.ctx, updateSQL, kratosUUID, r.ctid)
+				if err != nil {
+					log.Err(err).Msgf("Error updating row %s", r.ctid)
+					continue
+				}
+				successCount++
+			}
+		}
+
+		if successCount > 0 {
+			log.Info().Msgf("Successfully migrated %d/%d rows in %s.%s", successCount, len(results), ci.Table, ci.Column)
+		}
 	}
+
+	log.Info().Msg("Foreign key migration complete!")
+	return nil
+}
+
+// MigrateUserFiles migrates user profile pictures from Firebase UIDs to Kratos UUIDs
+func (m *FirebaseToKratosMigrator) MigrateUserFiles() error {
+	if m.fileService == nil {
+		log.Warn().Msg("FileService not initialized, skipping file migration")
+		return nil
+	}
+
+	log.Info().Msg("Starting user files migration...")
+
+	// Query mappings joined with core_users to get tenant IDs
+	// We look for users who have a tenant_id and whose old ID (firebase_uid) is in the core_users table
+	query := `
+		SELECT m.firebase_uid, m.kratos_uuid, u.tenant_id 
+		FROM migration_user_mapping m
+		JOIN core_users u ON m.firebase_uid = u.id
+	`
+
+	rows, err := m.store.ConnPool.Query(m.ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to query user mappings for file migration: %w", err)
+	}
+	defer rows.Close()
+
+	type fileMigrationTask struct {
+		firebaseUID string
+		kratosUUID  string
+		tenantID    string
+	}
+	var tasks []fileMigrationTask
+	for rows.Next() {
+		var t fileMigrationTask
+		if err := rows.Scan(&t.firebaseUID, &t.kratosUUID, &t.tenantID); err != nil {
+			log.Err(err).Msg("Error scanning file migration task")
+			continue
+		}
+		if t.tenantID == "" {
+			t.tenantID = "www"
+		}
+		tasks = append(tasks, t)
+	}
+	rows.Close()
+
+	log.Info().Msgf("Found %d users with potential files to migrate", len(tasks))
+
+	successCount := 0
+	skipCount := 0
+	errorCount := 0
+
+	for _, t := range tasks {
+		// Path format: /tenants/ + tenantPart + /core/users/ + userId + "/profile-picture.jpg"
+		// The path usually starts without a leading slash in many blob storages,
+		// but let's follow the user's format exactly or adjust as needed for service.
+
+		oldPath := fmt.Sprintf("tenants/%s/core/users/%s/profile-picture.jpg", t.tenantID, t.firebaseUID)
+		backupPath := fmt.Sprintf("tenants/%s/backup/core/users/%s/profile-picture.jpg", t.tenantID, t.firebaseUID)
+		newPath := fmt.Sprintf("core/users/%s/profile-picture.jpg", t.kratosUUID)
+
+		// Check if old file exists
+		exists, err := m.fileService.FileExists(m.ctx, oldPath)
+		if err != nil {
+			log.Err(err).Msgf("Error checking existence of %s", oldPath)
+			errorCount++
+			continue
+		}
+
+		if !exists {
+			skipCount++
+			continue
+		}
+
+		log.Info().Msgf("Migrating profile picture: %s -> %s", oldPath, newPath)
+
+		// Copy backup before delete (if supported by the service, otherwise this is a rename)
+		if err := m.fileService.CopyFile(m.ctx, backupPath, oldPath); err != nil {
+			log.Err(err).Msgf("Failed to copy file from %s to %s", oldPath, backupPath)
+			errorCount++
+			continue
+		}
+
+		// Rename (Copy + Delete)
+		if err := m.fileService.RenameFile(m.ctx, newPath, oldPath); err != nil {
+			log.Err(err).Msgf("Failed to migrate file from %s to %s", oldPath, newPath)
+			errorCount++
+			continue
+		}
+
+		successCount++
+	}
+
+	log.Info().Msgf("File migration complete: %d migrated, %d skipped, %d errors", successCount, skipCount, errorCount)
+	return nil
 }
