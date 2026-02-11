@@ -233,6 +233,35 @@ func (m *FirebaseToKratosMigrator) migrateUser(user repository.CoreUser) error {
 		log.Info().Msgf("Created global user: %s (roles: %v)", kratosUUID, globalRoles)
 	}
 
+	// 5. Sync roles/memberships to Kratos identity metadata
+	if !hasTenant {
+		// Global roles
+		globalRoleClaims := m.authClient.BuildGlobalRoleClaims(user.Roles)
+		err = m.authClient.SetCustomUserClaims(m.ctx, kratosUUID, globalRoleClaims)
+		if err != nil {
+			log.Err(err).Msgf("Failed to sync global roles to Kratos for user %s", kratosUUID)
+			// Non-fatal error for the transaction, but we log it
+		} else {
+			log.Info().Msgf("Synced global roles to Kratos for user %s: %v", kratosUUID, user.Roles)
+		}
+	} else {
+		// Tenant membership
+		tenantMembershipClaims := map[string]interface{}{
+			"tenant_memberships": map[string]interface{}{
+				"tenant_id": user.TenantID.String,
+				"roles":     user.Roles,
+			},
+		}
+		err = m.authClient.SetCustomUserClaims(m.ctx, kratosUUID, tenantMembershipClaims)
+		if err != nil {
+			log.Err(err).Msgf("Failed to sync tenant membership to Kratos for user %s", kratosUUID)
+			// Non-fatal error
+		} else {
+			log.Info().Msgf("Synced tenant membership to Kratos for user %s (tenant: %s, roles: %v)",
+				kratosUUID, user.TenantID.String, user.Roles)
+		}
+	}
+
 	// Commit transaction
 	if err := tx.Commit(m.ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)

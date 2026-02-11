@@ -12,9 +12,9 @@ use .env
 - upsert migration_user_mapping
 
 3. if user.tenantID
-   create membership with roles
+   create membership with roles in core_users and sync to Kratos metadata_public.tenant_memberships
    else
-   create roles with roles
+   create roles in core_users and sync to Kratos metadata_public.global_roles
 
 4. Migrate all foreign keys
    Find them using:
