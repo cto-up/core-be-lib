@@ -15,7 +15,7 @@ type AuthError struct {
 }
 
 func (e *AuthError) Error() string {
-	return e.Message
+	return e.Code + ": " + e.Message
 }
 
 // Error codes

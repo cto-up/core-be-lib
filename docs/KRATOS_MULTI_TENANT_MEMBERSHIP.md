@@ -510,7 +510,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useKratosAuth } from "@/composables/useKratosAuth";
+import { useKratosAuth } from "core-fe-lib/authentication/composables/useKratosAuth";
 import axios from "axios";
 
 interface TenantMembership {

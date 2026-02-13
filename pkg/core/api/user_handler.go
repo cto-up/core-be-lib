@@ -214,6 +214,7 @@ func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
 		Email string `json:"email"`
 	}
 	if err := c.BindJSON(&req); err != nil {
+		log.Error().Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -227,8 +228,8 @@ func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get Firebase client")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Firebase client"})
+		log.Error().Err(err).Msg("Failed to get Authorization client")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Authorization client"})
 		return
 	}
 	url, err := getResetPasswordURL(c, "")

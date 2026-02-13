@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/emailservice"
@@ -52,13 +53,6 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, t
 		fromEmail = "noreply@ctoup.com"
 	}
 
-	// Log the URL being used for ActionCodeSettings
-	urlPrefix := url
-	if len(url) > 10 {
-		urlPrefix = url[:10]
-	}
-	log.Info().Str("url_prefix", urlPrefix).Str("email", toEmail).Msg("Generating password reset link")
-
 	actionCodeSettings := &auth.ActionCodeSettings{
 		URL: url,
 	}
@@ -66,13 +60,17 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, t
 	link, err := baseAuthClient.PasswordResetLinkWithSettings(c, toEmail, actionCodeSettings)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to generate reset link")
+		if strings.HasPrefix(err.Error(), auth.ErrorCodeUserNotFound) {
+			log.Warn().Str("email", toEmail).Msg("Password reset requested for non-existent user")
+			return nil // Don't return an error to avoid revealing user existence
+		}
 		return err
 	}
 
 	// Log the generated link to verify it's not empty
 	if link == "" {
-		log.Error().Str("email", toEmail).Str("url", url).Msg("Firebase returned empty password reset link")
-		return fmt.Errorf("firebase returned empty password reset link")
+		log.Error().Str("email", toEmail).Str("url", url).Msg("Returned empty password reset link")
+		return fmt.Errorf("Returned empty password reset link")
 	}
 	linkPrefix := link
 	if len(link) > 10 {

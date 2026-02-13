@@ -399,7 +399,7 @@ func ListResources(c *gin.Context) {
 
 ```vue
 <script setup lang="ts">
-import { useTenant } from "@/composables/useTenant";
+import { useTenant } from "core-fe-lib/authentication/composables/useTenant";
 
 const { tenantID, subdomain, hasTenant } = useTenant();
 </script>
@@ -415,7 +415,7 @@ const { tenantID, subdomain, hasTenant } = useTenant();
 ### Frontend: Register with Tenant
 
 ```typescript
-import { useKratosAuth } from "@/composables/useKratosAuth";
+import { useKratosAuth } from "core-fe-lib/authentication/composables/useKratosAuth";
 
 const { signMeUp } = useKratosAuth();
 
@@ -602,7 +602,7 @@ err = kratosClient.SetCustomUserClaims(ctx, kratosUser.UID, firebaseUser.GetClai
 ```typescript
 // Replace Firebase imports
 // import { getAuth } from "firebase/auth";
-import { kratosService } from "@/services/kratos.service";
+import { kratosService } from "core-fe-lib/authentication/services/kratos.service";
 
 // Replace Firebase auth calls
 // const user = getAuth().currentUser;
