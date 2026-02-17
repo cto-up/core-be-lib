@@ -131,14 +131,15 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 	if isSuperAdmin {
 		return user, nil
 	}
-	if tenantID == "" {
-		return user, fmt.Errorf("Only SUPER_ADMIN can access root domain")
-	}
 
 	// if /verify/webauthn, skip tenant membership Check
 	path, ok := ctx.Value(auth.REQUEST_URL_PATH).(string)
-	if ok && strings.Contains(path, "/verify/webauthn") {
+	if ok && (strings.Contains(path, "/verify/webauthn") || strings.HasPrefix(path, "/api/v1/mfa/")) {
 		return user, nil
+	}
+
+	if tenantID == "" {
+		return user, fmt.Errorf("Only SUPER_ADMIN can access root domain")
 	}
 
 	if membershipsInterface, ok := token.Claims[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
