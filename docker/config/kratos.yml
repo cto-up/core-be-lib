@@ -54,7 +54,7 @@ selfservice:
   default_browser_return_url: http://auth.ctoup.localhost
   allowed_return_urls:
     - http://auth.ctoup.localhost
-    - http://localhost:5173
+    - http://localhost:9001
 
   methods:
     password:
@@ -72,14 +72,22 @@ selfservice:
           display_name: ctoup # Change to your app name
           id: ctoup.localhost # Parent domain for multi-tenant subdomains
           origins:
+            - http://localhost:9001
+            - http://ctoup.localhost:9001
+            - http://auth.ctoup.localhost:9001
+
+            - http://localhost:3000
+            - http://ctoup.localhost:3000
+            - http://auth.ctoup.localhost:3000
+
             - http://localhost:5173
             - http://ctoup.localhost:5173
             - http://auth.ctoup.localhost:5173
-            - http://corpb.ctoup.localhost:5173
+
             - http://localhost
             - http://ctoup.localhost
             - http://auth.ctoup.localhost
-            - http://corpb.ctoup.localhost
+
     # Recovery codes (backup codes)
     lookup_secret:
       enabled: true
@@ -100,7 +108,7 @@ selfservice:
       # Optional MFA - users decide
       required_aal: highest_available
       after:
-        default_browser_return_url: http://localhost:5173/settings
+        default_browser_return_url: http://localhost:9001/settings
 
     recovery:
       enabled: true
@@ -110,22 +118,22 @@ selfservice:
     login:
       ui_url: /signin
       after:
-        default_browser_return_url: http://localhost:5173/
+        default_browser_return_url: http://localhost:9001/
 
     verification:
       enabled: true
-      ui_url: http://localhost:5173/verification
+      ui_url: http://localhost:9001/verification
       use: code
       after:
-        default_browser_return_url: http://localhost:5173/
+        default_browser_return_url: http://localhost:9001/
 
     logout:
       after:
-        default_browser_return_url: http://localhost:5173/signin
+        default_browser_return_url: http://localhost:9001/signin
 
     registration:
       lifespan: 10m
-      ui_url: http://localhost:5173/signup
+      ui_url: http://localhost:9001/signup
       after:
         password:
           hooks:

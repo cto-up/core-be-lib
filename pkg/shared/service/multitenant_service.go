@@ -38,9 +38,9 @@ func (uh *MultitenantService) GetStore() *db.Store {
 	return uh.store
 }
 
-// Map subdomain to Firebase tenant ID
+// Map subdomain to tenant ID
 func (uh *MultitenantService) GetTenantIDWithSubdomain(ctx context.Context, subdomain string) (string, error) {
-	if subdomain == "" || subdomain == "www" {
+	if subdomain == "" || subdomain == "www" || subdomain == "auth" {
 		return "", nil
 	}
 
