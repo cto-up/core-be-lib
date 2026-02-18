@@ -96,9 +96,10 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, "Not Authenticated")
 		return
 	}
-	user, err := s.userService.GetUserByTenantIDByID(ctx, tenantID, authUserID.(string))
+	user, err := s.userService.GetUserByID(ctx, authUserID.(string))
 
 	if err != nil {
+		
 		if err.Error() == pgx.ErrNoRows.Error() {
 			// user does not exist yet create it
 			user, err := s.userService.InitUserInDatabase(ctx, tenantID, authUserID.(string))

@@ -106,18 +106,6 @@ SELECT
 FROM new_user
 CROSS JOIN new_membership;
 
--- name: UpdateSharedProfileByTenant :one
-UPDATE core_users 
-SET profile = $1
-WHERE core_users.id = $2
-    AND EXISTS (
-        SELECT 1 FROM core_user_tenant_memberships
-        WHERE user_id = $2 
-            AND core_user_tenant_memberships.tenant_id = sqlc.arg(tenant_id)
-            AND status = 'active'
-    )
-RETURNING id;
-
 -- name: UpdateSharedProfile :one
 UPDATE core_users 
 SET profile = $1

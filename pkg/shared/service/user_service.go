@@ -70,9 +70,12 @@ func (uh *BaseUserService) GetUserByID(c context.Context, id string) (core.User,
 	}
 
 	user := core.User{
-		Id:        dbUser.ID,
-		Name:      dbUser.Profile.Name,
-		Email:     dbUser.Email.String,
+		Id:    dbUser.ID,
+		Name:  dbUser.Profile.Name,
+		Email: dbUser.Email.String,
+		Profile: &core.UserProfileSchema{
+			Name: dbUser.Profile.Name,
+		},
 		Roles:     convertToRoleDTOs(dbUser.Roles),
 		CreatedAt: &dbUser.CreatedAt,
 	}

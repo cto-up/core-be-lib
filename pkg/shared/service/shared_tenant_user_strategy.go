@@ -83,10 +83,9 @@ func (g *TenantUserStrategy) UpdateUser(c context.Context, authClient auth.AuthC
 	return err
 }
 func (g *TenantUserStrategy) UpdateSharedProfile(ctx context.Context, store *db.Store, userID string, req subentity.UserProfile) error {
-	_, err := store.UpdateSharedProfileByTenant(ctx, repository.UpdateSharedProfileByTenantParams{
-		ID:       userID,
-		Profile:  req,
-		TenantID: g.tenantID,
+	_, err := store.UpdateSharedProfile(ctx, repository.UpdateSharedProfileParams{
+		ID:      userID,
+		Profile: req,
 	})
 	return err
 }

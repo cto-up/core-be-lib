@@ -986,32 +986,6 @@ func (q *Queries) UpdateSharedProfile(ctx context.Context, arg UpdateSharedProfi
 	return id, err
 }
 
-const updateSharedProfileByTenant = `-- name: UpdateSharedProfileByTenant :one
-UPDATE core_users 
-SET profile = $1
-WHERE core_users.id = $2
-    AND EXISTS (
-        SELECT 1 FROM core_user_tenant_memberships
-        WHERE user_id = $2 
-            AND core_user_tenant_memberships.tenant_id = $3
-            AND status = 'active'
-    )
-RETURNING id
-`
-
-type UpdateSharedProfileByTenantParams struct {
-	Profile  subentity.UserProfile `json:"profile"`
-	ID       string                `json:"id"`
-	TenantID string                `json:"tenant_id"`
-}
-
-func (q *Queries) UpdateSharedProfileByTenant(ctx context.Context, arg UpdateSharedProfileByTenantParams) (string, error) {
-	row := q.db.QueryRow(ctx, updateSharedProfileByTenant, arg.Profile, arg.ID, arg.TenantID)
-	var id string
-	err := row.Scan(&id)
-	return id, err
-}
-
 const updateSharedUser = `-- name: UpdateSharedUser :one
 UPDATE core_users 
 SET 
