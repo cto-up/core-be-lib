@@ -44,7 +44,18 @@ func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 		subdomain = subdomains[0]
 	}
 
-	return buildTenantURL(c, "/signin?from=/", subdomain)
+	// Detect if the request originates from the backoffice (served under /admin/)
+	// by checking Referer or Origin headers for the /admin/ particule
+	path := "/signin?from=/"
+	if os.Getenv("FRONTEND_USE_ADMIN_PARTICULE") == "true" {
+		referer := c.GetHeader("Referer")
+		origin := c.GetHeader("Origin")
+		if strings.Contains(referer, "/admin/") || strings.Contains(origin, "/admin/") {
+			path = "/admin/signin?from=/"
+		}
+	}
+
+	return buildTenantURL(c, path, subdomain)
 }
 
 func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail string) error {
