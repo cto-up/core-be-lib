@@ -38,21 +38,26 @@ func buildTenantURL(c *gin.Context, path string, subdomain string) (string, erro
 	return url, nil
 }
 
+// isAdminParticuleRequest returns true when the request originates from the backoffice
+// (served under /admin/) and the FRONTEND_USE_ADMIN_PARTICULE env var is enabled.
+func isAdminParticuleRequest(c *gin.Context) bool {
+	if os.Getenv("FRONTEND_USE_ADMIN_PARTICULE") != "true" {
+		return false
+	}
+	referer := c.GetHeader("Referer")
+	origin := c.GetHeader("Origin")
+	return strings.Contains(referer, "/admin/") || strings.Contains(origin, "/admin/")
+}
+
 func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 	var subdomain string
 	if len(subdomains) > 0 {
 		subdomain = subdomains[0]
 	}
 
-	// Detect if the request originates from the backoffice (served under /admin/)
-	// by checking Referer or Origin headers for the /admin/ particule
 	path := "/signin?from=/"
-	if os.Getenv("FRONTEND_USE_ADMIN_PARTICULE") == "true" {
-		referer := c.GetHeader("Referer")
-		origin := c.GetHeader("Origin")
-		if strings.Contains(referer, "/admin/") || strings.Contains(origin, "/admin/") {
-			path = "/admin/signin?from=/"
-		}
+	if isAdminParticuleRequest(c) {
+		path = "/admin/signin?from=/"
 	}
 
 	return buildTenantURL(c, path, subdomain)

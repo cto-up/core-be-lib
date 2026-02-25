@@ -96,8 +96,12 @@ func (h *RecoveryHandler) HandleRecovery(c *gin.Context, params core.HandleRecov
 	flowID := params.Flow
 	token := params.Token
 
-	// Construct the Kratos recovery URL
-	kratosURL := fmt.Sprintf("%s/self-service/recovery?flow=%s&token=%s", h.kratosPublicURL, flowID, token)
+	// Construct the Kratos recovery URL, with /admin/ prefix when applicable
+	kratosPath := "/self-service/recovery"
+	if isAdminParticuleRequest(c) {
+		kratosPath = "/admin/self-service/recovery"
+	}
+	kratosURL := fmt.Sprintf("%s%s?flow=%s&token=%s", h.kratosPublicURL, kratosPath, flowID, token)
 
 	log.Info().
 		Str("flow", flowID).
