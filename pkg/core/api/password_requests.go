@@ -39,14 +39,15 @@ func buildTenantURL(c *gin.Context, path string, subdomain string) (string, erro
 }
 
 // isAdminParticuleRequest returns true when the request originates from the backoffice
-// (served under /admin/) and the FRONTEND_USE_ADMIN_PARTICULE env var is enabled.
+//
+// Detection strategy (in priority order):
+//
+//	X-App-Source: admin header — explicit, reliable for cross-origin requests
+//
+// Note: browsers send only the origin (no path) in Referer/Origin for cross-origin requests
+// (strict-origin-when-cross-origin policy), so the X-App-Source header is the reliable signal.
 func isAdminParticuleRequest(c *gin.Context) bool {
-	if os.Getenv("FRONTEND_USE_ADMIN_PARTICULE") != "true" {
-		return false
-	}
-	referer := c.GetHeader("Referer")
-	origin := c.GetHeader("Origin")
-	return strings.Contains(referer, "/admin/") || strings.Contains(origin, "/admin/")
+	return c.GetHeader("X-App-Source") == "admin"
 }
 
 func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
