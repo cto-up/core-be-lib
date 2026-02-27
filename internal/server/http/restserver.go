@@ -24,7 +24,7 @@ func RunRESTServer(ctx context.Context, connPool *pgxpool.Pool, address string, 
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Session-Token, X-CSRF-Token, Cookie, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Session-Token, X-CSRF-Token, Cookie, X-Requested-With, X-App-Source")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, OPTIONS, PATCH")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
