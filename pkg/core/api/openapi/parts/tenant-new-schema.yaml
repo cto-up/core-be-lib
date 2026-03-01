@@ -19,3 +19,8 @@ properties:
   allow_sign_up:
     type: boolean
     description: Allow users to sign up for this tenant
+  is_reseller:
+    type: boolean
+  reseller_id:
+    type: string
+    nullable: true

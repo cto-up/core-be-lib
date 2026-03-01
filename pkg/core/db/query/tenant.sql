@@ -13,6 +13,7 @@ WHERE subdomain = $1 LIMIT 1;
 -- name: ListTenants :many
 SELECT * FROM core_tenants
 WHERE (UPPER(name) LIKE UPPER(sqlc.narg('like')) OR sqlc.narg('like') IS NULL)
+AND (reseller_id = sqlc.narg('reseller_id') OR sqlc.narg('reseller_id') IS NULL)
 ORDER BY
   CASE
             WHEN sqlc.arg('order')::text = 'asc' and sqlc.arg('sortBy')::text = 'tenant_id' THEN "tenant_id"
@@ -29,9 +30,9 @@ OFFSET $2;
 
 -- name: CreateTenant :one
 INSERT INTO core_tenants (
-  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up"
+  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up", "reseller_id", "is_reseller"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7
+  $1, $2, $3, $4, $5, $6, $7, $8, $9
 )
 RETURNING *;
 
@@ -42,7 +43,8 @@ SET
     "subdomain" = $3,
     "enable_email_link_sign_in" = $4,
     "allow_password_sign_up" = $5,
-    "allow_sign_up" = $6
+    "allow_sign_up" = $6,
+    "is_reseller" = $7
 WHERE id = $1
 RETURNING id;
 

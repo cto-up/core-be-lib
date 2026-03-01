@@ -70,8 +70,8 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 		Features:    tenant.Features,
 		Profile:     tenant.Profile,
 		AllowSignUp: tenant.AllowSignUp,
-		//AllowPasswordSignUp:   tenant.AllowPasswordSignUp,
-		//EnableEmailLinkSignIn: tenant.EnableEmailLinkSignIn,
+		IsReseller:  tenant.IsReseller,
+		ResellerID:  tenant.ResellerID,
 	})
 }
 
@@ -112,6 +112,31 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
 		return
 	}
+
+	// If current user is a CUSTOMER_ADMIN of a reseller, set reseller_id
+	var resellerID pgtype.Text
+	claims, exists := c.Get(auth.AUTH_CLAIMS)
+	if exists {
+		claimsMap := claims.(map[string]interface{})
+		if claimsMap["CUSTOMER_ADMIN"] == true {
+			authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+			isReseller, _ := exh.multiTenantService.IsReseller(c, authTenantID)
+			if isReseller && authTenantID != "" {
+				resellerID = pgtype.Text{String: authTenantID, Valid: true}
+			}
+		}
+	}
+
+	// Override with value from request if provided (e.g. by SUPER_ADMIN)
+	if req.ResellerId != nil {
+		resellerID = pgtype.Text{String: *req.ResellerId, Valid: true}
+	}
+
+	var isReseller bool
+	if req.IsReseller != nil && service.IsSuperAdmin(c) {
+		isReseller = *req.IsReseller
+	}
+
 	tenant, err := exh.store.CreateTenant(c,
 		repository.CreateTenantParams{
 			UserID:                userID.(string),
@@ -121,6 +146,8 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 			EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
 			AllowPasswordSignUp:   req.AllowPasswordSignUp,
 			AllowSignUp:           req.AllowSignUp,
+			ResellerID:            resellerID,
+			IsReseller:            isReseller,
 		})
 	if err != nil {
 		tenantManager.DeleteTenant(c, newTenant.ID)
@@ -173,15 +200,45 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 		return
 	}
 
-	_, err = exh.store.UpdateTenant(c,
-		repository.UpdateTenantParams{
-			ID:                    id,
-			Name:                  req.Name,
-			Subdomain:             req.Subdomain,
-			EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
-			AllowPasswordSignUp:   req.AllowPasswordSignUp,
-			AllowSignUp:           req.AllowSignUp,
-		})
+	updateParams := repository.UpdateTenantParams{
+		ID:                    id,
+		Name:                  req.Name,
+		Subdomain:             req.Subdomain,
+		EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
+		AllowPasswordSignUp:   req.AllowPasswordSignUp,
+		AllowSignUp:           req.AllowSignUp,
+	}
+
+	// Authorization check
+	if !service.IsSuperAdmin(c) {
+		existing, err := exh.store.GetTenantByID(c, id)
+		if err != nil {
+			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
+			return
+		}
+
+		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+		if service.IsResellerAdmin(c) {
+			if !existing.ResellerID.Valid || existing.ResellerID.String != authTenantID {
+				c.JSON(http.StatusForbidden, "Not allowed to manage this tenant")
+				return
+			}
+		} else {
+			c.JSON(http.StatusForbidden, "Not allowed to perform this operation")
+			return
+		}
+		updateParams.IsReseller = existing.IsReseller
+	} else if req.IsReseller != nil {
+		updateParams.IsReseller = *req.IsReseller
+	} else {
+		// SUPER_ADMIN but IsReseller not provided, keep existing
+		existing, err := exh.store.GetTenantByID(c, id)
+		if err == nil {
+			updateParams.IsReseller = existing.IsReseller
+		}
+	}
+
+	_, err = exh.store.UpdateTenant(c, updateParams)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to update tenant in database")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -194,9 +251,23 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 	tenant, err := exh.store.GetTenantByID(c, id)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get tenant by ID")
+		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
+	}
+
+	// Authorization check
+	if !service.IsSuperAdmin(c) {
+		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+		if service.IsResellerAdmin(c) {
+			if !tenant.ResellerID.Valid || tenant.ResellerID.String != authTenantID {
+				c.JSON(http.StatusForbidden, "Not allowed to delete this tenant")
+				return
+			}
+		} else {
+			c.JSON(http.StatusForbidden, "Not allowed to perform this operation")
+			return
+		}
 	}
 
 	// Get the tenant manager
@@ -268,6 +339,23 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 		Like:   like,
 		SortBy: pagingSql.SortBy,
 		Order:  pagingSql.Order,
+	}
+
+	if params.ResellerId != nil {
+		query.ResellerID = pgtype.Text{String: *params.ResellerId, Valid: true}
+	}
+
+	// If user is CUSTOMER_ADMIN of a reseller, force reseller_id filter
+	claims, exists := c.Get(auth.AUTH_CLAIMS)
+	if exists {
+		claimsMap := claims.(map[string]interface{})
+		if claimsMap["CUSTOMER_ADMIN"] == true {
+			authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+			isReseller, _ := exh.multiTenantService.IsReseller(c, authTenantID)
+			if isReseller && authTenantID != "" {
+				query.ResellerID = pgtype.Text{String: authTenantID, Valid: true}
+			}
+		}
 	}
 
 	tenants, err := exh.store.ListTenants(c, query)

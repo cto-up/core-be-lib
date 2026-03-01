@@ -36,6 +36,12 @@ get:
       required: false
       schema:
         type: string
+    - name: reseller_id
+      in: query
+      description: filter by reseller id
+      required: false
+      schema:
+        type: string
   responses:
     "200":
       description: tenant response

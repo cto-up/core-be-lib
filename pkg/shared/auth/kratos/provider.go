@@ -142,6 +142,13 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 		return user, fmt.Errorf("Only SUPER_ADMIN can access root domain")
 	}
 
+	// Populate IsReseller
+	isReseller, err := k.multitenantService.IsReseller(ctx, tenantID)
+	if err == nil {
+		user.IsReseller = isReseller
+		claims["IS_RESELLER"] = isReseller
+	}
+
 	if membershipsInterface, ok := token.Claims[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
 		for _, m := range membershipsInterface {
 			if membershipMap, ok := m.(map[string]interface{}); ok {

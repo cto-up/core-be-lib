@@ -41,12 +41,29 @@ func NewUserSuperAdminHandler(store *db.Store, authProvider sharedauth.AuthProvi
 	return handler
 }
 
+func (uh *UserSuperAdminHandler) checkAuthorization(c *gin.Context, tenant repository.CoreTenant) bool {
+	if access.IsSuperAdmin(c) {
+		return true
+	}
+	if access.IsResellerAdmin(c) {
+		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+		if tenant.ResellerID.Valid && tenant.ResellerID.String == authTenantID {
+			return true
+		}
+	}
+	c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
+	return false
+}
+
 // AddUser implements openapi.ServerInterface.
 func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId uuid.UUID) {
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !uh.checkAuthorization(c, tenant) {
 		return
 	}
 	var req core.AddUserJSONRequestBody
@@ -92,6 +109,9 @@ func (uh *UserSuperAdminHandler) UpdateUserFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	if !uh.checkAuthorization(c, tenant) {
+		return
+	}
 	var req core.UpdateUserJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Error().Err(err).Msg("Failed to bind JSON")
@@ -121,6 +141,9 @@ func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	if !uh.checkAuthorization(c, tenant) {
+		return
+	}
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get auth client for tenant")
@@ -144,6 +167,9 @@ func (uh *UserSuperAdminHandler) RemoveUserFromTenantFromSuperAdmin(c *gin.Conte
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !uh.checkAuthorization(c, tenant) {
 		return
 	}
 
@@ -183,6 +209,9 @@ func (uh *UserSuperAdminHandler) GetUserByIDFromSuperAdmin(c *gin.Context, tenan
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	if !uh.checkAuthorization(c, tenant) {
+		return
+	}
 
 	user, err := uh.userService.GetUserByTenantIDByID(c, tenant.TenantID, id)
 	if err != nil {
@@ -199,6 +228,9 @@ func (uh *UserSuperAdminHandler) ListUsersFromSuperAdmin(c *gin.Context, tenantI
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !uh.checkAuthorization(c, tenant) {
 		return
 	}
 	pagingRequest := helpers.PagingRequest{
@@ -241,6 +273,13 @@ func (uh *UserSuperAdminHandler) AssignRoleFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	if !uh.checkAuthorization(c, tenant) {
+		return
+	}
+	if access.IsResellerAdmin(c) && access.GetRoleLevel(access.TenantRole(role)) > access.GetRoleLevel(access.TenantRoleCustomerAdmin) {
+		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("resellers are not allowed to assign roles higher than CUSTOMER_ADMIN")))
+		return
+	}
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get auth client for tenant")
@@ -262,6 +301,9 @@ func (uh *UserSuperAdminHandler) UnassignRoleFromSuperAdmin(c *gin.Context, tena
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !uh.checkAuthorization(c, tenant) {
 		return
 	}
 
@@ -286,6 +328,9 @@ func (uh *UserSuperAdminHandler) UpdateUserStatusFromSuperAdmin(c *gin.Context, 
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !uh.checkAuthorization(c, tenant) {
 		return
 	}
 	var req core.UpdateUserStatusJSONBody
@@ -328,6 +373,19 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	// We need to check authorization here too. But uh is UserHandler or UserSuperAdminHandler?
+	// The receiver in ResetPasswordRequestBySuperAdmin is UserHandler!
+	// Wait, I should probably check it anyway.
+	if access.IsResellerAdmin(c) {
+		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+		if !tenant.ResellerID.Valid || tenant.ResellerID.String != authTenantID {
+			c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
+			return
+		}
+	} else if !access.IsSuperAdmin(c) {
+		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to perform this operation")))
+		return
+	}
 
 	// Use the reusable buildTenantURL function
 	url, err := buildTenantURL(c, "/signin?from=/", tenant.Subdomain)
@@ -358,6 +416,9 @@ func (uh *UserSuperAdminHandler) CheckUserExistsFromSuperAdmin(c *gin.Context, t
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !uh.checkAuthorization(c, tenant) {
 		return
 	}
 
@@ -409,6 +470,9 @@ func (uh *UserSuperAdminHandler) AddUserMembershipFromSuperAdmin(c *gin.Context,
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !uh.checkAuthorization(c, tenant) {
 		return
 	}
 

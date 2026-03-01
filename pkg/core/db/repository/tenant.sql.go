@@ -10,25 +10,28 @@ import (
 
 	subentity "ctoup.com/coreapp/pkg/shared/repository/subentity"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTenant = `-- name: CreateTenant :one
 INSERT INTO core_tenants (
-  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up"
+  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up", "reseller_id", "is_reseller"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7
+  $1, $2, $3, $4, $5, $6, $7, $8, $9
 )
-RETURNING id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up
+RETURNING id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id
 `
 
 type CreateTenantParams struct {
-	UserID                string `json:"user_id"`
-	TenantID              string `json:"tenant_id"`
-	Name                  string `json:"name"`
-	Subdomain             string `json:"subdomain"`
-	EnableEmailLinkSignIn bool   `json:"enable_email_link_sign_in"`
-	AllowPasswordSignUp   bool   `json:"allow_password_sign_up"`
-	AllowSignUp           bool   `json:"allow_sign_up"`
+	UserID                string      `json:"user_id"`
+	TenantID              string      `json:"tenant_id"`
+	Name                  string      `json:"name"`
+	Subdomain             string      `json:"subdomain"`
+	EnableEmailLinkSignIn bool        `json:"enable_email_link_sign_in"`
+	AllowPasswordSignUp   bool        `json:"allow_password_sign_up"`
+	AllowSignUp           bool        `json:"allow_sign_up"`
+	ResellerID            pgtype.Text `json:"reseller_id"`
+	IsReseller            bool        `json:"is_reseller"`
 }
 
 func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (CoreTenant, error) {
@@ -40,6 +43,8 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Cor
 		arg.EnableEmailLinkSignIn,
 		arg.AllowPasswordSignUp,
 		arg.AllowSignUp,
+		arg.ResellerID,
+		arg.IsReseller,
 	)
 	var i CoreTenant
 	err := row.Scan(
@@ -55,6 +60,8 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Cor
 		&i.Profile,
 		&i.Features,
 		&i.AllowSignUp,
+		&i.IsReseller,
+		&i.ResellerID,
 	)
 	return i, err
 }
@@ -72,7 +79,7 @@ func (q *Queries) DeleteTenant(ctx context.Context, id uuid.UUID) (uuid.UUID, er
 }
 
 const getTenantByID = `-- name: GetTenantByID :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id FROM core_tenants
 WHERE id = $1 LIMIT 1
 `
 
@@ -92,12 +99,14 @@ func (q *Queries) GetTenantByID(ctx context.Context, id uuid.UUID) (CoreTenant, 
 		&i.Profile,
 		&i.Features,
 		&i.AllowSignUp,
+		&i.IsReseller,
+		&i.ResellerID,
 	)
 	return i, err
 }
 
 const getTenantBySubdomain = `-- name: GetTenantBySubdomain :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id FROM core_tenants
 WHERE subdomain = $1 LIMIT 1
 `
 
@@ -117,12 +126,14 @@ func (q *Queries) GetTenantBySubdomain(ctx context.Context, subdomain string) (C
 		&i.Profile,
 		&i.Features,
 		&i.AllowSignUp,
+		&i.IsReseller,
+		&i.ResellerID,
 	)
 	return i, err
 }
 
 const getTenantByTenantID = `-- name: GetTenantByTenantID :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id FROM core_tenants
 WHERE tenant_id = $1 LIMIT 1
 `
 
@@ -142,34 +153,38 @@ func (q *Queries) GetTenantByTenantID(ctx context.Context, tenantID string) (Cor
 		&i.Profile,
 		&i.Features,
 		&i.AllowSignUp,
+		&i.IsReseller,
+		&i.ResellerID,
 	)
 	return i, err
 }
 
 const listTenants = `-- name: ListTenants :many
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id FROM core_tenants
 WHERE (UPPER(name) LIKE UPPER($3) OR $3 IS NULL)
+AND (reseller_id = $4 OR $4 IS NULL)
 ORDER BY
   CASE
-            WHEN $4::text = 'asc' and $5::text = 'tenant_id' THEN "tenant_id"
-            WHEN $4::text = 'asc' and $5::text = 'name' THEN "name"
-            WHEN $4::text = 'asc' and $5::text = 'subdomain' THEN "subdomain"
+            WHEN $5::text = 'asc' and $6::text = 'tenant_id' THEN "tenant_id"
+            WHEN $5::text = 'asc' and $6::text = 'name' THEN "name"
+            WHEN $5::text = 'asc' and $6::text = 'subdomain' THEN "subdomain"
         END ASC,
   CASE
-            WHEN (NOT $4::text = 'asc') and $5::text = 'tenant_id' THEN "tenant_id"
-            WHEN (NOT $4::text = 'asc') and $5::text = 'name' THEN "name"
-            WHEN (NOT $4::text = 'asc') and $5::text = 'subdomain' THEN "subdomain"
+            WHEN (NOT $5::text = 'asc') and $6::text = 'tenant_id' THEN "tenant_id"
+            WHEN (NOT $5::text = 'asc') and $6::text = 'name' THEN "name"
+            WHEN (NOT $5::text = 'asc') and $6::text = 'subdomain' THEN "subdomain"
         END DESC
 LIMIT $1
 OFFSET $2
 `
 
 type ListTenantsParams struct {
-	Limit  int32       `json:"limit"`
-	Offset int32       `json:"offset"`
-	Like   interface{} `json:"like"`
-	Order  string      `json:"order"`
-	SortBy string      `json:"sortBy"`
+	Limit      int32       `json:"limit"`
+	Offset     int32       `json:"offset"`
+	Like       interface{} `json:"like"`
+	ResellerID pgtype.Text `json:"reseller_id"`
+	Order      string      `json:"order"`
+	SortBy     string      `json:"sortBy"`
 }
 
 func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]CoreTenant, error) {
@@ -177,6 +192,7 @@ func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]Cor
 		arg.Limit,
 		arg.Offset,
 		arg.Like,
+		arg.ResellerID,
 		arg.Order,
 		arg.SortBy,
 	)
@@ -200,6 +216,8 @@ func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]Cor
 			&i.Profile,
 			&i.Features,
 			&i.AllowSignUp,
+			&i.IsReseller,
+			&i.ResellerID,
 		); err != nil {
 			return nil, err
 		}
@@ -218,7 +236,8 @@ SET
     "subdomain" = $3,
     "enable_email_link_sign_in" = $4,
     "allow_password_sign_up" = $5,
-    "allow_sign_up" = $6
+    "allow_sign_up" = $6,
+    "is_reseller" = $7
 WHERE id = $1
 RETURNING id
 `
@@ -230,6 +249,7 @@ type UpdateTenantParams struct {
 	EnableEmailLinkSignIn bool      `json:"enable_email_link_sign_in"`
 	AllowPasswordSignUp   bool      `json:"allow_password_sign_up"`
 	AllowSignUp           bool      `json:"allow_sign_up"`
+	IsReseller            bool      `json:"is_reseller"`
 }
 
 func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (uuid.UUID, error) {
@@ -240,6 +260,7 @@ func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (uui
 		arg.EnableEmailLinkSignIn,
 		arg.AllowPasswordSignUp,
 		arg.AllowSignUp,
+		arg.IsReseller,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)

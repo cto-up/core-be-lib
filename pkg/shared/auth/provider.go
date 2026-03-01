@@ -33,6 +33,7 @@ type AuthenticatedUser struct {
 	Claims            map[string]interface{} `json:"claims"`
 	TenantID          string                 `json:"tenant_id,omitempty"`
 	TenantMemberships []TenantMembership     `json:"tenant_memberships,omitempty"` // List of tenant memberships with roles
+	IsReseller        bool                   `json:"is_reseller"`                  // Is the current tenant a reseller
 }
 
 func (au *AuthenticatedUser) GetClaimsArray() []string {
@@ -55,6 +56,7 @@ type UserRecord struct {
 // MultitenantService interface for getting tenant information
 type MultitenantService interface {
 	GetTenantIDWithSubdomain(ctx context.Context, subdomain string) (string, error)
+	IsReseller(ctx context.Context, tenantID string) (bool, error)
 }
 
 // UserToCreate represents parameters for creating a new user

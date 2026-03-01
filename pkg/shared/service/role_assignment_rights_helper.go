@@ -76,6 +76,19 @@ func IsSuperAdmin(c *gin.Context) bool {
 	return isSuperAdmin
 }
 
+func IsReseller(c *gin.Context) bool {
+	claims, exist := c.Get(auth.AUTH_CLAIMS)
+	if !exist {
+		return false
+	}
+	isReseller := claims.((map[string]interface{}))["IS_RESELLER"] == true
+	return isReseller
+}
+
+func IsResellerAdmin(c *gin.Context) bool {
+	return (IsCustomerAdmin(c) || IsAdmin(c)) && IsReseller(c)
+}
+
 // GetUserTenantRoles retrieves the user's roles in the current tenant from context
 func GetUserTenantRoles(c *gin.Context) ([]string, error) {
 	rolesInterface, exists := c.Get(CONTEXT_KEY_TENANT_ROLES)
@@ -131,19 +144,19 @@ func HasMinimumTenantRole(c *gin.Context, minimumRole TenantRole) bool {
 		return false
 	}
 
-	minimumLevel := getRoleLevel(minimumRole)
+	minimumLevel := GetRoleLevel(minimumRole)
 
 	for _, role := range roles {
-		if getRoleLevel(TenantRole(role)) >= minimumLevel {
+		if GetRoleLevel(TenantRole(role)) >= minimumLevel {
 			return true
 		}
 	}
 	return false
 }
 
-// getRoleLevel returns the hierarchical level of a role
+// GetRoleLevel returns the hierarchical level of a role
 // Higher number = more permissions
-func getRoleLevel(role TenantRole) int {
+func GetRoleLevel(role TenantRole) int {
 	switch role {
 	case TenantRoleAdmin:
 		return 3

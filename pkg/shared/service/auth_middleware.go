@@ -156,6 +156,12 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.Authentica
 		if claims["SUPER_ADMIN"] == true {
 			return true
 		}
+		// Allow CUSTOMER_ADMIN if tenant is a reseller for tenant-related operations
+		if claims["CUSTOMER_ADMIN"] == true && claims["IS_RESELLER"] == true {
+			if strings.HasPrefix(c.Request.URL.Path, "/superadmin-api/v1/tenant") {
+				return true
+			}
+		}
 		c.JSON(http.StatusForbidden, gin.H{
 			"status":  http.StatusForbidden,
 			"message": "Need to be a SUPER_ADMIN to perform such operation",
