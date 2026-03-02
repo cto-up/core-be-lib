@@ -73,6 +73,11 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 		return
 	}
 
+	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
+		return
+	}
+
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get auth client for tenant")
@@ -116,6 +121,10 @@ func (uh *UserSuperAdminHandler) UpdateUserFromSuperAdmin(c *gin.Context, tenant
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Error().Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
+		return
+	}
+	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
