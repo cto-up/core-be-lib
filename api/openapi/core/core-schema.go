@@ -709,11 +709,14 @@ type UserProfileSchema struct {
 	About                *string   `json:"about,omitempty"`
 	BackgroundPictureURL *string   `json:"backgroundPictureURL,omitempty"`
 	Interests            *[]string `json:"interests,omitempty"`
-	Name                 string    `json:"name"`
-	PictureURL           *string   `json:"pictureURL,omitempty"`
-	Skills               *[]string `json:"skills,omitempty"`
-	SocialMedias         *[]string `json:"socialMedias,omitempty"`
-	Title                *string   `json:"title,omitempty"`
+
+	// IsReseller Whether the current tenant is a reseller (read-only, derived from auth claims)
+	IsReseller   *bool     `json:"is_reseller,omitempty"`
+	Name         string    `json:"name"`
+	PictureURL   *string   `json:"pictureURL,omitempty"`
+	Skills       *[]string `json:"skills,omitempty"`
+	SocialMedias *[]string `json:"socialMedias,omitempty"`
+	Title        *string   `json:"title,omitempty"`
 }
 
 // InternalServerError defines model for InternalServerError.

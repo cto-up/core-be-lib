@@ -24,3 +24,6 @@ properties:
     type: array
     items:
       type: string
+  is_reseller:
+    type: boolean
+    description: Whether the current tenant is a reseller (read-only, derived from auth claims)

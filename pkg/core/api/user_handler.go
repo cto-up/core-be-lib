@@ -99,7 +99,6 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 	user, err := s.userService.GetUserByID(ctx, authUserID.(string))
 
 	if err != nil {
-		
 		if err.Error() == pgx.ErrNoRows.Error() {
 			// user does not exist yet create it
 			user, err := s.userService.InitUserInDatabase(ctx, tenantID, authUserID.(string))
@@ -114,7 +113,13 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 			return
 		}
 	}
-	ctx.JSON(http.StatusOK, user.Profile)
+	profile := user.Profile
+	if profile == nil {
+		profile = &core.UserProfileSchema{}
+	}
+	isReseller := access.IsReseller(ctx)
+	profile.IsReseller = &isReseller
+	ctx.JSON(http.StatusOK, profile)
 }
 
 func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {

@@ -57,6 +57,7 @@ type UserRecord struct {
 type MultitenantService interface {
 	GetTenantIDWithSubdomain(ctx context.Context, subdomain string) (string, error)
 	IsReseller(ctx context.Context, tenantID string) (bool, error)
+	IsResellerManaged(ctx context.Context, tenantID string) (bool, error)
 }
 
 // UserToCreate represents parameters for creating a new user

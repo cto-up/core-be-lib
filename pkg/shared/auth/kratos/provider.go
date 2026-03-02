@@ -157,17 +157,32 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 					membership.TenantID = tid
 				}
 
-				// Only validate for tenant
+				// Only validate for the current tenant
 				if membership.TenantID == tenantID {
+					hasCustAdmin := false
 					if rolesInterface, ok := membershipMap["roles"].([]interface{}); ok {
 						for _, r := range rolesInterface {
 							if roleStr, ok := r.(string); ok {
 								claims[roleStr] = true
+								if roleStr == "CUSTOMER_ADMIN" {
+									hasCustAdmin = true
+								}
 							}
 						}
 					}
-					user.TenantMemberships = append(user.TenantMemberships, membership)
 
+					// Always derive IS_RESELLER from DB so it stays accurate when:
+					//   - a tenant's reseller_id is assigned/removed
+					//   - a tenant is deleted by the reseller
+					// Only CUSTOMER_ADMIN users of a reseller-managed tenant get this flag.
+					if hasCustAdmin {
+						if managed, err := k.multitenantService.IsResellerManaged(ctx, tenantID); err == nil && managed {
+							user.IsReseller = true
+							claims["IS_RESELLER"] = true
+						}
+					}
+
+					user.TenantMemberships = append(user.TenantMemberships, membership)
 					return user, nil
 				}
 			}

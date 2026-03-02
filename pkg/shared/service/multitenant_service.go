@@ -76,3 +76,23 @@ func (uh *MultitenantService) IsReseller(ctx context.Context, tenantID string) (
 	}
 	return tenant.IsReseller, nil
 }
+
+// IsResellerManaged checks if a tenant is managed by a reseller.
+// A tenant is reseller-managed when its reseller_id points to a tenant with is_reseller=true.
+func (uh *MultitenantService) IsResellerManaged(ctx context.Context, tenantID string) (bool, error) {
+	if tenantID == "" {
+		return false, nil
+	}
+	tenant, err := uh.store.GetTenantByTenantID(ctx, tenantID)
+	if err != nil {
+		return false, err
+	}
+	if !tenant.ResellerID.Valid || tenant.ResellerID.String == "" {
+		return false, nil
+	}
+	resellerTenant, err := uh.store.GetTenantByTenantID(ctx, tenant.ResellerID.String)
+	if err != nil {
+		return false, err
+	}
+	return resellerTenant.IsReseller, nil
+}

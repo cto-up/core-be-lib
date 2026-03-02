@@ -9,4 +9,5 @@ type UserProfile struct {
 	SocialMedias         []string `json:"socialMedias"`
 	Interests            []string `json:"interests"`
 	Skills               []string `json:"skills"`
+	IsReseller           bool     `json:"is_reseller,omitempty"`
 }

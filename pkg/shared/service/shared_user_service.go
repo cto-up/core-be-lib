@@ -10,12 +10,21 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
+	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/rs/zerolog/log"
-
-	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 )
+
+// hasCustomerAdminRole returns true if the provided roles contain CUSTOMER_ADMIN.
+func hasCustomerAdminRole(roles []core.Role) bool {
+	for _, r := range roles {
+		if r == core.CUSTOMERADMIN {
+			return true
+		}
+	}
+	return false
+}
 
 type StrategyType string
 
@@ -321,12 +330,13 @@ func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.
 	if err != nil {
 		return errors.New("user not found in auth provider")
 	}
+
 	claims := map[string]interface{}{}
-	// For tenant-scoped users, add tenant_memberships to metadata_public which includes tenant_id and assigned roles
-	claims["tenant_memberships"] = map[string]interface{}{
+	membership := map[string]interface{}{
 		"tenant_id": tenantID,
 		"roles":     roles,
 	}
+	claims["tenant_memberships"] = membership
 	err = authClient.SetCustomUserClaims(c, userID, claims)
 	if err != nil {
 		return err
