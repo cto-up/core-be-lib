@@ -16,6 +16,8 @@ const (
 	AUTH_CLAIMS             = "auth_claims"
 	AUTH_TENANT_ID_KEY      = "auth_tenant_id"
 	AUTH_TENANT_MEMBERSHIPS = "tenant_memberships"
+	AUTH_IS_RESELLER        = "is_reseller"
+	AUTH_IS_ACTING_RESELLER = "is_acting_reseller"
 	REQUEST_URL_PATH        = "request_url_path"
 )
 
@@ -34,6 +36,7 @@ type AuthenticatedUser struct {
 	TenantID          string                 `json:"tenant_id,omitempty"`
 	TenantMemberships []TenantMembership     `json:"tenant_memberships,omitempty"` // List of tenant memberships with roles
 	IsReseller        bool                   `json:"is_reseller"`                  // Is the current tenant a reseller
+	IsActingReseller  bool                   `json:"is_acting_reseller"`           // Is the current tenant managed by a reseller
 }
 
 func (au *AuthenticatedUser) GetClaimsArray() []string {
@@ -57,7 +60,7 @@ type UserRecord struct {
 type MultitenantService interface {
 	GetTenantIDWithSubdomain(ctx context.Context, subdomain string) (string, error)
 	IsReseller(ctx context.Context, tenantID string) (bool, error)
-	IsResellerManaged(ctx context.Context, tenantID string) (bool, error)
+	IsActingReseller(ctx context.Context, tenantID string) (bool, error)
 }
 
 // UserToCreate represents parameters for creating a new user

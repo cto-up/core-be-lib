@@ -710,6 +710,9 @@ type UserProfileSchema struct {
 	BackgroundPictureURL *string   `json:"backgroundPictureURL,omitempty"`
 	Interests            *[]string `json:"interests,omitempty"`
 
+	// IsActingReseller Whether the current tenant is a reseller of a the tenant (read-only, derived from auth claims)
+	IsActingReseller *bool `json:"is_acting_reseller,omitempty"`
+
 	// IsReseller Whether the current tenant is a reseller (read-only, derived from auth claims)
 	IsReseller   *bool     `json:"is_reseller,omitempty"`
 	Name         string    `json:"name"`

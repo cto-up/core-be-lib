@@ -113,15 +113,14 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 		return
 	}
 
-	// If current user is a CUSTOMER_ADMIN of a reseller, set reseller_id
+	// If current user is a IS_RESELLER of a reseller, set reseller_id
 	var resellerID pgtype.Text
 	claims, exists := c.Get(auth.AUTH_CLAIMS)
 	if exists {
 		claimsMap := claims.(map[string]interface{})
-		if claimsMap["CUSTOMER_ADMIN"] == true {
+		if claimsMap["IS_RESELLER"] == true {
 			authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
-			isReseller, _ := exh.multiTenantService.IsReseller(c, authTenantID)
-			if isReseller && authTenantID != "" {
+			if authTenantID != "" {
 				resellerID = pgtype.Text{String: authTenantID, Valid: true}
 			}
 		}
@@ -193,7 +192,17 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 		AllowPasswordSignUp:   req.AllowPasswordSignUp,
 	}
 
-	_, err := tenantManager.UpdateTenant(c, req.TenantId, tenantConfig)
+	// Authorization check
+	isAllowed, err := service.IsAllowedToManageTenantByID(c, exh.store, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
+		return
+	}
+	if !isAllowed {
+		c.JSON(http.StatusForbidden, "Not allowed to manage this tenant")
+		return
+	}
+	_, err = tenantManager.UpdateTenant(c, req.TenantId, tenantConfig)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to update tenant in auth provider")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -209,22 +218,11 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 		AllowSignUp:           req.AllowSignUp,
 	}
 
-	// Authorization check
+	// Only SUPER_ADMIN can update reseller_id and is_reseller fields
 	if !service.IsSuperAdmin(c) {
 		existing, err := exh.store.GetTenantByID(c, id)
 		if err != nil {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
-			return
-		}
-
-		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
-		if service.IsResellerAdmin(c) {
-			if !existing.ResellerID.Valid || existing.ResellerID.String != authTenantID {
-				c.JSON(http.StatusForbidden, "Not allowed to manage this tenant")
-				return
-			}
-		} else {
-			c.JSON(http.StatusForbidden, "Not allowed to perform this operation")
 			return
 		}
 		updateParams.IsReseller = existing.IsReseller
@@ -257,17 +255,14 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 	}
 
 	// Authorization check
-	if !service.IsSuperAdmin(c) {
-		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
-		if service.IsResellerAdmin(c) {
-			if !tenant.ResellerID.Valid || tenant.ResellerID.String != authTenantID {
-				c.JSON(http.StatusForbidden, "Not allowed to delete this tenant")
-				return
-			}
-		} else {
-			c.JSON(http.StatusForbidden, "Not allowed to perform this operation")
-			return
-		}
+	isAllowed, err := service.IsAllowedToManageTenantByID(c, exh.store, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
+		return
+	}
+	if !isAllowed {
+		c.JSON(http.StatusForbidden, "Not allowed to manage this tenant")
+		return
 	}
 
 	// Get the tenant manager
@@ -303,6 +298,16 @@ func (exh *TenantHandler) GetTenantByID(c *gin.Context, id uuid.UUID) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	// Authorization check
+	isAllowed, err := service.IsAllowedToManageTenantByID(c, exh.store, id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
+		return
+	}
+	if !isAllowed {
+		c.JSON(http.StatusForbidden, "Not allowed to manage this tenant")
 		return
 	}
 	c.JSON(http.StatusOK, tenant)
@@ -345,11 +350,11 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 		query.ResellerID = pgtype.Text{String: *params.ResellerId, Valid: true}
 	}
 
-	// If user is CUSTOMER_ADMIN of a reseller, force reseller_id filter
+	// If user is IS_RESELLER of a reseller, force reseller_id filter
 	claims, exists := c.Get(auth.AUTH_CLAIMS)
 	if exists {
 		claimsMap := claims.(map[string]interface{})
-		if claimsMap["CUSTOMER_ADMIN"] == true {
+		if claimsMap["IS_RESELLER"] == true {
 			authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
 			isReseller, _ := exh.multiTenantService.IsReseller(c, authTenantID)
 			if isReseller && authTenantID != "" {

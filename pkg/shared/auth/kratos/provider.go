@@ -159,6 +159,9 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 
 				// Only validate for the current tenant
 				if membership.TenantID == tenantID {
+					user.TenantMemberships = append(user.TenantMemberships, membership)
+					return user, nil
+				} else {
 					hasCustAdmin := false
 					if rolesInterface, ok := membershipMap["roles"].([]interface{}); ok {
 						for _, r := range rolesInterface {
@@ -176,14 +179,17 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 					//   - a tenant is deleted by the reseller
 					// Only CUSTOMER_ADMIN users of a reseller-managed tenant get this flag.
 					if hasCustAdmin {
-						if managed, err := k.multitenantService.IsResellerManaged(ctx, tenantID); err == nil && managed {
-							user.IsReseller = true
-							claims["IS_RESELLER"] = true
+						if managed, err := k.multitenantService.IsActingReseller(ctx, tenantID); err == nil && managed {
+							user.IsActingReseller = true
+							claims["ACTING_RESELLER"] = true
 						}
+						resellerMembership := auth.TenantMembership{
+							TenantID: tenantID,
+							Roles:    []string{"ACTING_RESELLER"},
+						}
+						user.TenantMemberships = append(user.TenantMemberships, resellerMembership)
+						return user, nil
 					}
-
-					user.TenantMemberships = append(user.TenantMemberships, membership)
-					return user, nil
 				}
 			}
 		}

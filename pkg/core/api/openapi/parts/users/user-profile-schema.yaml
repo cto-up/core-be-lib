@@ -27,3 +27,6 @@ properties:
   is_reseller:
     type: boolean
     description: Whether the current tenant is a reseller (read-only, derived from auth claims)
+  is_acting_reseller:
+    type: boolean
+    description: Whether the current tenant is a reseller of a the tenant (read-only, derived from auth claims)

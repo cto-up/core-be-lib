@@ -5,8 +5,11 @@ import (
 	"fmt"
 
 	"ctoup.com/coreapp/api/openapi/core"
+	"ctoup.com/coreapp/pkg/core/db"
+	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // GlobalRole represents possible roles with global scope
@@ -76,6 +79,39 @@ func IsSuperAdmin(c *gin.Context) bool {
 	return isSuperAdmin
 }
 
+func IsAllowedToManageTenantByID(c *gin.Context, store *db.Store, id uuid.UUID) (bool, error) {
+	if IsSuperAdmin(c) {
+		return true, nil
+	}
+
+	existing, err := store.GetTenantByID(c, id)
+	if err != nil {
+		return false, err
+	}
+
+	authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+	if IsReseller(c) {
+		if !existing.ResellerID.Valid || existing.ResellerID.String != authTenantID {
+			return false, errors.New("not allowed to manage this tenant")
+		}
+	} else {
+		return false, errors.New("not allowed to perform this operation")
+	}
+	return true, nil
+}
+func IsAllowedToManageTenant(c *gin.Context, tenant repository.CoreTenant) bool {
+	if IsSuperAdmin(c) {
+		return true
+	}
+	if IsReseller(c) {
+		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+		if tenant.ResellerID.Valid && tenant.ResellerID.String == authTenantID {
+			return true
+		}
+	}
+	return false
+}
+
 func IsReseller(c *gin.Context) bool {
 	claims, exist := c.Get(auth.AUTH_CLAIMS)
 	if !exist {
@@ -83,10 +119,6 @@ func IsReseller(c *gin.Context) bool {
 	}
 	isReseller := claims.((map[string]interface{}))["IS_RESELLER"] == true
 	return isReseller
-}
-
-func IsResellerAdmin(c *gin.Context) bool {
-	return (IsCustomerAdmin(c) || IsAdmin(c)) && IsReseller(c)
 }
 
 // GetUserTenantRoles retrieves the user's roles in the current tenant from context

@@ -58,7 +58,7 @@ func main() {
 	// Set Zerolog to write to the multi-writer
 	log.Logger = zerolog.New(multiWriter).With().Timestamp().Logger()
 
-	log.Print("Application started...")
+	log.Print("Prompt started...")
 
 	connectionString := connectionRepository.GetConnectionString()
 

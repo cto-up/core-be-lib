@@ -107,6 +107,8 @@ func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *auth.Authen
 	c.Set(auth.AUTH_EMAIL, user.Email)
 	c.Set(auth.AUTH_USER_ID, user.UserID)
 	c.Set(auth.AUTH_CLAIMS, user.Claims)
+	c.Set(auth.AUTH_IS_RESELLER, user.IsReseller)
+	c.Set(auth.AUTH_IS_ACTING_RESELLER, user.IsActingReseller)
 
 	// Set tenant context if available
 	if user.TenantID != "" {
@@ -127,7 +129,7 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.Authentica
 	if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
 		util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
 
-		if claims["SUPER_ADMIN"] == true || claims["ADMIN"] == true || claims["CUSTOMER_ADMIN"] == true {
+		if claims["SUPER_ADMIN"] == true || claims["ADMIN"] == true || claims["CUSTOMER_ADMIN"] == true || claims["IS_ACTING_RESELLER"] == true {
 			return true
 		}
 		c.JSON(http.StatusForbidden, gin.H{
@@ -156,8 +158,8 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.Authentica
 		if claims["SUPER_ADMIN"] == true {
 			return true
 		}
-		// Allow CUSTOMER_ADMIN if tenant is a reseller for tenant-related operations
-		if claims["CUSTOMER_ADMIN"] == true && claims["IS_RESELLER"] == true {
+		// Allow IS_RESELLER if tenant is a reseller for tenant-related operations
+		if claims["IS_RESELLER"] == true {
 			if strings.HasPrefix(c.Request.URL.Path, "/superadmin-api/v1/tenant") {
 				return true
 			}

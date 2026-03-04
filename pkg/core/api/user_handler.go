@@ -117,8 +117,12 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 	if profile == nil {
 		profile = &core.UserProfileSchema{}
 	}
-	isReseller := access.IsReseller(ctx)
+	isReseller := ctx.GetBool(auth.AUTH_IS_RESELLER)
+	isActingReseller := ctx.GetBool(auth.AUTH_IS_ACTING_RESELLER)
+
 	profile.IsReseller = &isReseller
+	profile.IsActingReseller = &isActingReseller
+
 	ctx.JSON(http.StatusOK, profile)
 }
 
