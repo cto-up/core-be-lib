@@ -96,8 +96,8 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, "Not Authenticated")
 		return
 	}
-	user, err := s.userService.GetUserByID(ctx, authUserID.(string))
 
+	user, err := s.userService.GetUserByID(ctx, authUserID.(string))
 	if err != nil {
 		if err.Error() == pgx.ErrNoRows.Error() {
 			// user does not exist yet create it
@@ -119,7 +119,6 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 	}
 	isReseller := ctx.GetBool(auth.AUTH_IS_RESELLER)
 	isActingReseller := ctx.GetBool(auth.AUTH_IS_ACTING_RESELLER)
-
 	profile.IsReseller = &isReseller
 	profile.IsActingReseller = &isActingReseller
 
@@ -146,7 +145,7 @@ func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	ctx.Status(http.StatusNoContent)
+	ctx.JSON(http.StatusOK, req)
 }
 
 func (s *UserHandler) UploadProfilePicture(c *gin.Context) {

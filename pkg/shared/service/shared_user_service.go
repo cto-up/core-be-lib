@@ -386,9 +386,19 @@ func (uh *SharedUserService) GetUserByTenantIDByID(c *gin.Context, tenantID stri
 	}
 
 	user := core.User{
-		Id:        dbUser.ID,
-		Name:      dbUser.Profile.Name,
-		Email:     dbUser.Email.String,
+		Id:    dbUser.ID,
+		Name:  dbUser.Profile.Name,
+		Email: dbUser.Email.String,
+		Profile: &core.UserProfileSchema{
+			Name:                 dbUser.Profile.Name,
+			Title:                &dbUser.Profile.Title,
+			About:                &dbUser.Profile.About,
+			PictureURL:           &dbUser.Profile.PictureURL,
+			BackgroundPictureURL: &dbUser.Profile.BackgroundPictureURL,
+			SocialMedias:         &dbUser.Profile.SocialMedias,
+			Interests:            &dbUser.Profile.Interests,
+			Skills:               &dbUser.Profile.Skills,
+		},
 		Roles:     roles,
 		CreatedAt: &dbUser.CreatedAt,
 	}
