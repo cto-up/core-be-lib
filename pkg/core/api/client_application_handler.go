@@ -173,20 +173,20 @@ func toAPITokenCreated(token string, apiToken repository.CoreApiToken) core.APIT
 }
 
 // Convert audit log to API model
-func toAPIAuditLog(log repository.CoreApiTokenAuditLog) core.APITokenAuditLog {
+func toAPIAuditLog(auditLog repository.CoreApiTokenAuditLog) core.APITokenAuditLog {
 	result := core.APITokenAuditLog{
-		Id:        log.ID,
-		TokenId:   log.TokenID,
-		Action:    core.APITokenAuditLogAction(log.Action),
-		Timestamp: log.Timestamp,
+		Id:        auditLog.ID,
+		TokenId:   auditLog.TokenID,
+		Action:    core.APITokenAuditLogAction(auditLog.Action),
+		Timestamp: auditLog.Timestamp,
 	}
 
-	if log.IpAddress.Valid {
-		result.IpAddress = &log.IpAddress.String
+	if auditLog.IpAddress.Valid {
+		result.IpAddress = &auditLog.IpAddress.String
 	}
 
-	if log.UserAgent.Valid {
-		result.UserAgent = &log.UserAgent.String
+	if auditLog.UserAgent.Valid {
+		result.UserAgent = &auditLog.UserAgent.String
 	}
 
 	return result
