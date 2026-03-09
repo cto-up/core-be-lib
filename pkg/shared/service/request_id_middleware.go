@@ -4,18 +4,11 @@ import (
 	"context"
 	"time"
 
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-)
-
-// Define a custom type for the context key to avoid collisions
-type contextKey string
-
-const (
-	RequestIDKey contextKey = "requestID"
-	LoggerKey    contextKey = "logger" // Key for storing the zerolog logger in the context
 )
 
 // RequestIDMiddleware is a Gin middleware to add a unique request ID to each request.
@@ -28,7 +21,7 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		}
 
 		// Store the request ID in the Gin context
-		c.Set(string(RequestIDKey), requestID)
+		c.Set(string(util.RequestIDKey), requestID)
 
 		// Set the X-Request-ID header in the response for clients/next services
 		c.Writer.Header().Set("X-Request-ID", requestID)
@@ -40,7 +33,8 @@ func RequestIDMiddleware() gin.HandlerFunc {
 
 		// Store the enriched logger in the Go context (c.Request.Context())
 		// This is the idiomatic way to pass request-scoped values in Go.
-		ctx := context.WithValue(c.Request.Context(), LoggerKey, requestLogger)
+		ctx := context.WithValue(c.Request.Context(), util.RequestIDKey, requestID)
+		ctx = context.WithValue(ctx, util.LoggerKey, requestLogger)
 		c.Request = c.Request.WithContext(ctx)
 
 		// Record the start time
@@ -63,7 +57,7 @@ func RequestIDMiddleware() gin.HandlerFunc {
 }
 
 func GetLoggerFromContext(c *gin.Context) zerolog.Logger {
-	if logger, ok := c.Request.Context().Value(LoggerKey).(zerolog.Logger); ok {
+	if logger, ok := c.Request.Context().Value(util.LoggerKey).(zerolog.Logger); ok {
 		return logger
 	}
 	return log.Logger // Fallback to global logger

@@ -51,15 +51,7 @@ func MyHandler(c *gin.Context) {
 
 // In a helper function (that accepts context.Context):
 func performDatabaseOperation(ctx context.Context, data string) error {
-    // You'll need to retrieve the zerolog.Logger from the plain context.Context
-    // This assumes the context passed to this function originated from c.Request.Context()
-    var logger zerolog.Logger
-    if l, ok := ctx.Value(LoggerKey).(zerolog.Logger); ok { // LoggerKey is defined in constants
-        logger = l
-    } else {
-        logger = zerolog.Nop() // Fallback to a "no-op" logger if not found, or global logger
-        // For production, you might want to log a warning here or always ensure it's present.
-    }
+   logger := GetLoggerFromCtx(ctx)
 
     logger.Debug().
         Str("data_to_save", data).
