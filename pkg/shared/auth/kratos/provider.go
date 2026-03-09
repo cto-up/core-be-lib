@@ -242,6 +242,7 @@ func (k *KratosAuthClient) GetPublicClient() *ory.APIClient {
 }
 
 func (k *KratosAuthClient) CreateUser(ctx context.Context, user *auth.UserToCreate) (*auth.UserRecord, error) {
+	log := util.GetLoggerFromCtx(ctx)
 	traits := map[string]interface{}{
 		"email": user.GetEmail(),
 	}
@@ -261,6 +262,7 @@ func (k *KratosAuthClient) CreateUser(ctx context.Context, user *auth.UserToCrea
 
 	created, _, err := k.adminClient.IdentityAPI.CreateIdentity(ctx).CreateIdentityBody(identBody).Execute()
 	if err != nil {
+		log.Err(err).Msg("Failed to create identity")
 		return nil, auth.ConvertKratosError(err)
 	}
 
@@ -271,6 +273,7 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 	// Get existing
 	existing, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
+		log.Err(err).Msg("Failed to get identity")
 		return nil, auth.ConvertKratosError(err)
 	}
 
@@ -298,6 +301,7 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 
 	updated, _, err := k.adminClient.IdentityAPI.UpdateIdentity(ctx, uid).UpdateIdentityBody(updateBody).Execute()
 	if err != nil {
+		log.Err(err).Msg("Failed to update identity")
 		return nil, auth.ConvertKratosError(err)
 	}
 
@@ -305,28 +309,34 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 }
 
 func (k *KratosAuthClient) DeleteUser(ctx context.Context, uid string) error {
+	log := util.GetLoggerFromCtx(ctx)
 	_, err := k.adminClient.IdentityAPI.DeleteIdentity(ctx, uid).Execute()
 	if err != nil {
+		log.Err(err).Msg("Failed to delete identity")
 		return auth.ConvertKratosError(err)
 	}
 	return nil
 }
 
 func (k *KratosAuthClient) GetUser(ctx context.Context, uid string) (*auth.UserRecord, error) {
+	log := util.GetLoggerFromCtx(ctx)
 	ident, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
+		log.Err(err).Msg("Failed to get identity")
 		return nil, auth.ConvertKratosError(err)
 	}
 	return convertKratosIdentityToUserRecord(ident), nil
 }
 
 func (k *KratosAuthClient) GetUserByEmail(ctx context.Context, email string) (*auth.UserRecord, error) {
+	log := util.GetLoggerFromCtx(ctx)
 	// Kratos doesn't have a direct "get by email" in IdentityAPI easily without listing/filtering
 	// For now, list with filter if supported or loop (inefficient)
 	// Better: Use Kratos search or just use ID if possible.
 	// Implementing via ListIdentities for now
 	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
 	if err != nil {
+		log.Err(err).Msg("Failed to list identities")
 		return nil, auth.ConvertKratosError(err)
 	}
 	if len(idents) == 0 {
@@ -336,8 +346,10 @@ func (k *KratosAuthClient) GetUserByEmail(ctx context.Context, email string) (*a
 }
 
 func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error {
+	log := util.GetLoggerFromCtx(ctx)
 	existing, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
+		log.Err(err).Msg("Failed to get identity")
 		return auth.ConvertKratosError(err)
 	}
 
