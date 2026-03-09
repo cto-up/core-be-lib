@@ -60,6 +60,6 @@ func RunRESTServer(ctx context.Context, connPool *pgxpool.Pool, address string, 
 	case <-ctx.Done():
 		log.Info().Msg("Context canceled, shutting down services...")
 	case err := <-serverErrorChan:
-		log.Error().Err(err).Msg("Server error")
+		log.Err(err).Msg("Server error")
 	}
 }

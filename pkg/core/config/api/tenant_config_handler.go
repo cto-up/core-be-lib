@@ -15,7 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/rs/zerolog/log"
 )
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
@@ -26,6 +25,7 @@ type TenantConfigHandler struct {
 
 // AddTenantConfig implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) AddTenantConfig(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -33,12 +33,14 @@ func (exh *TenantConfigHandler) AddTenantConfig(c *gin.Context) {
 	}
 	var req core.AddTenantConfigJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 	userID, exist := c.Get(auth.AUTH_USER_ID)
 	if !exist {
 		// should not happen as the middleware ensures that the user is authenticated
+		logger.Error().Msg("User not found")
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
 		return
 	}
@@ -50,7 +52,7 @@ func (exh *TenantConfigHandler) AddTenantConfig(c *gin.Context) {
 			TenantID: tenantID.(string),
 		})
 	if err != nil {
-		log.Error().Err(err).Msg("Error creating tenant config")
+		logger.Err(err).Msg("Error creating tenant config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -59,6 +61,7 @@ func (exh *TenantConfigHandler) AddTenantConfig(c *gin.Context) {
 
 // UpdateTenantConfig implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) UpdateTenantConfig(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -66,6 +69,7 @@ func (exh *TenantConfigHandler) UpdateTenantConfig(c *gin.Context, id uuid.UUID)
 	}
 	var req core.UpdateTenantConfigJSONBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -77,7 +81,7 @@ func (exh *TenantConfigHandler) UpdateTenantConfig(c *gin.Context, id uuid.UUID)
 			TenantID: tenantID.(string),
 		})
 	if err != nil {
-		log.Error().Err(err).Msg("Error updating tenant config")
+		logger.Err(err).Msg("Error updating tenant config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -86,8 +90,10 @@ func (exh *TenantConfigHandler) UpdateTenantConfig(c *gin.Context, id uuid.UUID)
 
 // DeleteTenantConfig implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) DeleteTenantConfig(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -96,7 +102,7 @@ func (exh *TenantConfigHandler) DeleteTenantConfig(c *gin.Context, id uuid.UUID)
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("Error deleting tenant config")
+		logger.Err(err).Msg("Error deleting tenant config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -105,8 +111,10 @@ func (exh *TenantConfigHandler) DeleteTenantConfig(c *gin.Context, id uuid.UUID)
 
 // FindTenantConfigByID implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) GetTenantConfigByID(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -115,6 +123,7 @@ func (exh *TenantConfigHandler) GetTenantConfigByID(c *gin.Context, id uuid.UUID
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
+		logger.Err(err).Msg("Error fetching tenant config")
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
@@ -127,6 +136,7 @@ func (exh *TenantConfigHandler) GetTenantConfigByID(c *gin.Context, id uuid.UUID
 
 // ListTenantConfigs implements openapi.ServerInterface.
 func (exh *TenantConfigHandler) ListTenantConfigs(c *gin.Context, params core.ListTenantConfigsParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -166,7 +176,7 @@ func (exh *TenantConfigHandler) ListTenantConfigs(c *gin.Context, params core.Li
 
 	tenantConfigs, err := exh.store.ListTenantConfigs(c, query)
 	if err != nil {
-		log.Error().Err(err).Msg("Error listing tenant configs")
+		logger.Err(err).Msg("Error listing tenant configs")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

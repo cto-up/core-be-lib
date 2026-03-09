@@ -17,7 +17,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/rs/zerolog/log"
 )
 
 // Client application service constants
@@ -48,8 +47,7 @@ func NewClientApplicationService(store *db.Store) *ClientApplicationService {
 
 // CreateClientApplication creates a new client application
 func (s *ClientApplicationService) CreateClientApplication(ctx context.Context, tenantID string, name, description, createdBy string) (repository.CoreClientApplication, error) {
-	log.Info().Str("tenantID", tenantID).Str("name", name).Msg("Creating client application")
-
+	logger := util.GetLoggerFromCtx(ctx)
 	// Tenant ID can be null for super admin (global) applications
 	var tenantIDParam *string
 	if tenantID != "" {
@@ -64,7 +62,7 @@ func (s *ClientApplicationService) CreateClientApplication(ctx context.Context, 
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("tenantID", tenantID).Str("name", name).Msg("Failed to create client application")
+		logger.Err(err).Str("tenantID", tenantID).Str("name", name).Msg("Failed to create client application")
 		return repository.CoreClientApplication{}, err
 	}
 
@@ -73,6 +71,7 @@ func (s *ClientApplicationService) CreateClientApplication(ctx context.Context, 
 
 // GetClientApplicationByID retrieves a client application by ID
 func (s *ClientApplicationService) GetClientApplicationByID(ctx context.Context, id uuid.UUID, tenantID string) (repository.CoreClientApplication, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	var tenantIDParam *string
 	if tenantID != "" {
 		tenantIDParam = &tenantID
@@ -84,7 +83,7 @@ func (s *ClientApplicationService) GetClientApplicationByID(ctx context.Context,
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("id", id.String()).Msg("Failed to get client application")
+		logger.Err(err).Str("id", id.String()).Msg("Failed to get client application")
 		return repository.CoreClientApplication{}, err
 	}
 
@@ -95,7 +94,7 @@ func (s *ClientApplicationService) GetClientApplicationByID(ctx context.Context,
 func (s *ClientApplicationService) ListClientApplications(ctx context.Context, tenantID string,
 	limit, offset int32, sortBy, order string,
 	searchQuery string, includeInactive bool) ([]repository.CoreClientApplication, error) {
-
+	logger := util.GetLoggerFromCtx(ctx)
 	var tenantIDParam *string
 	if tenantID != "" {
 		tenantIDParam = &tenantID
@@ -125,7 +124,7 @@ func (s *ClientApplicationService) ListClientApplications(ctx context.Context, t
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("tenantID", tenantID).Msg("Failed to list client applications")
+		logger.Err(err).Str("tenantID", tenantID).Msg("Failed to list client applications")
 		return nil, err
 	}
 
@@ -135,6 +134,8 @@ func (s *ClientApplicationService) ListClientApplications(ctx context.Context, t
 // UpdateClientApplication updates a client application
 func (s *ClientApplicationService) UpdateClientApplication(ctx context.Context, id uuid.UUID,
 	tenantID string, name, description string, active bool) (repository.CoreClientApplication, error) {
+
+	logger := util.GetLoggerFromCtx(ctx)
 
 	var tenantIDParam *string
 	if tenantID != "" {
@@ -150,7 +151,7 @@ func (s *ClientApplicationService) UpdateClientApplication(ctx context.Context, 
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("id", id.String()).Msg("Failed to update client application")
+		logger.Err(err).Str("id", id.String()).Msg("Failed to update client application")
 		return repository.CoreClientApplication{}, err
 	}
 
@@ -159,6 +160,9 @@ func (s *ClientApplicationService) UpdateClientApplication(ctx context.Context, 
 
 // DeactivateClientApplication deactivates a client application
 func (s *ClientApplicationService) DeactivateClientApplication(ctx context.Context, id uuid.UUID, tenantID string) error {
+
+	logger := util.GetLoggerFromCtx(ctx)
+
 	var tenantIDParam *string
 	if tenantID != "" {
 		tenantIDParam = &tenantID
@@ -170,7 +174,7 @@ func (s *ClientApplicationService) DeactivateClientApplication(ctx context.Conte
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("id", id.String()).Msg("Failed to deactivate client application")
+		logger.Err(err).Str("id", id.String()).Msg("Failed to deactivate client application")
 		return err
 	}
 
@@ -179,6 +183,9 @@ func (s *ClientApplicationService) DeactivateClientApplication(ctx context.Conte
 
 // DeleteClientApplication deletes a client application
 func (s *ClientApplicationService) DeleteClientApplication(ctx context.Context, id uuid.UUID, tenantID string) error {
+
+	logger := util.GetLoggerFromCtx(ctx)
+
 	var tenantIDParam *string
 	if tenantID != "" {
 		tenantIDParam = &tenantID
@@ -190,7 +197,7 @@ func (s *ClientApplicationService) DeleteClientApplication(ctx context.Context, 
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("id", id.String()).Msg("Failed to delete client application")
+		logger.Err(err).Str("id", id.String()).Msg("Failed to delete client application")
 		return err
 	}
 
@@ -226,25 +233,26 @@ func (s *ClientApplicationService) GenerateSecureToken() (string, string, []byte
 func (s *ClientApplicationService) CreateAPIToken(ctx *gin.Context, clientApplicationID uuid.UUID,
 	name, description string, expiresInDays int, createdBy string, scopes []string) (string, repository.CoreApiToken, error) {
 
+	logger := util.GetLoggerFromCtx(ctx)
 	// Validate client application exists and is active
 	app, err := s.store.GetClientApplicationByID(ctx, repository.GetClientApplicationByIDParams{
 		ID: clientApplicationID,
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("clientApplicationID", clientApplicationID.String()).Msg("Failed to get client application for token creation")
+		logger.Err(err).Str("clientApplicationID", clientApplicationID.String()).Msg("Failed to get client application for token creation")
 		return "", repository.CoreApiToken{}, err
 	}
 
 	if !app.Active {
-		log.Error().Str("clientApplicationID", clientApplicationID.String()).Msg("Cannot create token for inactive application")
+		logger.Error().Str("clientApplicationID", clientApplicationID.String()).Msg("Cannot create token for inactive application")
 		return "", repository.CoreApiToken{}, fmt.Errorf("cannot create token for inactive application")
 	}
 
 	// Generate token
 	token, tokenPrefix, tokenHash, err := s.GenerateSecureToken()
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to generate secure token")
+		logger.Err(err).Msg("Failed to generate secure token")
 		return "", repository.CoreApiToken{}, err
 	}
 
@@ -275,7 +283,7 @@ func (s *ClientApplicationService) CreateAPIToken(ctx *gin.Context, clientApplic
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("clientApplicationID", clientApplicationID.String()).Msg("Failed to create API token")
+		logger.Err(err).Str("clientApplicationID", clientApplicationID.String()).Msg("Failed to create API token")
 		return "", repository.CoreApiToken{}, err
 	}
 
@@ -292,14 +300,14 @@ func (s *ClientApplicationService) CreateAPIToken(ctx *gin.Context, clientApplic
 	})
 
 	if err != nil {
-		log.Warn().Err(err).Str("tokenID", apiToken.ID.String()).Msg("Failed to create audit log for token creation")
+		logger.Warn().Err(err).Str("tokenID", apiToken.ID.String()).Msg("Failed to create audit log for token creation")
 		// Don't fail the token creation if audit log fails
 	}
 
 	// Update the client application's last used timestamp
 	err = s.store.UpdateClientApplicationLastUsed(ctx, clientApplicationID)
 	if err != nil {
-		log.Warn().Err(err).Str("clientApplicationID", clientApplicationID.String()).Msg("Failed to update client application last used timestamp")
+		logger.Warn().Err(err).Str("clientApplicationID", clientApplicationID.String()).Msg("Failed to update client application last used timestamp")
 	}
 
 	return token, apiToken, nil
@@ -307,6 +315,7 @@ func (s *ClientApplicationService) CreateAPIToken(ctx *gin.Context, clientApplic
 
 // GetAPITokenByID retrieves an API token by ID
 func (s *ClientApplicationService) GetAPITokenByID(ctx context.Context, id uuid.UUID, tenantID string) (repository.GetAPITokenByIDRow, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	var tenantIDParam *string
 	if tenantID != "" {
 		tenantIDParam = &tenantID
@@ -318,7 +327,7 @@ func (s *ClientApplicationService) GetAPITokenByID(ctx context.Context, id uuid.
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("id", id.String()).Msg("Failed to get API token")
+		logger.Err(err).Str("id", id.String()).Msg("Failed to get API token")
 		return repository.GetAPITokenByIDRow{}, err
 	}
 
@@ -329,6 +338,8 @@ func (s *ClientApplicationService) GetAPITokenByID(ctx context.Context, id uuid.
 func (s *ClientApplicationService) ListAPITokens(ctx context.Context, clientApplicationID *uuid.UUID,
 	tenantID string, limit, offset int32, sortBy, order string,
 	includeRevoked, includeExpired bool) ([]repository.ListAPITokensRow, error) {
+
+	logger := util.GetLoggerFromCtx(ctx)
 
 	var tenantIDParam *string
 	if tenantID != "" {
@@ -362,7 +373,7 @@ func (s *ClientApplicationService) ListAPITokens(ctx context.Context, clientAppl
 	})
 
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to list API tokens")
+		logger.Err(err).Msg("Failed to list API tokens")
 		return nil, err
 	}
 
@@ -371,18 +382,19 @@ func (s *ClientApplicationService) ListAPITokens(ctx context.Context, clientAppl
 
 // RevokeAPIToken revokes an API token
 func (s *ClientApplicationService) RevokeAPIToken(ctx *gin.Context, id uuid.UUID, reason, revokedBy string) (repository.CoreApiToken, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Check if token exists and is not already revoked
 	token, err := s.store.GetAPITokenByID(ctx, repository.GetAPITokenByIDParams{
 		ID: id,
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("id", id.String()).Msg("Failed to get API token for revocation")
+		logger.Err(err).Str("id", id.String()).Msg("Failed to get API token for revocation")
 		return repository.CoreApiToken{}, err
 	}
 
 	if token.Revoked {
-		log.Warn().Str("id", id.String()).Msg("Token is already revoked")
+		logger.Warn().Str("id", id.String()).Msg("Token is already revoked")
 		return repository.CoreApiToken{}, fmt.Errorf("token is already revoked")
 	}
 
@@ -394,7 +406,7 @@ func (s *ClientApplicationService) RevokeAPIToken(ctx *gin.Context, id uuid.UUID
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("id", id.String()).Msg("Failed to revoke API token")
+		logger.Err(err).Str("id", id.String()).Msg("Failed to revoke API token")
 		return repository.CoreApiToken{}, err
 	}
 
@@ -411,7 +423,7 @@ func (s *ClientApplicationService) RevokeAPIToken(ctx *gin.Context, id uuid.UUID
 	})
 
 	if err != nil {
-		log.Warn().Err(err).Str("tokenID", id.String()).Msg("Failed to create audit log for token revocation")
+		logger.Err(err).Str("tokenID", id.String()).Msg("Failed to create audit log for token revocation")
 		// Don't fail the revocation if audit log fails
 	}
 
@@ -420,10 +432,11 @@ func (s *ClientApplicationService) RevokeAPIToken(ctx *gin.Context, id uuid.UUID
 
 // DeleteAPIToken deletes an API token
 func (s *ClientApplicationService) DeleteAPIToken(ctx context.Context, id uuid.UUID) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	_, err := s.store.DeleteAPIToken(ctx, id)
 
 	if err != nil {
-		log.Error().Err(err).Str("id", id.String()).Msg("Failed to delete API token")
+		logger.Err(err).Str("id", id.String()).Msg("Failed to delete API token")
 		return err
 	}
 
@@ -432,6 +445,7 @@ func (s *ClientApplicationService) DeleteAPIToken(ctx context.Context, id uuid.U
 
 // GetAPITokenAuditLogs retrieves audit logs for an API token
 func (s *ClientApplicationService) GetAPITokenAuditLogs(ctx context.Context, tokenID uuid.UUID, limit, offset int32) ([]repository.CoreApiTokenAuditLog, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	logs, err := s.store.GetAPITokenAuditLogs(ctx, repository.GetAPITokenAuditLogsParams{
 		TokenID: tokenID,
 		Limit:   limit,
@@ -439,7 +453,7 @@ func (s *ClientApplicationService) GetAPITokenAuditLogs(ctx context.Context, tok
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("tokenID", tokenID.String()).Msg("Failed to get API token audit logs")
+		logger.Err(err).Str("tokenID", tokenID.String()).Msg("Failed to get API token audit logs")
 		return nil, err
 	}
 
@@ -448,6 +462,7 @@ func (s *ClientApplicationService) GetAPITokenAuditLogs(ctx context.Context, tok
 
 // VerifyAPIToken verifies an API token and returns the associated application and token if valid
 func (s *ClientApplicationService) VerifyAPIToken(ctx *gin.Context, tokenString string) (repository.GetAPITokenByHashRow, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Sanitize token
 	tokenString = strings.TrimSpace(tokenString)
 
@@ -458,7 +473,7 @@ func (s *ClientApplicationService) VerifyAPIToken(ctx *gin.Context, tokenString 
 	// Look up token by hash
 	token, err := s.store.GetAPITokenByHash(ctx, tokenHash)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to verify API token")
+		logger.Err(err).Msg("Failed to verify API token")
 		return repository.GetAPITokenByHashRow{}, err
 	}
 
@@ -475,7 +490,7 @@ func (s *ClientApplicationService) VerifyAPIToken(ctx *gin.Context, tokenString 
 	})
 
 	if err != nil {
-		log.Warn().Err(err).Str("tokenID", token.ID.String()).Msg("Failed to create audit log for token usage")
+		logger.Err(err).Str("tokenID", token.ID.String()).Msg("Failed to create audit log for token usage")
 		// Don't fail the verification if audit log fails
 	}
 
@@ -486,13 +501,13 @@ func (s *ClientApplicationService) VerifyAPIToken(ctx *gin.Context, tokenString 
 	})
 
 	if err != nil {
-		log.Warn().Err(err).Str("tokenID", token.ID.String()).Msg("Failed to update token last used timestamp")
+		logger.Err(err).Str("tokenID", token.ID.String()).Msg("Failed to update token last used timestamp")
 	}
 
 	// Update the client application's last used timestamp
 	err = s.store.UpdateClientApplicationLastUsed(ctx, token.ClientApplicationID)
 	if err != nil {
-		log.Warn().Err(err).Str("clientApplicationID", token.ClientApplicationID.String()).Msg("Failed to update client application last used timestamp")
+		logger.Err(err).Str("clientApplicationID", token.ClientApplicationID.String()).Msg("Failed to update client application last used timestamp")
 	}
 
 	return token, nil

@@ -189,7 +189,7 @@ Always log SUPER_ADMIN actions:
 
 ```go
 func LogAction(c *gin.Context, action, resource string) {
-    log.Info().
+    logger.Info().
         Str("action", action).
         Str("resource", resource).
         Str("user_id", c.GetString(auth.AUTH_USER_ID)).
@@ -354,7 +354,7 @@ func DeleteResource(c *gin.Context) {
 func DeleteResource(c *gin.Context) {
     resourceID := c.Param("id")
 
-    log.Info().
+    logger.Info().
         Str("resource_id", resourceID).
         Bool("is_super_admin", service.IsSuperAdmin(c)).
         Msg("Deleting resource")

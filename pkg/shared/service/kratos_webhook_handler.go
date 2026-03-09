@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"ctoup.com/coreapp/pkg/shared/auth"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
@@ -49,15 +50,16 @@ func NewKratosWebhookHandler(
 // HandleRegistrationWebhook processes registration webhooks from Kratos
 // This is called after a user successfully registers
 func (kwh *KratosWebhookHandler) HandleRegistrationWebhook(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	var payload KratosWebhookPayload
 
 	if err := c.BindJSON(&payload); err != nil {
-		log.Error().Err(err).Msg("Failed to parse webhook payload")
+		logger.Err(err).Msg("Failed to parse webhook payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload"})
 		return
 	}
 
-	log.Info().
+	logger.Info().
 		Str("user_id", payload.Identity.ID).
 		Str("email", payload.Identity.Traits.Email).
 		Str("subdomain", payload.Identity.Traits.Subdomain).
@@ -68,22 +70,22 @@ func (kwh *KratosWebhookHandler) HandleRegistrationWebhook(c *gin.Context) {
 		// Get tenant ID from subdomain
 		tenantID, err := kwh.multitenantService.GetTenantIDWithSubdomain(c.Request.Context(), payload.Identity.Traits.Subdomain)
 		if err != nil {
-			log.Error().
+			logger.
 				Err(err).
 				Str("subdomain", payload.Identity.Traits.Subdomain).
 				Msg("Failed to get tenant ID from subdomain")
 		} else {
 			// Create membership entry with default USER role
-			log.Error().Msg("REGISTRATION CALLBACK NOT IMPLEMENTED")
+			logger.Error().Msg("REGISTRATION CALLBACK NOT IMPLEMENTED")
 
 			if err != nil {
-				log.Error().
+				logger.
 					Err(err).
 					Str("user_id", payload.Identity.ID).
 					Str("tenant_id", tenantID).
 					Msg("Failed to create membership entry")
 			} else {
-				log.Info().
+				logger.Info().
 					Str("user_id", payload.Identity.ID).
 					Str("tenant_id", tenantID).
 					Str("subdomain", payload.Identity.Traits.Subdomain).
@@ -99,14 +101,14 @@ func (kwh *KratosWebhookHandler) HandleRegistrationWebhook(c *gin.Context) {
 		)
 
 		if err != nil {
-			log.Error().
+			logger.
 				Err(err).
 				Str("user_id", payload.Identity.ID).
 				Str("subdomain", payload.Identity.Traits.Subdomain).
 				Msg("Failed to assign user to tenant metadata")
 		}
 	} else {
-		log.Warn().
+		logger.Warn().
 			Str("user_id", payload.Identity.ID).
 			Msg("No subdomain provided in registration - user not assigned to tenant")
 	}
@@ -121,15 +123,16 @@ func (kwh *KratosWebhookHandler) HandleRegistrationWebhook(c *gin.Context) {
 // HandleLoginWebhook processes login webhooks from Kratos
 // Can be used for logging, analytics, or additional validation
 func (kwh *KratosWebhookHandler) HandleLoginWebhook(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c)
 	var payload KratosWebhookPayload
 
 	if err := c.BindJSON(&payload); err != nil {
-		log.Error().Err(err).Msg("Failed to parse webhook payload")
+		logger.Err(err).Msg("Failed to parse webhook payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload"})
 		return
 	}
 
-	log.Info().
+	logger.Info().
 		Str("user_id", payload.Identity.ID).
 		Str("email", payload.Identity.Traits.Email).
 		Msg("User logged in")
@@ -137,7 +140,7 @@ func (kwh *KratosWebhookHandler) HandleLoginWebhook(c *gin.Context) {
 	// Validate user has tenant assignment
 	tenantMetadata, err := kwh.tenantService.GetUserTenant(c.Request.Context(), payload.Identity.ID)
 	if err != nil || tenantMetadata.TenantID == "" {
-		log.Warn().
+		logger.Warn().
 			Str("user_id", payload.Identity.ID).
 			Msg("User logged in without tenant assignment")
 	}
@@ -147,15 +150,16 @@ func (kwh *KratosWebhookHandler) HandleLoginWebhook(c *gin.Context) {
 
 // HandleSettingsWebhook processes settings update webhooks
 func (kwh *KratosWebhookHandler) HandleSettingsWebhook(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c)
 	var payload KratosWebhookPayload
 
 	if err := c.BindJSON(&payload); err != nil {
-		log.Error().Err(err).Msg("Failed to parse webhook payload")
+		logger.Err(err).Msg("Failed to parse webhook payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload"})
 		return
 	}
 
-	log.Info().
+	logger.Info().
 		Str("user_id", payload.Identity.ID).
 		Msg("User updated settings")
 
@@ -165,11 +169,14 @@ func (kwh *KratosWebhookHandler) HandleSettingsWebhook(c *gin.Context) {
 // VerifyWebhookSignature verifies the webhook signature from Kratos
 // Implement this if you configure webhook signatures in Kratos
 func (kwh *KratosWebhookHandler) VerifyWebhookSignature(c *gin.Context) bool {
+	logger := util.GetLoggerFromCtx(c)
 	// Get signature from header
 	signature := c.GetHeader("X-Kratos-Webhook-Signature")
 
+	logger.Warn().Msg("Received webhook - signature verification not implemented")
+
 	if signature == "" {
-		log.Warn().Msg("Webhook received without signature")
+		logger.Warn().Msg("Webhook received without signature")
 		return false
 	}
 
@@ -182,6 +189,7 @@ func (kwh *KratosWebhookHandler) VerifyWebhookSignature(c *gin.Context) bool {
 
 // RegisterWebhookRoutes registers webhook routes on the router
 func (kwh *KratosWebhookHandler) RegisterWebhookRoutes(router *gin.RouterGroup) {
+
 	webhooks := router.Group("/webhooks/kratos")
 	{
 		webhooks.POST("/registration", kwh.HandleRegistrationWebhook)
@@ -249,9 +257,13 @@ type TenantInvitationPayload struct {
 
 // HandleTenantInvitation creates an invitation for a user to join a tenant
 func (kwh *KratosWebhookHandler) HandleTenantInvitation(c *gin.Context) {
+
+	logger := util.GetLoggerFromCtx(c)
+
 	var payload TenantInvitationPayload
 
 	if err := c.BindJSON(&payload); err != nil {
+		logger.Err(err).Msg("Failed to parse tenant invitation payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -259,6 +271,7 @@ func (kwh *KratosWebhookHandler) HandleTenantInvitation(c *gin.Context) {
 	// Get authenticated user (inviter)
 	inviterID := c.GetString(auth.AUTH_USER_ID)
 	if inviterID == "" {
+		logger.Warn().Msg("Unauthenticated user attempted to create tenant invitation")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 		return
 	}
@@ -271,7 +284,7 @@ func (kwh *KratosWebhookHandler) HandleTenantInvitation(c *gin.Context) {
 	)
 
 	if err != nil || !hasAccess {
-		log.Error().
+		logger.
 			Err(err).
 			Str("inviter_id", inviterID).
 			Str("subdomain", payload.Subdomain).
@@ -294,7 +307,7 @@ func (kwh *KratosWebhookHandler) HandleTenantInvitation(c *gin.Context) {
 		)
 
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to assign existing user to tenant")
+			logger.Err(err).Msg("Failed to assign existing user to tenant")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign user"})
 			return
 		}
@@ -308,11 +321,6 @@ func (kwh *KratosWebhookHandler) HandleTenantInvitation(c *gin.Context) {
 			_ = authClient.SetCustomUserClaims(c.Request.Context(), existingUser.UID, customClaims)
 		}
 
-		log.Info().
-			Str("user_id", existingUser.UID).
-			Str("subdomain", payload.Subdomain).
-			Msg("Existing user assigned to tenant")
-
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
 			"message": "User assigned to tenant",
@@ -320,16 +328,6 @@ func (kwh *KratosWebhookHandler) HandleTenantInvitation(c *gin.Context) {
 		})
 		return
 	}
-
-	// User doesn't exist - create invitation
-	// Store invitation in database for later use during registration
-	// This is application-specific logic
-
-	log.Info().
-		Str("email", payload.Email).
-		Str("subdomain", payload.Subdomain).
-		Str("invited_by", inviterID).
-		Msg("Tenant invitation created")
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",

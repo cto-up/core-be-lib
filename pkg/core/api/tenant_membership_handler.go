@@ -7,8 +7,8 @@ import (
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/shared/auth"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
 )
 
 type TenantMembershipHandler struct {
@@ -32,6 +32,8 @@ func NewTenantMembershipHandler(
 // ListUserTenants returns all tenants the current user belongs to
 // GET /api/v1/users/me/tenants
 func (h *TenantMembershipHandler) ListUserTenants(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	userID := c.GetString(auth.AUTH_USER_ID)
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
@@ -42,7 +44,7 @@ func (h *TenantMembershipHandler) ListUserTenants(c *gin.Context) {
 	memberships := []string{}
 	err := fmt.Errorf("NOT IMPLEMENTED YET")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get user tenants")
+		logger.Err(err).Msg("Failed to get user tenants")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -53,6 +55,7 @@ func (h *TenantMembershipHandler) ListUserTenants(c *gin.Context) {
 // ListPendingInvitations returns all pending invitations for the current user
 // GET /api/v1/users/me/tenants/pending
 func (h *TenantMembershipHandler) ListPendingInvitations(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	userID := c.GetString(auth.AUTH_USER_ID)
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
@@ -63,7 +66,7 @@ func (h *TenantMembershipHandler) ListPendingInvitations(c *gin.Context) {
 	invitations := []string{}
 	err := fmt.Errorf("NOT IMPLEMENTED YET")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get pending invitations")
+		logger.Err(err).Msg("Failed to get pending invitations")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -74,6 +77,7 @@ func (h *TenantMembershipHandler) ListPendingInvitations(c *gin.Context) {
 // AcceptTenantInvitation accepts a pending invitation
 // POST /api/v1/users/me/tenants/{tenantId}/accept
 func (h *TenantMembershipHandler) AcceptTenantInvitation(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	userID := c.GetString(auth.AUTH_USER_ID)
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
@@ -89,7 +93,7 @@ func (h *TenantMembershipHandler) AcceptTenantInvitation(c *gin.Context) {
 	//err := h.membershipService.AcceptTenantInvitation(c, userID, tenantID)
 	err := fmt.Errorf("NOT IMPLEMENTED YET")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to accept invitation")
+		logger.Err(err).Msg("Failed to accept invitation")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -100,6 +104,7 @@ func (h *TenantMembershipHandler) AcceptTenantInvitation(c *gin.Context) {
 // RejectTenantInvitation rejects a pending invitation
 // POST /api/v1/users/me/tenants/{tenantId}/reject
 func (h *TenantMembershipHandler) RejectTenantInvitation(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	userID := c.GetString(auth.AUTH_USER_ID)
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
@@ -115,7 +120,7 @@ func (h *TenantMembershipHandler) RejectTenantInvitation(c *gin.Context) {
 	//err := h.membershipService.RejectTenantInvitation(c, userID, tenantID)
 	err := fmt.Errorf("NOT IMPLEMENTED YET")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to reject invitation")
+		logger.Err(err).Msg("Failed to reject invitation")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -126,6 +131,7 @@ func (h *TenantMembershipHandler) RejectTenantInvitation(c *gin.Context) {
 // ListTenantMembers returns all members of a tenant (requires ADMIN role)
 // GET /api/v1/tenants/{tenantId}/members
 func (h *TenantMembershipHandler) ListTenantMembers(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID := c.Param("tenantId")
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
@@ -138,7 +144,7 @@ func (h *TenantMembershipHandler) ListTenantMembers(c *gin.Context) {
 	members := []string{}
 	err := fmt.Errorf("NOT IMPLEMENTED YET")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get tenant members")
+		logger.Err(err).Msg("Failed to get tenant members")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -149,6 +155,7 @@ func (h *TenantMembershipHandler) ListTenantMembers(c *gin.Context) {
 // InviteUserToTenant invites a user to join the tenant (requires ADMIN role)
 // POST /api/v1/tenants/{tenantId}/members
 func (h *TenantMembershipHandler) InviteUserToTenant(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID := c.Param("tenantId")
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
@@ -174,7 +181,7 @@ func (h *TenantMembershipHandler) InviteUserToTenant(c *gin.Context) {
 	//err := h.membershipService.InviteUserToTenant(c, req.Email, tenantID, req.Roles, inviterID)
 	err := fmt.Errorf("NOT IMPLEMENTED YET")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to invite user")
+		logger.Err(err).Msg("Failed to invite user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -185,6 +192,7 @@ func (h *TenantMembershipHandler) InviteUserToTenant(c *gin.Context) {
 // UpdateMemberRole updates a member's role in the tenant (requires ADMIN role)
 // PATCH /api/v1/tenants/{tenantId}/members/{userId}
 func (h *TenantMembershipHandler) UpdateMemberRole(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID := c.Param("tenantId")
 	userID := c.Param("userId")
 
@@ -205,7 +213,7 @@ func (h *TenantMembershipHandler) UpdateMemberRole(c *gin.Context) {
 	//err := h.membershipService.UpdateMemberRole(c, userID, tenantID, req.Role)
 	err := fmt.Errorf("NOT IMPLEMENTED YET")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to update member role")
+		logger.Err(err).Msg("Failed to update member role")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -216,6 +224,7 @@ func (h *TenantMembershipHandler) UpdateMemberRole(c *gin.Context) {
 // RemoveMemberFromTenant removes a member from the tenant (requires ADMIN role)
 // DELETE /api/v1/tenants/{tenantId}/members/{userId}
 func (h *TenantMembershipHandler) RemoveMemberFromTenant(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID := c.Param("tenantId")
 	userID := c.Param("userId")
 
@@ -227,7 +236,7 @@ func (h *TenantMembershipHandler) RemoveMemberFromTenant(c *gin.Context) {
 	//err := h.membershipService.RemoveUserFromTenant(c, userID, tenantID)
 	err := fmt.Errorf("NOT IMPLEMENTED YET")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to remove member")
+		logger.Err(err).Msg("Failed to remove member")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

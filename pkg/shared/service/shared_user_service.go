@@ -11,9 +11,9 @@ import (
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/rs/zerolog/log"
 )
 
 // hasCustomerAdminRole returns true if the provided roles contain CUSTOMER_ADMIN.
@@ -146,9 +146,11 @@ func (uh *SharedUserService) UpdateUserProfileInDatabase(ctx context.Context, te
 }
 
 func (uh *SharedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error {
+	logger := util.GetLoggerFromCtx(c)
 
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
+		logger.Err(err).Msg("Failed to begin transaction")
 		return err
 	}
 	defer tx.Rollback(c)
@@ -156,13 +158,14 @@ func (uh *SharedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClie
 
 	_, err = qtx.DeleteSharedUser(c, userId)
 	if err != nil {
+		logger.Err(err).Str("user_id", userId).Msg("Failed to delete user from database")
 		return err
 	}
 	err = authClient.DeleteUser(c, userId)
 
 	if err != nil {
 		if auth.IsUserNotFound(err) {
-			log.Error().Err(err).Msgf("User does not exist: %v", userId)
+			logger.Err(err).Msgf("User does not exist: %v", userId)
 		} else {
 			return err
 		}
@@ -170,13 +173,18 @@ func (uh *SharedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClie
 
 	err = tx.Commit(c)
 
+	if err != nil {
+		logger.Err(err).Msg("Failed to commit transaction")
+	}
+
 	return err
 }
 
 func (uh *SharedUserService) RemoveUserFromTenant(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error {
-
+	logger := util.GetLoggerFromCtx(c)
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
+		logger.Err(err).Msg("Failed to begin transaction")
 		return err
 	}
 	defer tx.Rollback(c)
@@ -187,24 +195,29 @@ func (uh *SharedUserService) RemoveUserFromTenant(c *gin.Context, authClient aut
 		TenantID: tenantId,
 	})
 	if err != nil {
-		return err
-	}
-	if err != nil {
+		logger.Err(err).Msg("Failed to delete user from tenant")
 		return err
 	}
 
 	err = tx.Commit(c)
 
+	if err != nil {
+		logger.Err(err).Msg("Failed to commit transaction")
+	}
+
 	return err
 }
 
 func (uh *SharedUserService) GetFullUserByID(c *gin.Context, authClient auth.AuthClient, tenantID string, id string) (FullUser, error) {
+	logger := util.GetLoggerFromCtx(c)
+
 	fullUser := FullUser{}
 	coreUser, err := uh.store.GetSharedUserByTenantByID(c, repository.GetSharedUserByTenantByIDParams{
 		TenantID: tenantID,
 		ID:       id,
 	})
 	if err != nil {
+		logger.Err(err).Str("user_id", id).Msg("Failed to get user from database")
 		return fullUser, err
 	}
 
@@ -226,6 +239,7 @@ func (uh *SharedUserService) GetFullUserByID(c *gin.Context, authClient auth.Aut
 
 	userAuth, err := authClient.GetUser(c, id)
 	if err != nil {
+		logger.Err(err).Str("user_id", id).Msg("Failed to get user from auth provider")
 		return fullUser, err
 	}
 	return FullUser{
@@ -237,12 +251,14 @@ func (uh *SharedUserService) GetFullUserByID(c *gin.Context, authClient auth.Aut
 }
 
 func (uh *SharedUserService) GetUserByEmail(c *gin.Context, tenantID string, email string) (core.User, error) {
+	logger := util.GetLoggerFromCtx(c)
 	fullUser := core.User{}
 	dbUser, err := uh.store.GetSharedUserByTenantByEmail(c, repository.GetSharedUserByTenantByEmailParams{
 		Email:    email,
 		TenantID: tenantID,
 	})
 	if err != nil {
+		logger.Err(err).Str("email", email).Msg("Failed to get user from database")
 		return fullUser, err
 	}
 
@@ -269,9 +285,11 @@ func (uh *SharedUserService) ListUsers(c *gin.Context, tenantId string, pagingSq
 }
 
 func (uh *SharedUserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
+	logger := util.GetLoggerFromCtx(c)
 	strategy := uh.getStrategy(tenantId)
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
+		logger.Err(err).Msg("Failed to begin transaction")
 		return err
 	}
 	defer tx.Rollback(c)
@@ -279,20 +297,24 @@ func (uh *SharedUserService) AssignRole(c *gin.Context, authClient auth.AuthClie
 
 	err = strategy.AssignRole(qtx, c, authClient, tenantId, userID, role)
 	if err != nil {
+		logger.Err(err).Msg("Failed to assign role to user")
 		return err
 	}
 	// The new custom claims will propagate to the user's ID token the
 	err = tx.Commit(c)
 	if err != nil {
+		logger.Err(err).Msg("Failed to commit transaction")
 		return err
 	}
 	return nil
 }
 
 func (uh *SharedUserService) UnassignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
+	logger := util.GetLoggerFromCtx(c)
 
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
+		logger.Err(err).Msg("Failed to begin transaction")
 		return err
 	}
 	defer tx.Rollback(c)
@@ -301,16 +323,19 @@ func (uh *SharedUserService) UnassignRole(c *gin.Context, authClient auth.AuthCl
 	strategy := uh.getStrategy(tenantId)
 	err = strategy.UnAssignRole(qtx, c, authClient, tenantId, userID, role)
 	if err != nil {
+		logger.Err(err).Msg("Failed to unassign role from user")
 		return err
 	}
 	// The new custom claims will propagate to the user's ID token the
 	err = tx.Commit(c)
 	if err != nil {
+		logger.Err(err).Msg("Failed to commit transaction")
 		return err
 	}
 	return nil
 }
 func (uh *SharedUserService) UpdateUserStatus(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, requestName string, requestValue bool) error {
+	logger := util.GetLoggerFromCtx(c)
 	// Lookup the user associated with the specified uid.
 	params := (&auth.UserToUpdate{})
 	switch requestName {
@@ -320,14 +345,20 @@ func (uh *SharedUserService) UpdateUserStatus(c *gin.Context, authClient auth.Au
 		params = params.Disabled(requestValue)
 	}
 	_, err := authClient.UpdateUser(c, userID, params)
-	return err
+	if err != nil {
+		logger.Err(err).Str("user_id", userID).Msg("Failed to update user status")
+		return err
+	}
+	return nil
 }
 
 // AddUserToTenant adds an existing user to a tenant (creates membership)
 func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role, invitedBy string) error {
+	logger := util.GetLoggerFromCtx(c)
 	// Check if user exists
 	_, err := authClient.GetUser(c, userID)
 	if err != nil {
+		logger.Err(err).Str("user_id", userID).Msg("Failed to get user from auth provider")
 		return errors.New("user not found in auth provider")
 	}
 
@@ -361,6 +392,7 @@ func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.
 		},
 	})
 	if err != nil {
+		logger.Err(err).Str("user_id", userID).Str("tenant_id", tenantID).Msg("Failed to add user to tenant in database")
 		return err
 	}
 
@@ -368,12 +400,13 @@ func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.
 }
 
 func (uh *SharedUserService) GetUserByTenantIDByID(c *gin.Context, tenantID string, id string) (core.User, error) {
-
+	logger := util.GetLoggerFromCtx(c)
 	dbUser, err := uh.store.GetSharedUserByTenantByID(c, repository.GetSharedUserByTenantByIDParams{
 		TenantID: tenantID,
 		ID:       id,
 	})
 	if err != nil {
+		logger.Err(err).Str("user_id", id).Str("tenant_id", tenantID).Msg("Failed to get user from database")
 		return core.User{}, err
 	}
 

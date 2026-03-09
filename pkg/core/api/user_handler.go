@@ -10,7 +10,6 @@ import (
 
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/util"
-	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/api/helpers"
 	core "ctoup.com/coreapp/api/openapi/core"
@@ -64,6 +63,7 @@ func getProfilePictureFilePath(userId any) string {
 * in case user was created in firebase but not in the store
  */
 func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
+	logger := util.GetLoggerFromCtx(ctx.Request.Context())
 	userID, exist := ctx.Get(auth.AUTH_USER_ID)
 	if !exist {
 		ctx.JSON(http.StatusBadRequest, "Need to be authenticated")
@@ -82,6 +82,7 @@ func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
 			Profile: subentity.UserProfile{},
 		})
 	if err != nil {
+		logger.Err(err).Msg("Error creating user in database")
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -89,6 +90,8 @@ func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
 }
 
 func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
+	logger := util.GetLoggerFromCtx(ctx.Request.Context())
+
 	tenantID := ctx.GetString(auth.AUTH_TENANT_ID_KEY)
 
 	authUserID, exists := ctx.Get(auth.AUTH_USER_ID)
@@ -103,6 +106,7 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 			// user does not exist yet create it
 			user, err := s.userService.InitUserInDatabase(ctx, tenantID, authUserID.(string))
 			if err != nil {
+				logger.Err(err).Msg("Error initializing user in database")
 				ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 				return
 			}
@@ -126,6 +130,8 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 }
 
 func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {
+	logger := util.GetLoggerFromCtx(ctx.Request.Context())
+
 	tenantID := ctx.GetString(auth.AUTH_TENANT_ID_KEY)
 
 	authUserID, exists := ctx.Get(auth.AUTH_USER_ID)
@@ -136,12 +142,14 @@ func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {
 
 	var req subentity.UserProfile
 	if err := ctx.BindJSON(&req); err != nil {
+		logger.Err(err).Msg("Error binding JSON")
 		ctx.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	err := s.userService.UpdateUserProfileInDatabase(ctx, tenantID, authUserID.(string), req)
 	if err != nil {
+		logger.Err(err).Msg("Error updating user profile in database")
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -149,10 +157,12 @@ func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {
 }
 
 func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	// Get the file from the request
 	file, err := c.FormFile("file")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get file from request")
+		logger.Err(err).Msg("Failed to get file from request")
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
@@ -160,7 +170,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 	// Save the file to a temporary location
 	tmpFile, err := os.CreateTemp("", file.Filename)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create temporary file")
+		logger.Err(err).Msg("Failed to create temporary file")
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -168,7 +178,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 		tmpFile.Close()
 		err = os.Remove(tmpFile.Name())
 		if err != nil {
-			log.Error().Msg(err.Error())
+			logger.Error().Msg(err.Error())
 		}
 	}()
 
@@ -179,6 +189,7 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 	userId, exist := c.Get(auth.AUTH_USER_ID)
 	if !exist {
 		if err != nil {
+			logger.Err(err).Msg("User not authenticated")
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
@@ -187,19 +198,20 @@ func (s *UserHandler) UploadProfilePicture(c *gin.Context) {
 
 	fileContent, err := file.Open()
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to open file")
+		logger.Err(err).Msg("Failed to open file")
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 	byteContainer, err := io.ReadAll(fileContent) // you may want to handle the error
 	if err != nil {
+		logger.Err(err).Msg("Failed to read file content")
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
 	// The file is received, so let's save it
 	if err := s.fileService.SaveFile(c, byteContainer, newFilePath); err != nil {
-		log.Error().Err(err).Msg("Failed to save file")
+		logger.Err(err).Msg("Failed to save file")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"message": "Unable to save the file",
 		})
@@ -219,38 +231,39 @@ func (s *UserHandler) GetProfilePicture(c *gin.Context, userId string, params co
 }
 
 func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	var req struct {
 		Email string `json:"email"`
 	}
 	if err := c.BindJSON(&req); err != nil {
-		log.Error().Err(err).Msg("Failed to bind JSON")
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get Authorization client")
+		logger.Err(err).Msg("Failed to get Authorization client")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Authorization client"})
 		return
 	}
 	url, err := getResetPasswordURL(c, "")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get reset password URL")
+		logger.Err(err).Msg("Failed to get reset password URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to send password reset email")
+		logger.Err(err).Msg("Failed to send password reset email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -258,6 +271,8 @@ func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
 }
 
 func (uh *UserHandler) Signup(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -266,31 +281,33 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 
 	tenant, err := uh.store.GetTenantByTenantID(c, tenantID.(string))
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get tenant")
+		logger.Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	if !tenant.AllowSignUp {
+		logger.Error().Str("tenantID", tenantID.(string)).Msg("Signup not allowed for tenant")
 		c.JSON(http.StatusForbidden, gin.H{"error": "Sign up not allowed"})
 		return
 	}
 
 	var req core.NewSignUp
 	if err := c.BindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -303,7 +320,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 
 	user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), newUser, &req.Password)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create user")
+		logger.Err(err).Msg("Failed to create user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -311,31 +328,31 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 	// create email verification token
 	token, err := uh.emailVerificationService.CreateEmailVerificationToken(c, user.ID, tenantID.(string))
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create email verification token")
+		logger.Err(err).Msg("Failed to create email verification token")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	url, err := getConfirmationEmailURL(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get confirmation email URL")
+		logger.Err(err).Msg("Failed to get confirmation email URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = sendConfirmationEmail(c, url, req.Email, token)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to send confirmation email")
+		logger.Err(err).Msg("Failed to send confirmation email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	c.JSON(http.StatusCreated, user)
-	// c.JSON(http.StatusOK, gin.H{"message": "Verification email sent"})
 }
 
 // VerifyEmail handles email verification using token
 func (uh *UserHandler) VerifyEmail(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -345,11 +362,13 @@ func (uh *UserHandler) VerifyEmail(c *gin.Context) {
 		Token string `json:"token" binding:"required"`
 	}
 	if err := c.BindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	if err := uh.emailVerificationService.VerifyEmailToken(c, req.Token, tenantID.(string)); err != nil {
+		logger.Err(err).Msg("Failed to verify email token")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -362,6 +381,7 @@ func (uh *UserHandler) VerifyEmail(c *gin.Context) {
 
 // ResendEmailVerification resends verification email to authenticated user
 func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
@@ -376,6 +396,7 @@ func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
 
 	userEmail, exists := c.Get(auth.AUTH_EMAIL)
 	if !exists {
+		logger.Error().Msg("User email not found")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User email not found"})
 		return
 	}
@@ -383,13 +404,13 @@ func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
 	// Check if email is already verified
 	isVerified, err := uh.emailVerificationService.GetUserVerificationStatus(c, userID.(string), tenantID.(string))
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to check verification status")
+		logger.Err(err).Msg("Failed to check verification status")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check verification status"})
 		return
 	}
 
 	if isVerified {
-		log.Error().Err(err).Msg("Email already verified")
+		logger.Err(err).Msg("Email already verified")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already verified"})
 		return
 	}
@@ -397,13 +418,14 @@ func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
 	// Get base URL for verification link
 	url, err := getConfirmationEmailURL(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to generate verification URL")
+		logger.Err(err).Msg("Failed to generate verification URL")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification URL"})
 		return
 	}
 
 	// Resend verification email (includes rate limiting)
 	if err := uh.emailVerificationService.ResendVerificationEmail(c, userID.(string), tenantID.(string), userEmail.(string), url); err != nil {
+		logger.Err(err).Msg("Failed to send verification email")
 		// Check if it's a rate limit error
 		if fmt.Sprintf("%v", err) == "rate limit exceeded" ||
 			(len(fmt.Sprintf("%v", err)) > 20 && fmt.Sprintf("%v", err)[:20] == "rate limit exceeded.") {
@@ -419,6 +441,7 @@ func (uh *UserHandler) ResendEmailVerification(c *gin.Context) {
 
 // GetMyEmailVerificationStatus returns current user's email verification status
 func (uh *UserHandler) GetMyEmailVerificationStatus(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
@@ -440,7 +463,7 @@ func (uh *UserHandler) GetMyEmailVerificationStatus(c *gin.Context) {
 	// Get verification status
 	isVerified, err := uh.emailVerificationService.GetUserVerificationStatus(c, userID.(string), tenantID.(string))
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get verification status")
+		logger.Err(err).Msg("Failed to get verification status")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get verification status"})
 		return
 	}
@@ -453,15 +476,17 @@ func (uh *UserHandler) GetMyEmailVerificationStatus(c *gin.Context) {
 
 // GetUserByEmail implements openapi.ServerInterface.
 func (uh *UserHandler) GetUserByEmail(c *gin.Context, email string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
 	user, err := uh.userService.GetUserByEmail(c, tenantID.(string), email)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get user by email")
+		logger.Err(err).Msg("Failed to get user by email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -471,14 +496,16 @@ func (uh *UserHandler) GetUserByEmail(c *gin.Context, email string) {
 
 // IdentifyUser implements openapi.ServerInterface.
 func (uh *UserHandler) IdentifyUser(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	if uh.authProvider.GetProviderName() != "kratos" {
-		log.Warn().Str("provider", uh.authProvider.GetProviderName()).Msg("Identify not implemented for this provider")
+		logger.Warn().Str("provider", uh.authProvider.GetProviderName()).Msg("Identify not implemented for this provider")
 		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Identification processed (not supported for provider)"})
 		return
 	}
 
 	var req core.Identify
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -496,19 +523,20 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
 	tenant, err := uh.store.GetTenantByTenantID(c, tenantID.(string))
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get tenant")
+		logger.Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	if !tenant.AllowSignUp {
-		log.Error().Str("tenantID", tenantID.(string)).Msg("Signup not allowed for tenant")
+		logger.Error().Str("tenantID", tenantID.(string)).Msg("Signup not allowed for tenant")
 		// POLA: return 200 as requested
 		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Signup not allowed"})
 		return
@@ -516,14 +544,14 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -531,8 +559,6 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 	// Check if user exists globally
 	globalUser, err := uh.userService.GetUserByEmailGlobal(c, string(req.Email))
 	if err != nil {
-		// User doesn't exist
-		log.Info().Str("email", string(req.Email)).Msg("User doesn't exist globally, creating new user")
 
 		newUserReq := core.NewUser{
 			Email: string(req.Email),
@@ -541,7 +567,7 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 		}
 		user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), newUserReq, nil)
 		if err != nil {
-			log.Error().Err(err).Str("email", string(req.Email)).Msg("Failed to create user during identification")
+			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to create user during identification")
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
@@ -549,9 +575,9 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 		// Send magic link
 		err = sendMagicLink(c, baseAuthClient, origin, string(req.Email))
 		if err != nil {
-			log.Error().Err(err).Str("email", string(req.Email)).Msg("Failed to send magic link")
+			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to send magic link")
 		}
-		log.Info().Str("email", user.Email.String).Msg("Magic link sent for new user")
+		logger.Info().Str("email", user.Email.String).Msg("Magic link sent for new user")
 	} else {
 		// User exists globally
 		// Check if member of tenant
@@ -560,27 +586,25 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 			TenantID: tenantID.(string),
 		})
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to check tenant membership")
+			logger.Err(err).Msg("Failed to check tenant membership")
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
 
 		if !isMember {
-			log.Info().Str("email", string(req.Email)).Str("tenantID", tenantID.(string)).Msg("User exists globally but not a member, adding to tenant")
 			// Add to tenant
 			err = uh.userService.AddUserToTenant(c, baseAuthClient, tenantID.(string), globalUser.Id, []core.Role{core.USER}, "")
 			if err != nil {
-				log.Error().Err(err).Str("email", string(req.Email)).Msg("Failed to add user to tenant during identification")
+				logger.Err(err).Str("email", string(req.Email)).Msg("Failed to add user to tenant during identification")
 				c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 				return
 			}
 		}
 
 		// Send sign-in link
-		log.Info().Str("email", string(req.Email)).Msg("Sending sign-in link to existing user/member")
 		err = sendSigninEmail(c, origin, string(req.Email))
 		if err != nil {
-			log.Error().Err(err).Str("email", string(req.Email)).Msg("Failed to send sign-in email")
+			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to send sign-in email")
 		}
 	}
 

@@ -9,6 +9,7 @@ import (
 	core "ctoup.com/coreapp/api/openapi/core"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/rs/zerolog/log"
 
 	// [DO NOT REMOVE COMMENT - Import]
 	"ctoup.com/coreapp/pkg/core/db"
@@ -24,7 +25,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/rs/zerolog/log"
 	healthcheck "github.com/tavsec/gin-healthcheck"
 	"github.com/tavsec/gin-healthcheck/checks"
 	"github.com/tavsec/gin-healthcheck/config"
@@ -76,7 +76,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 
 	err := connPool.Ping(context.Background())
 	if err != nil {
-		log.Error().Err(err).Msg("Ping DB failed")
+		log.Err(err).Msg("Ping DB failed")
 	}
 
 	// Convert pgxpool.Pool to *sql.DB for SqlCheck

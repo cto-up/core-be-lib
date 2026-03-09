@@ -42,7 +42,7 @@ func (fam *TenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					"message": "Tenant not found",
 				})
 			} else {
-				log.Error().Err(err).Msg("Failed to get tenant ID with subdomain")
+				log.Err(err).Msg("Failed to get tenant ID with subdomain")
 				ctx.JSON(http.StatusInternalServerError, gin.H{
 					"status":  http.StatusInternalServerError,
 					"message": err.Error(),

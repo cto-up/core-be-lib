@@ -10,7 +10,6 @@ import (
 	"ctoup.com/coreapp/api/helpers"
 	api "ctoup.com/coreapp/api/openapi/core"
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
@@ -34,6 +33,7 @@ type PromptHandler struct {
 
 // AddPrompt implements api.ServerInterface.
 func (exh *PromptHandler) AddPrompt(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -41,12 +41,14 @@ func (exh *PromptHandler) AddPrompt(c *gin.Context) {
 	}
 	var req api.AddPromptJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON for adding prompt")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 	userID, exist := c.Get(auth.AUTH_USER_ID)
 	if !exist {
 		// should not happen as the middleware ensures that the user is authenticated
+		logger.Error().Msg("User ID not found")
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
 		return
 	}
@@ -63,7 +65,7 @@ func (exh *PromptHandler) AddPrompt(c *gin.Context) {
 	}
 	prompt, err := exh.store.CreatePrompt(c, params)
 	if err != nil {
-		log.Error().Err(err).Msg("Error creating prompt")
+		logger.Err(err).Msg("Error creating prompt")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -72,6 +74,7 @@ func (exh *PromptHandler) AddPrompt(c *gin.Context) {
 
 // UpdatePrompt implements api.ServerInterface.
 func (exh *PromptHandler) UpdatePrompt(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -79,6 +82,7 @@ func (exh *PromptHandler) UpdatePrompt(c *gin.Context, id uuid.UUID) {
 	}
 	var req api.UpdatePromptJSONBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON for updating prompt")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -95,7 +99,7 @@ func (exh *PromptHandler) UpdatePrompt(c *gin.Context, id uuid.UUID) {
 	}
 	_, err := exh.store.UpdatePrompt(c, params)
 	if err != nil {
-		log.Error().Err(err).Msg("Error updating prompt")
+		logger.Err(err).Msg("Error updating prompt")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -104,6 +108,8 @@ func (exh *PromptHandler) UpdatePrompt(c *gin.Context, id uuid.UUID) {
 
 // DeletePrompt implements api.ServerInterface.
 func (exh *PromptHandler) DeletePrompt(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -114,7 +120,7 @@ func (exh *PromptHandler) DeletePrompt(c *gin.Context, id uuid.UUID) {
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("Error deleting prompt")
+		logger.Err(err).Msg("Error deleting prompt")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -123,8 +129,10 @@ func (exh *PromptHandler) DeletePrompt(c *gin.Context, id uuid.UUID) {
 
 // FindPromptByID implements api.ServerInterface.
 func (exh *PromptHandler) GetPromptByID(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -133,6 +141,7 @@ func (exh *PromptHandler) GetPromptByID(c *gin.Context, id uuid.UUID) {
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
+		logger.Err(err).Msg("Error fetching prompt")
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
@@ -159,8 +168,10 @@ func (exh *PromptHandler) GetPromptByID(c *gin.Context, id uuid.UUID) {
 
 // ListPrompts implements api.ServerInterface.
 func (exh *PromptHandler) ListPrompts(c *gin.Context, params api.ListPromptsParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -217,7 +228,7 @@ func (exh *PromptHandler) ListPrompts(c *gin.Context, params api.ListPromptsPara
 
 	prompts, err := exh.store.ListPrompts(c, query)
 	if err != nil {
-		log.Error().Err(err).Msg("Error listing prompts")
+		logger.Err(err).Msg("Error listing prompts")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -239,6 +250,7 @@ func (exh *PromptHandler) ListPrompts(c *gin.Context, params api.ListPromptsPara
 
 // ExecutePrompt implements api.ServerInterface.
 func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -247,6 +259,7 @@ func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptPara
 
 	var req api.ExecutePromptJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON for format prompt")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -255,6 +268,7 @@ func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptPara
 	id := params.Id
 	name := params.Name
 	if id == nil && name == nil {
+		logger.Error().Msg("id or name must be provided")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(errors.New("id or name must be provided")))
 		return
 	}
@@ -266,6 +280,7 @@ func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptPara
 			TenantID: tenantID.(string),
 		})
 		if err != nil {
+			logger.Err(err).Msg("Error fetching prompt")
 			if err.Error() == pgx.ErrNoRows.Error() {
 				c.JSON(http.StatusNotFound, helpers.ErrorResponse(errors.New("prompt not found")))
 				return
@@ -307,6 +322,7 @@ func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptPara
 	})
 
 	if err != nil {
+		logger.Err(err).Msg("Error executing prompt")
 		if strings.HasPrefix(err.Error(), "missing required parameter:") {
 			c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 			return
@@ -322,14 +338,17 @@ func (h *PromptHandler) FormatPrompt(c *gin.Context, params api.FormatPromptPara
 
 // ExecutePrompt implements api.ServerInterface.
 func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePromptParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
 	var req api.ExecutePromptJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON for execute prompt")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -338,6 +357,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 	id := queryParams.Id
 	name := queryParams.Name
 	if id == nil && name == nil {
+		logger.Error().Msg("id or name must be provided")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(errors.New("id or name must be provided")))
 		return
 	}
@@ -351,6 +371,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			TenantID: tenantID.(string),
 		})
 		if err != nil {
+			logger.Err(err).Msg("Error fetching prompt")
 			if err.Error() == pgx.ErrNoRows.Error() {
 				c.JSON(http.StatusNotFound, helpers.ErrorResponse(errors.New("prompt not found")))
 				return
@@ -364,6 +385,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			TenantID: tenantID.(string),
 		})
 		if err != nil {
+			logger.Err(err).Msg("Error fetching prompt")
 			if err.Error() == pgx.ErrNoRows.Error() {
 				c.JSON(http.StatusNotFound, helpers.ErrorResponse(errors.New("prompt not found")))
 				return
@@ -430,7 +452,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		llm,
 	)
 	if err != nil {
-		log.Printf("Error NewBaseChain: %v", err)
+		logger.Printf("Error NewBaseChain: %v", err)
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(errors.New("NewBaseChain error")))
 		return
 	}
@@ -455,13 +477,13 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 		)
 
 		if err != nil {
-			log.Printf("Error generating answer: %v", err)
+			logger.Printf("Error generating answer: %v", err)
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
 		result, err := service.ConvertAnswerToString(generatedAnswer)
 		if err != nil {
-			log.Printf("Error converting answer to string: %v", err)
+			logger.Printf("Error converting answer to string: %v", err)
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
@@ -508,7 +530,7 @@ func (h *PromptHandler) ExecutePrompt(c *gin.Context, queryParams api.ExecutePro
 			return msg.EventType != "ERROR" && msg.Progress != 100
 		case err := <-errorChan:
 			// Send error as SSE event instead of trying to change status code
-			log.Printf("Error in streaming: %v", err)
+			logger.Err(err).Msg("Error in streaming")
 			errEvent := event.NewProgressEvent("ERROR", err.Error(), 100)
 			c.SSEvent("message", errEvent)
 			return false

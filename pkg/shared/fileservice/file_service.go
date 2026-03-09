@@ -14,19 +14,20 @@ import (
 	"strings"
 
 	"cloud.google.com/go/storage" // GCS client
+	"ctoup.com/coreapp/pkg/shared/util"
 
 	// AWS S3 client imports
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/rs/zerolog/log"
 
 	// Azure Blob client imports
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
 	"gocloud.dev/blob"
 	"gocloud.dev/gcerrors"
 	"google.golang.org/api/option" // Import the option package
@@ -53,7 +54,7 @@ func NewFileService() *FileService {
 		}
 		err := createGCSBucketIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to create GCS bucket")
+			log.Err(err).Msg("Failed to create GCS bucket")
 		}
 	case "s3":
 		bucketName = os.Getenv("S3_BUCKET_NAME")
@@ -62,7 +63,7 @@ func NewFileService() *FileService {
 		}
 		err := createS3BucketIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to create S3 bucket")
+			log.Err(err).Msg("Failed to create S3 bucket")
 		}
 	case "azure":
 		bucketName = os.Getenv("AZURE_STORAGE_CONTAINER_NAME")
@@ -71,7 +72,7 @@ func NewFileService() *FileService {
 		}
 		err := createAzureContainerIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to create Azure container")
+			log.Err(err).Msg("Failed to create Azure container")
 		}
 	case "file":
 	}
@@ -94,7 +95,7 @@ func NewFileService() *FileService {
 	// Open the bucket once and store the client
 	b, err := blob.OpenBucket(context.Background(), bucketURL)
 	if err != nil {
-		log.Error().Err(err).Msgf("Failed to open bucket at URL: %s", bucketURL)
+		log.Err(err).Msgf("Failed to open bucket at URL: %s", bucketURL)
 	}
 
 	return &FileService{
@@ -244,16 +245,17 @@ func createAzureContainerIfNotExists(ctx context.Context, containerName string) 
 
 // SaveFile writes data to a file in the specified bucket.
 func (fs *FileService) SaveFile(ctx context.Context, data []byte, filename string) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	// We can now use the `fs.bucket` attribute directly.
 	w, err := fs.bucket.NewWriter(ctx, filename, nil)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create new writer")
+		logger.Err(err).Msg("Failed to create new writer")
 		return err
 	}
 
 	// Write the data to the file.
 	if _, err = w.Write(data); err != nil {
-		log.Error().Err(err).Msg("Failed to write data to file")
+		logger.Err(err).Msg("Failed to write data to file")
 		w.Close() // Ensure the writer is closed even on error.
 		return err
 	}
@@ -264,9 +266,10 @@ func (fs *FileService) SaveFile(ctx context.Context, data []byte, filename strin
 
 // DeleteFile deletes a file from the specified bucket.
 func (fs *FileService) DeleteFile(ctx context.Context, filename string) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	// We can now use the `fs.bucket` attribute directly.
 	if err := fs.bucket.Delete(ctx, filename); err != nil {
-		log.Error().Err(err).Msgf("Failed to delete file %s", filename)
+		logger.Err(err).Msgf("Failed to delete file %s", filename)
 		return err
 	}
 	return nil
@@ -274,8 +277,9 @@ func (fs *FileService) DeleteFile(ctx context.Context, filename string) error {
 
 // CopyFile copies a file from src to dst within the same bucket.
 func (fs *FileService) CopyFile(ctx context.Context, dst, src string) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	if err := fs.bucket.Copy(ctx, dst, src, nil); err != nil {
-		log.Error().Err(err).Msgf("Failed to copy file from %s to %s", src, dst)
+		logger.Err(err).Msgf("Failed to copy file from %s to %s", src, dst)
 		return err
 	}
 	return nil
@@ -283,7 +287,9 @@ func (fs *FileService) CopyFile(ctx context.Context, dst, src string) error {
 
 // RenameFile moves a file from src to dst by copying then deleting.
 func (fs *FileService) RenameFile(ctx context.Context, dst, src string) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	if err := fs.CopyFile(ctx, dst, src); err != nil {
+		logger.Err(err).Msgf("Failed to copy file from %s to %s during rename", src, dst)
 		return err
 	}
 	return fs.DeleteFile(ctx, src)
@@ -291,9 +297,10 @@ func (fs *FileService) RenameFile(ctx context.Context, dst, src string) error {
 
 // FileExists checks if a file exists in the bucket.
 func (fs *FileService) FileExists(ctx context.Context, filename string) (bool, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	exists, err := fs.bucket.Exists(ctx, filename)
 	if err != nil {
-		log.Error().Err(err).Msgf("Failed to check existence of file %s", filename)
+		logger.Err(err).Msgf("Failed to check existence of file %s", filename)
 		return false, err
 	}
 	return exists, nil
@@ -302,13 +309,14 @@ func (fs *FileService) FileExists(ctx context.Context, filename string) (bool, e
 // GetFile retrieves a file from the specified bucket and writes its contents to the HTTP response.
 // It supports ETag-based caching for improved performance.
 func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Create a new reader to the specified file.
 	reader, err := fs.bucket.NewReader(ctx, filename, nil)
 	if err != nil {
+		logger.Err(err).Msgf("Failed to open file %s", filename)
 		if gcerrors.Code(err) == gcerrors.NotFound {
 			ctx.AbortWithStatus(404)
 		} else {
-			log.Error().Err(err).Msg("Failed to open file")
 			ctx.AbortWithError(500, err)
 		}
 		return err
@@ -318,7 +326,7 @@ func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {
 	// Read the file content to generate ETag
 	content, err := io.ReadAll(reader)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to read file content")
+		logger.Err(err).Msg("Failed to read file content")
 		ctx.AbortWithError(500, err)
 		return err
 	}
@@ -356,7 +364,7 @@ func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {
 
 	// Write the blob contents to the response.
 	if _, err = ctx.Writer.Write(content); err != nil {
-		log.Error().Err(err).Msg("Failed to write file to response writer")
+		logger.Err(err).Msg("Failed to write file to response writer")
 		ctx.AbortWithError(500, err)
 		return err
 	}

@@ -11,9 +11,9 @@ import (
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	access "ctoup.com/coreapp/pkg/shared/service"
+	"ctoup.com/coreapp/pkg/shared/util"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
 )
 
 func getTenantPictureFilePath(tenantID string, pictureType string) string {
@@ -23,9 +23,11 @@ func getTenantPictureFilePath(tenantID string, pictureType string) string {
 
 // getTenantPicture is a generic function to get a tenant picture
 func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Get tenant ID from context
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -38,13 +40,16 @@ func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
 
 // uploadTenantPicture is a generic function to upload a tenant picture
 func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Get tenant ID from context
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 	if !access.IsAdmin(c) && !access.IsSuperAdmin(c) && !access.IsCustomerAdmin(c) {
+		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can upload tenant pictures")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can upload tenant pictures"})
 		return
 	}
@@ -52,14 +57,14 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	// Get the file from the request
 	file, err := c.FormFile("picture")
 	if err != nil {
-		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to get file from request")
+		logger.Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to get file from request")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	// Check if the file is a webp
 	if !strings.HasSuffix(strings.ToLower(file.Filename), ".webp") {
-		log.Error().Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Invalid file format. Only webp files are allowed")
+		logger.Error().Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Invalid file format. Only webp files are allowed")
 		c.JSON(http.StatusBadRequest, errors.New("only webp files are allowed"))
 		return
 	}
@@ -67,7 +72,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	// Open the uploaded file
 	fileContent, err := file.Open()
 	if err != nil {
-		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to open file")
+		logger.Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to open file")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -76,7 +81,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	// Read the file content
 	byteContainer, err := io.ReadAll(fileContent)
 	if err != nil {
-		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to read file")
+		logger.Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to read file")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -84,7 +89,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	// Save the file with tenant-specific name
 	filepath := getTenantPictureFilePath(tenantID.(string), pictureType)
 	if err := s.FileService.SaveFile(c, byteContainer, filepath); err != nil {
-		log.Error().Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to save file")
+		logger.Err(err).Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Failed to save file")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

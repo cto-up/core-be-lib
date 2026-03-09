@@ -110,7 +110,7 @@ func SetupPostgresContainer() (*pgxpool.Pool, func(), error) {
 	cleanup := func() {
 		connPool.Close()
 		if err := postgresC.Terminate(ctx); err != nil {
-			log.Error().Err(err).Msg("Failed to terminate container")
+			log.Err(err).Msg("Failed to terminate container")
 		}
 	}
 

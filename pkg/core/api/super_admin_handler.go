@@ -11,8 +11,8 @@ import (
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/service"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
 )
 
 /* TO REMOVE after Firebase migration !!!*/
@@ -29,6 +29,7 @@ func NewSuperAdminHandler(authProvider auth.AuthProvider) *SuperAdminHandler {
 // AddAuthorizedDomains handles the request to add authorized domains for Firebase Authentication
 // Firebase specific
 func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Check if user has SUPER_ADMIN role
 	if !service.IsSuperAdmin(c) {
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("requires SUPER_ADMIN role")))
@@ -38,6 +39,7 @@ func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
 	// Parse request body
 	var req api.AddAuthorizedDomainsJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to parse request body")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -50,7 +52,7 @@ func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
 
 	err := service.SDKAddAuthorizedDomains(c, req.Domains)
 	if err != nil {
-		log.Error().Err(err).Msg("Error adding authorized domains")
+		logger.Err(err).Msg("Error adding authorized domains")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -62,6 +64,7 @@ func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
 // RemoveAuthorizedDomains handles the request to add authorized domains for Firebase Authentication
 // Firebase specific
 func (exh *SuperAdminHandler) RemoveAuthorizedDomains(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Check if user has SUPER_ADMIN role
 	if !service.IsSuperAdmin(c) {
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("requires SUPER_ADMIN role")))
@@ -71,19 +74,21 @@ func (exh *SuperAdminHandler) RemoveAuthorizedDomains(c *gin.Context) {
 	// Parse request body
 	var req api.RemoveAuthorizedDomainsJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to parse request body")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	// Validate domains
 	if slices.Contains(req.Domains, "") {
+		logger.Error().Msg("Domain cannot be empty")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(errors.New("domain cannot be empty")))
 		return
 	}
 
 	err := service.SDKRemoveAuthorizedDomains(c, req.Domains)
 	if err != nil {
-		log.Error().Err(err).Msg("Error removing authorized domains")
+		logger.Err(err).Msg("Error removing authorized domains")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

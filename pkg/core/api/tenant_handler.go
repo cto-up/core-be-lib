@@ -13,12 +13,12 @@ import (
 	fileservice "ctoup.com/coreapp/pkg/shared/fileservice"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	"ctoup.com/coreapp/pkg/shared/service"
+	"ctoup.com/coreapp/pkg/shared/util"
 	utils "ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/rs/zerolog/log"
 )
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
@@ -31,9 +31,10 @@ type TenantHandler struct {
 
 // (GET /public-api/v1/tenant)
 func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	subdomain, err := utils.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Error getting subdomain")
+		logger.Err(err).Msg("Error getting subdomain")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -54,6 +55,7 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 
 	tenant, err := exh.store.GetTenantBySubdomain(c, subdomain)
 	if err != nil {
+		logger.Err(err).Str("subdomain", subdomain).Msg("Error getting tenant by subdomain")
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
@@ -77,9 +79,10 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 
 // AddTenant implements api.ServerInterface.
 func (exh *TenantHandler) AddTenant(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	var req api.AddTenantJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Error().Err(err).Msg("Failed to bind request body")
+		logger.Err(err).Msg("Failed to bind request body")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -87,7 +90,7 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 	// Get the tenant manager
 	tenantManager := exh.authProvider.GetTenantManager()
 	if tenantManager == nil {
-		log.Error().Msg("Tenant manager not supported by this provider")
+		logger.Error().Msg("Tenant manager not supported by this provider")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("tenant operations not supported")))
 		return
 	}
@@ -101,14 +104,14 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 
 	newTenant, err := tenantManager.CreateTenant(c, tenantConfig)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create tenant")
+		logger.Err(err).Msg("Failed to create tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	userID, exist := c.Get(auth.AUTH_USER_ID)
 	if !exist {
 		// should not happen as the middleware ensures that the user is authenticated
-		log.Error().Msg("User not authenticated")
+		logger.Error().Msg("User not authenticated")
 		c.JSON(http.StatusBadRequest, "Need to be authenticated")
 		return
 	}
@@ -149,8 +152,11 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 			IsReseller:            isReseller,
 		})
 	if err != nil {
-		tenantManager.DeleteTenant(c, newTenant.ID)
-		log.Error().Err(err).Msg("Failed to create tenant")
+		logger.Err(err).Msg("Failed to create tenant")
+		err := tenantManager.DeleteTenant(c, newTenant.ID)
+		if err != nil {
+			logger.Err(err).Msg("Failed to rollback tenant creation in auth provider")
+		}
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -166,15 +172,17 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("tenantID", newTenant.ID).Msg("Failed to set tenant profile on create")
+		logger.Err(err).Str("tenantID", newTenant.ID).Msg("Failed to set tenant profile on create")
 	}
 	c.JSON(http.StatusCreated, tenant)
 }
 
 // UpdateTenant implements api.ServerInterface.
 func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	var req api.UpdateTenantJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to parse request body")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -182,6 +190,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 	// Get the tenant manager
 	tenantManager := exh.authProvider.GetTenantManager()
 	if tenantManager == nil {
+		logger.Error().Msg("Tenant manager not supported by this provider")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("tenant operations not supported")))
 		return
 	}
@@ -195,16 +204,18 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 	// Authorization check
 	isAllowed, err := service.IsAllowedToManageTenantByID(c, exh.store, id)
 	if err != nil {
+		logger.Err(err).Msg("Failed to check tenant management permissions")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 		return
 	}
 	if !isAllowed {
+		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, "Not allowed to manage this tenant")
 		return
 	}
 	_, err = tenantManager.UpdateTenant(c, req.TenantId, tenantConfig)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to update tenant in auth provider")
+		logger.Err(err).Msg("Failed to update tenant in auth provider")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -222,6 +233,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 	if !service.IsSuperAdmin(c) {
 		existing, err := exh.store.GetTenantByID(c, id)
 		if err != nil {
+			logger.Err(err).Msg("Failed to get existing tenant for update")
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
 		}
@@ -238,7 +250,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 
 	_, err = exh.store.UpdateTenant(c, updateParams)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to update tenant in database")
+		logger.Err(err).Msg("Failed to update tenant in database")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -247,9 +259,10 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 
 // DeleteTenant implements api.ServerInterface.
 func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenant, err := exh.store.GetTenantByID(c, id)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get tenant")
+		logger.Err(err).Msg("Failed to get tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -257,10 +270,12 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 	// Authorization check
 	isAllowed, err := service.IsAllowedToManageTenantByID(c, exh.store, id)
 	if err != nil {
+		logger.Err(err).Msg("Failed to check tenant management permissions")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 		return
 	}
 	if !isAllowed {
+		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, "Not allowed to manage this tenant")
 		return
 	}
@@ -268,19 +283,20 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 	// Get the tenant manager
 	tenantManager := exh.authProvider.GetTenantManager()
 	if tenantManager == nil {
+		logger.Error().Msg("Tenant manager not supported by this provider")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("tenant operations not supported")))
 		return
 	}
 
 	err = tenantManager.DeleteTenant(c, tenant.TenantID)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to delete tenant in auth provider")
+		logger.Err(err).Msg("Failed to delete tenant in auth provider")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	_, err = exh.store.DeleteTenant(c, id)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to delete tenant in database")
+		logger.Err(err).Msg("Failed to delete tenant in database")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -289,10 +305,11 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 
 // FindTenantByID implements api.ServerInterface.
 func (exh *TenantHandler) GetTenantByID(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 
 	tenant, err := exh.store.GetTenantByID(c, id)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get tenant by ID")
+		logger.Err(err).Msg("Failed to get tenant by ID")
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
@@ -303,10 +320,12 @@ func (exh *TenantHandler) GetTenantByID(c *gin.Context, id uuid.UUID) {
 	// Authorization check
 	isAllowed, err := service.IsAllowedToManageTenantByID(c, exh.store, id)
 	if err != nil {
+		logger.Err(err).Msg("Failed to check tenant management permissions")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 		return
 	}
 	if !isAllowed {
+		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, "Not allowed to manage this tenant")
 		return
 	}
@@ -315,6 +334,7 @@ func (exh *TenantHandler) GetTenantByID(c *gin.Context, id uuid.UUID) {
 
 // ListTenants implements api.ServerInterface.
 func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	pagingRequest := helpers.PagingRequest{
 		MaxPageSize:     50,
 		DefaultPage:     1,
@@ -365,7 +385,7 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 
 	tenants, err := exh.store.ListTenants(c, query)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to list tenants")
+		logger.Err(err).Msg("Failed to list tenants")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

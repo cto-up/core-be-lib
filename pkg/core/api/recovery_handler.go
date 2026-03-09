@@ -11,6 +11,7 @@ import (
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/shared/auth"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	ory "github.com/ory/kratos-client-go"
 	"github.com/rs/zerolog/log"
@@ -58,7 +59,7 @@ func NewRecoveryHandler(authProvider auth.AuthProvider) *RecoveryHandler {
 	// Check if provider requires recovery proxy
 	authClient := authProvider.GetAuthClient()
 	if !authClient.RequiresRecoveryProxy() {
-		log.Info().
+		log.Error().
 			Str("provider", authProvider.GetProviderName()).
 			Msg("Provider does not require recovery proxy, skipping RecoveryHandler creation")
 		return nil
@@ -75,13 +76,6 @@ func NewRecoveryHandler(authProvider auth.AuthProvider) *RecoveryHandler {
 	if kratosClient, ok := authClient.(interface{ GetPublicClient() *ory.APIClient }); ok {
 		publicClient = kratosClient.GetPublicClient()
 	}
-
-	log.Info().
-		Str("provider", authProvider.GetProviderName()).
-		Str("kratos_url", kratosPublicURL).
-		Bool("has_client", publicClient != nil).
-		Msg("RecoveryHandler created for provider requiring proxy")
-
 	return &RecoveryHandler{
 		kratosPublicURL: kratosPublicURL,
 		publicClient:    publicClient,
@@ -93,6 +87,8 @@ func NewRecoveryHandler(authProvider auth.AuthProvider) *RecoveryHandler {
 // Then returns the settings flow URL for password setup
 // GET /public-api/v1/auth/recovery?flow=xxx&token=yyy
 func (h *RecoveryHandler) HandleRecovery(c *gin.Context, params core.HandleRecoveryParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	flowID := params.Flow
 	token := params.Token
 
@@ -102,11 +98,6 @@ func (h *RecoveryHandler) HandleRecovery(c *gin.Context, params core.HandleRecov
 		kratosPath = "/admin/self-service/recovery"
 	}
 	kratosURL := fmt.Sprintf("%s%s?flow=%s&token=%s", h.kratosPublicURL, kratosPath, flowID, token)
-
-	log.Info().
-		Str("flow", flowID).
-		Str("kratos_url", kratosURL).
-		Msg("Activating recovery link via Kratos")
 
 	// Create HTTP client that doesn't follow redirects
 	client := &http.Client{
@@ -118,14 +109,14 @@ func (h *RecoveryHandler) HandleRecovery(c *gin.Context, params core.HandleRecov
 	// Make request to Kratos to activate the recovery link
 	req, err := http.NewRequest("GET", kratosURL, nil)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create Kratos request")
+		logger.Err(err).Msg("Failed to create Kratos request")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to call Kratos recovery endpoint")
+		logger.Err(err).Msg("Failed to call Kratos recovery endpoint")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -165,24 +156,7 @@ func (h *RecoveryHandler) HandleRecovery(c *gin.Context, params core.HandleRecov
 
 	baseDomain := extractBaseDomain(host)
 
-	log.Info().
-		Str("request_host", c.Request.Host).
-		Str("referer", referer).
-		Str("origin", c.Request.Header.Get("Origin")).
-		Str("effective_host", host).
-		Str("base_domain", baseDomain).
-		Msg("Setting cookies with base domain")
-
 	for _, cookie := range resp.Cookies() {
-		log.Info().
-			Str("cookie_name", cookie.Name).
-			Str("cookie_path", cookie.Path).
-			Int("cookie_max_age", cookie.MaxAge).
-			Bool("http_only", cookie.HttpOnly).
-			Bool("secure", cookie.Secure).
-			Str("domain", baseDomain).
-			Msg("Setting cookie from Kratos")
-
 		c.SetCookie(
 			cookie.Name,
 			cookie.Value,
@@ -201,33 +175,24 @@ func (h *RecoveryHandler) HandleRecovery(c *gin.Context, params core.HandleRecov
 		// This means recovery was successful and user is now logged in
 		redirectURL := resp.Header.Get("Location")
 
-		log.Info().
-			Str("flow", flowID).
-			Str("redirect_url", redirectURL).
-			Msg("Recovery link activated, user logged in")
-
 		// Extract the settings flow ID from the redirect URL
 		// The redirect URL is like: http://localhost:4455/settings?flow=xxx
 		parsedURL, err := url.Parse(redirectURL)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to parse redirect URL")
+			logger.Err(err).Msg("Failed to parse redirect URL")
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
 
 		settingsFlowID := parsedURL.Query().Get("flow")
 		if settingsFlowID == "" {
-			log.Error().Str("redirect_url", redirectURL).Msg("No flow ID in redirect URL")
+			logger.Error().Str("redirect_url", redirectURL).Msg("No flow ID in redirect URL")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"message": "Failed to extract settings flow ID",
 			})
 			return
 		}
-
-		log.Info().
-			Str("settings_flow_id", settingsFlowID).
-			Msg("Extracted settings flow ID from redirect URL")
 
 		// Return the settings flow ID to the frontend
 		// The frontend will call Kratos directly to get the flow details
@@ -241,7 +206,7 @@ func (h *RecoveryHandler) HandleRecovery(c *gin.Context, params core.HandleRecov
 	case http.StatusBadRequest:
 		// Invalid or expired flow/token
 		body, _ := io.ReadAll(resp.Body)
-		log.Warn().
+		logger.Warn().
 			Str("flow", flowID).
 			Str("response", string(body)).
 			Msg("Recovery failed - invalid or expired")
@@ -254,7 +219,7 @@ func (h *RecoveryHandler) HandleRecovery(c *gin.Context, params core.HandleRecov
 	default:
 		// Other error
 		body, _ := io.ReadAll(resp.Body)
-		log.Error().
+		logger.Error().
 			Str("flow", flowID).
 			Int("status", resp.StatusCode).
 			Str("response", string(body)).

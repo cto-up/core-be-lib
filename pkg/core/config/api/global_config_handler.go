@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/rs/zerolog/log"
 )
 
 // https://pkg.go.dev/github.com/go-playground/validator/v10#hdr-One_Of
@@ -25,6 +24,7 @@ type GlobalConfigHandler struct {
 
 // AddGlobalConfig implements openapi.ServerInterface.
 func (exh *GlobalConfigHandler) AddGlobalConfig(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	var req core.AddGlobalConfigJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
@@ -43,7 +43,7 @@ func (exh *GlobalConfigHandler) AddGlobalConfig(c *gin.Context) {
 			Value:  util.ToNullableText(req.Value),
 		})
 	if err != nil {
-		log.Error().Err(err).Msg("Error creating global config")
+		logger.Err(err).Msg("Error creating global config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -52,6 +52,7 @@ func (exh *GlobalConfigHandler) AddGlobalConfig(c *gin.Context) {
 
 // UpdateGlobalConfig implements openapi.ServerInterface.
 func (exh *GlobalConfigHandler) UpdateGlobalConfig(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	var req core.UpdateGlobalConfigJSONBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
@@ -64,7 +65,7 @@ func (exh *GlobalConfigHandler) UpdateGlobalConfig(c *gin.Context, id uuid.UUID)
 			Value: util.ToNullableText(req.Value),
 		})
 	if err != nil {
-		log.Error().Err(err).Msg("Error updating global config")
+		logger.Err(err).Msg("Error updating global config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -73,9 +74,10 @@ func (exh *GlobalConfigHandler) UpdateGlobalConfig(c *gin.Context, id uuid.UUID)
 
 // DeleteGlobalConfig implements openapi.ServerInterface.
 func (exh *GlobalConfigHandler) DeleteGlobalConfig(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	_, err := exh.store.DeleteGlobalConfig(c, id)
 	if err != nil {
-		log.Error().Err(err).Msg("Error deleting global config")
+		logger.Err(err).Msg("Error deleting global config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -84,8 +86,10 @@ func (exh *GlobalConfigHandler) DeleteGlobalConfig(c *gin.Context, id uuid.UUID)
 
 // FindGlobalConfigByID implements openapi.ServerInterface.
 func (exh *GlobalConfigHandler) GetGlobalConfigByID(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	globalConfig, err := exh.store.GetGlobalConfigByID(c, id)
 	if err != nil {
+		logger.Err(err).Msg("Error fetching global config")
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
@@ -98,6 +102,7 @@ func (exh *GlobalConfigHandler) GetGlobalConfigByID(c *gin.Context, id uuid.UUID
 
 // ListGlobalConfigs implements openapi.ServerInterface.
 func (exh *GlobalConfigHandler) ListGlobalConfigs(c *gin.Context, params core.ListGlobalConfigsParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	pagingRequest := helpers.PagingRequest{
 		MaxPageSize:     50,
 		DefaultPage:     1,
@@ -131,7 +136,7 @@ func (exh *GlobalConfigHandler) ListGlobalConfigs(c *gin.Context, params core.Li
 
 	globalConfigs, err := exh.store.ListGlobalConfigs(c, query)
 	if err != nil {
-		log.Error().Err(err).Msg("Error listing global configs")
+		logger.Err(err).Msg("Error listing global configs")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

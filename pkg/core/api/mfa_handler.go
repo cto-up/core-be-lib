@@ -5,8 +5,8 @@ import (
 
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/auth/kratos"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
 )
 
 // MFAHandler handles MFA-related endpoints
@@ -24,9 +24,11 @@ func NewMFAHandler(authProvider auth.AuthProvider) *MFAHandler {
 // GetMFAStatus returns the MFA configuration status for the current user
 // (GET /api/v1/mfa/status)
 func (h *MFAHandler) GetMFAStatus(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Check if provider is Kratos
 	kratosProvider, ok := h.authProvider.(*kratos.KratosAuthProvider)
 	if !ok {
+		logger.Error().Msg("MFA is only supported with Kratos authentication provider")
 		c.JSON(http.StatusNotImplemented, gin.H{
 			"error":   "not_supported",
 			"message": "MFA is only supported with Kratos authentication provider",
@@ -36,16 +38,18 @@ func (h *MFAHandler) GetMFAStatus(c *gin.Context) {
 
 	status, err := kratosProvider.GetMFAStatus(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get MFA status")
+		logger.Err(err).Msg("Failed to get MFA status")
 
 		// Check error type
 		if authErr, ok := err.(*auth.AuthError); ok {
 			if authErr.Code == "unauthorized" {
+				logger.Err(err).Msg("User is not authorized to access MFA status")
 				c.JSON(http.StatusUnauthorized, err)
 				return
 			}
 		}
 
+		logger.Err(err).Msg("Failed to get MFA status")
 		c.JSON(http.StatusInternalServerError, err)
 		return
 	}
@@ -56,9 +60,11 @@ func (h *MFAHandler) GetMFAStatus(c *gin.Context) {
 // InitializeSettingsFlow creates a new settings flow for MFA configuration
 // (POST /api/v1/mfa/settings/init)
 func (h *MFAHandler) InitializeSettingsFlow(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Check if provider is Kratos
 	kratosProvider, ok := h.authProvider.(*kratos.KratosAuthProvider)
 	if !ok {
+		logger.Error().Msg("MFA is only supported with Kratos authentication provider")
 		c.JSON(http.StatusNotImplemented, gin.H{
 			"error":   "not_supported",
 			"message": "MFA is only supported with Kratos authentication provider",
@@ -68,7 +74,7 @@ func (h *MFAHandler) InitializeSettingsFlow(c *gin.Context) {
 
 	flow, err := kratosProvider.InitializeSettingsFlow(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to initialize settings flow")
+		logger.Err(err).Msg("Failed to initialize settings flow")
 
 		// Check error type
 		if authErr, ok := err.(*auth.AuthError); ok {
@@ -88,9 +94,11 @@ func (h *MFAHandler) InitializeSettingsFlow(c *gin.Context) {
 // DisableWebAuthn completely removes all WebAuthn credentials for the current user
 // (DELETE /api/v1/mfa/webauthn)
 func (h *MFAHandler) DisableWebAuthn(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Check if provider is Kratos
 	kratosProvider, ok := h.authProvider.(*kratos.KratosAuthProvider)
 	if !ok {
+		logger.Error().Msg("MFA is only supported with Kratos authentication provider")
 		c.JSON(http.StatusNotImplemented, gin.H{
 			"error":   "not_supported",
 			"message": "MFA is only supported with Kratos authentication provider",
@@ -100,7 +108,7 @@ func (h *MFAHandler) DisableWebAuthn(c *gin.Context) {
 
 	err := kratosProvider.DisableWebAuthn(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to disable WebAuthn")
+		logger.Err(err).Msg("Failed to disable WebAuthn")
 
 		// Check error type
 		if authErr, ok := err.(*auth.AuthError); ok {

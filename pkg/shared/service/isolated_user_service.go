@@ -9,9 +9,9 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/rs/zerolog/log"
 
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 )
@@ -160,8 +160,10 @@ func (uh *IsolatedUserService) UpdateUserProfileInDatabase(ctx context.Context, 
 }
 
 func (uh *IsolatedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error {
+	logger := util.GetLoggerFromCtx(c)
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
+		logger.Err(err).Str("userId", userId).Msg("Failed to begin transaction for deleting user")
 		return err
 	}
 
@@ -173,6 +175,7 @@ func (uh *IsolatedUserService) DeleteUser(c *gin.Context, authClient auth.AuthCl
 		TenantID: tenantId,
 	})
 	if err != nil {
+		logger.Err(err).Str("userId", userId).Msg("Failed to delete user")
 		return err
 	}
 
@@ -180,7 +183,7 @@ func (uh *IsolatedUserService) DeleteUser(c *gin.Context, authClient auth.AuthCl
 
 	if err != nil {
 		if auth.IsUserNotFound(err) {
-			log.Error().Err(err).Msgf("User does not exist: %v", userId)
+			logger.Err(err).Msgf("User does not exist: %v", userId)
 		} else {
 			return err
 		}
@@ -196,6 +199,7 @@ func (uh *IsolatedUserService) RemoveUserFromTenant(c *gin.Context, authClient a
 }
 
 func (uh *IsolatedUserService) GetFullUserByID(c *gin.Context, authClient auth.AuthClient, tenantID string, id string) (FullUser, error) {
+	logger := util.GetLoggerFromCtx(c)
 	fullUser := FullUser{}
 
 	userDB, err := uh.store.GetUserByTenantByID(c, repository.GetUserByTenantByIDParams{
@@ -203,6 +207,7 @@ func (uh *IsolatedUserService) GetFullUserByID(c *gin.Context, authClient auth.A
 		ID:       id,
 	})
 	if err != nil {
+		logger.Err(err).Str("userID", id).Msg("Failed to get user from database")
 		return fullUser, err
 	}
 	user := core.User{
@@ -215,6 +220,7 @@ func (uh *IsolatedUserService) GetFullUserByID(c *gin.Context, authClient auth.A
 
 	userAuth, err := authClient.GetUser(c, id)
 	if err != nil {
+		logger.Err(err).Str("userID", id).Msg("Failed to get user from auth provider")
 		return fullUser, err
 	}
 	return FullUser{
@@ -226,12 +232,14 @@ func (uh *IsolatedUserService) GetFullUserByID(c *gin.Context, authClient auth.A
 }
 
 func (uh *IsolatedUserService) GetUserByEmail(c *gin.Context, tenantId string, email string) (core.User, error) {
+	logger := util.GetLoggerFromCtx(c)
 	fullUser := core.User{}
 	dbUser, err := uh.store.GetUserByTenantByEmail(c, repository.GetUserByTenantByEmailParams{
 		Email:    email,
 		TenantID: tenantId,
 	})
 	if err != nil {
+		logger.Err(err).Str("email", email).Msg("Failed to get user by email from database")
 		return fullUser, err
 	}
 
@@ -246,6 +254,7 @@ func (uh *IsolatedUserService) GetUserByEmail(c *gin.Context, tenantId string, e
 }
 
 func (uh *IsolatedUserService) ListUsers(c *gin.Context, tenantId string, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
+	logger := util.GetLoggerFromCtx(c)
 	// Delegate to the appropriate strategy
 	// Query via core_users table with tenant_id column
 	dbUsers, err := uh.store.ListUsersByTenant(c, repository.ListUsersByTenantParams{
@@ -256,6 +265,7 @@ func (uh *IsolatedUserService) ListUsers(c *gin.Context, tenantId string, paging
 	})
 
 	if err != nil {
+		logger.Err(err).Str("tenantID", tenantId).Msg("Failed to list users from database")
 		return []core.User{}, err
 	}
 
@@ -276,6 +286,7 @@ func (uh *IsolatedUserService) ListUsers(c *gin.Context, tenantId string, paging
 }
 
 func (uh *IsolatedUserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
+	logger := util.GetLoggerFromCtx(c)
 	if !IsAdmin(c) || !IsSuperAdmin(c) {
 		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
 	}
@@ -291,6 +302,7 @@ func (uh *IsolatedUserService) AssignRole(c *gin.Context, authClient auth.AuthCl
 
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
+		logger.Err(err).Str("userID", userID).Str("role", string(role)).Msg("Failed to begin transaction for assigning role")
 		return err
 	}
 	defer tx.Rollback(c)
@@ -302,12 +314,14 @@ func (uh *IsolatedUserService) AssignRole(c *gin.Context, authClient auth.AuthCl
 		TenantID: tenantId,
 	})
 	if err != nil {
+		logger.Err(err).Str("userID", userID).Str("role", string(role)).Msg("Failed to assign role in database")
 		return err
 	}
 
 	// Lookup the user associated with the specified uid.
 	user, err := authClient.GetUser(c, userID)
 	if err != nil {
+		logger.Err(err).Str("userID", userID).Msg("Failed to get user from auth provider")
 		return err
 	}
 
@@ -321,17 +335,20 @@ func (uh *IsolatedUserService) AssignRole(c *gin.Context, authClient auth.AuthCl
 	claims[string(role)] = true
 	err = authClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
 	if err != nil {
+		logger.Err(err).Str("userID", userID).Str("role", string(role)).Msg("Failed to set custom user claims in auth provider")
 		return err
 	}
 	// The new custom claims will propagate to the user's ID token the
 	err = tx.Commit(c)
 	if err != nil {
+		logger.Err(err).Str("userID", userID).Str("role", string(role)).Msg("Failed to commit transaction for assigning role")
 		return err
 	}
 	return nil
 }
 
 func (uh *IsolatedUserService) UnassignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
+	logger := util.GetLoggerFromCtx(c)
 	if !IsAdmin(c) && !IsSuperAdmin(c) && !IsCustomerAdmin(c) {
 		return errors.New("must be an CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN to perform such operation")
 	}
@@ -345,6 +362,7 @@ func (uh *IsolatedUserService) UnassignRole(c *gin.Context, authClient auth.Auth
 
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
+		logger.Err(err).Str("userID", userID).Str("role", string(role)).Msg("Failed to begin transaction for unassigning role")
 		return err
 	}
 	defer tx.Rollback(c)
@@ -362,6 +380,7 @@ func (uh *IsolatedUserService) UnassignRole(c *gin.Context, authClient auth.Auth
 	// Lookup the user associated with the specified uid.
 	user, err := authClient.GetUser(c, userID)
 	if err != nil {
+		logger.Err(err).Str("userID", userID).Str("role", string(role)).Msg("Failed to get user from auth provider")
 		return err
 	}
 
@@ -369,16 +388,19 @@ func (uh *IsolatedUserService) UnassignRole(c *gin.Context, authClient auth.Auth
 	claims[string(role)] = false
 	err = authClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
 	if err != nil {
+		logger.Err(err).Str("userID", userID).Str("role", string(role)).Msg("Failed to set custom user claims in auth provider")
 		return err
 	}
 	// The new custom claims will propagate to the user's ID token the
 	err = tx.Commit(c)
 	if err != nil {
+		logger.Err(err).Str("userID", userID).Str("role", string(role)).Msg("Failed to commit transaction for unassigning role")
 		return err
 	}
 	return nil
 }
 func (uh *IsolatedUserService) UpdateUserStatus(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, requestName string, requestValue bool) error {
+	logger := util.GetLoggerFromCtx(c)
 	// Lookup the user associated with the specified uid.
 	params := (&auth.UserToUpdate{})
 	switch requestName {
@@ -388,6 +410,9 @@ func (uh *IsolatedUserService) UpdateUserStatus(c *gin.Context, authClient auth.
 		params = params.Disabled(requestValue)
 	}
 	_, err := authClient.UpdateUser(c, userID, params)
+	if err != nil {
+		logger.Err(err).Str("userID", userID).Str("requestName", requestName).Msg("Failed to update user status")
+	}
 	return err
 }
 

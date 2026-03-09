@@ -76,7 +76,7 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		// Use provider-based authentication
 		user, err := am.authProvider.VerifyToken(c)
 		if err != nil {
-			log.Error().Err(err).Str("provider", am.authProvider.GetProviderName()).Msg("authentication failed")
+			log.Err(err).Str("provider", am.authProvider.GetProviderName()).Msg("authentication failed")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"status":  http.StatusUnauthorized,
 				"message": http.StatusText(http.StatusUnauthorized),
@@ -196,7 +196,7 @@ func (am *AuthMiddleware) checkAALRequirements(c *gin.Context) bool {
 		// Get AAL info (current + available)
 		aalInfo, err := kratosProvider.GetSessionAALInfo(c)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to get AAL info")
+			log.Err(err).Msg("Failed to get AAL info")
 			return false
 		}
 

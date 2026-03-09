@@ -184,11 +184,11 @@ func (s *UserTenantMembershipService) AddUserToTenant(
 	// Update Kratos metadata with tenant memberships
 	err = s.updateKratosTenantMemberships(ctx, userID)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to update Kratos metadata")
+		logger.Err(err).Msg("Failed to update Kratos metadata")
 		// Don't fail - membership is in database
 	}
 
-	log.Info().
+	logger.Info().
 		Str("user_id", userID).
 		Str("tenant_id", tenantID).
 		Str("role", role).
@@ -217,10 +217,10 @@ func (s *UserTenantMembershipService) RemoveUserFromTenant(
 	// Update Kratos metadata
 	err = s.updateKratosTenantMemberships(ctx, userID)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to update Kratos metadata")
+		logger.Err(err).Msg("Failed to update Kratos metadata")
 	}
 
-	log.Info().
+	logger.Info().
 		Str("user_id", userID).
 		Str("tenant_id", tenantID).
 		Msg("User removed from tenant")
@@ -300,7 +300,7 @@ func (s *UserTenantMembershipService) InviteUserToTenant(
 		return fmt.Errorf("failed to create invitation: %w", err)
 	}
 
-	log.Info().
+	logger.Info().
 		Str("email", email).
 		Str("user_id", user.UID).
 		Str("tenant_id", tenantID).
@@ -329,10 +329,10 @@ func (s *UserTenantMembershipService) AcceptTenantInvitation(
 	// Update Kratos metadata
 	err = s.updateKratosTenantMemberships(ctx, userID)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to update Kratos metadata")
+		logger.Err(err).Msg("Failed to update Kratos metadata")
 	}
 
-	log.Info().
+	logger.Info().
 		Str("user_id", userID).
 		Str("tenant_id", tenantID).
 		Msg("User accepted tenant invitation")
@@ -414,7 +414,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		// Extract subdomain from request
 		subdomain, err := utils.GetSubdomain(c)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to extract subdomain")
+			logger.Err(err).Msg("Failed to extract subdomain")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subdomain"})
 			c.Abort()
 			return
@@ -426,7 +426,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		// Skip tenant validation for root domain or SUPER_ADMIN
 		if subdomain == "" || subdomain == "www" {
 			if isSuperAdmin {
-				log.Debug().
+				logger.Debug().
 					Str("user_id", c.GetString(auth.AUTH_USER_ID)).
 					Msg("SUPER_ADMIN accessing root domain - no tenant required")
 			}
@@ -437,7 +437,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		// Get tenant ID from database using subdomain
 		tenantID, err := ktm.multitenantService.GetTenantIDWithSubdomain(c, subdomain)
 		if err != nil {
-			log.Error().Err(err).Str("subdomain", subdomain).Msg("Tenant not found")
+			logger.Err(err).Str("subdomain", subdomain).Msg("Tenant not found")
 			c.JSON(http.StatusNotFound, gin.H{
 				"status":  http.StatusNotFound,
 				"message": "Tenant not found",
@@ -450,7 +450,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		if isSuperAdmin {
 			c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
 
-			log.Debug().
+			logger.Debug().
 				Str("tenant_id", tenantID).
 				Str("subdomain", subdomain).
 				Str("user_id", c.GetString(auth.AUTH_USER_ID)).
@@ -465,14 +465,14 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		hasAccess, err := ktm.membershipService.CheckUserTenantAccess(c.Request.Context(), userID, tenantID)
 
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to check tenant access")
+			logger.Err(err).Msg("Failed to check tenant access")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
 			c.Abort()
 			return
 		}
 
 		if !hasAccess {
-			log.Error().
+			logger.Error().
 				Str("user_id", userID).
 				Str("tenant_id", tenantID).
 				Str("subdomain", subdomain).
@@ -489,7 +489,7 @@ func (ktm *KratosTenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 		// Set tenant context for downstream handlers
 		c.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
 
-		log.Debug().
+		logger.Debug().
 			Str("tenant_id", tenantID).
 			Str("subdomain", subdomain).
 			Str("user_id", userID).

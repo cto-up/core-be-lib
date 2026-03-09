@@ -38,7 +38,7 @@ func main() {
 	// Setup logging
 	setupLogging()
 
-	log.Print("Application started...")
+	logger.Print("Application started...")
 
 	// Setup database
 	ctx := context.Background()
@@ -52,9 +52,9 @@ func main() {
 	// Initialize auth provider (Kratos or Firebase based on env)
 	authProvider, err := auth.InitializeAuthProvider(ctx, multitenantService)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize auth provider")
+		logger.Fatal().Err(err).Msg("Failed to initialize auth provider")
 	}
-	log.Info().Str("provider", authProvider.GetProviderName()).Msg("Auth provider initialized")
+	logger.Info().Str("provider", authProvider.GetProviderName()).Msg("Auth provider initialized")
 
 	// Initialize services
 	clientAppService := service.NewClientApplicationService(store)
@@ -63,7 +63,7 @@ func main() {
 	// Setup server
 	webPort := os.Getenv("BACKEND_PORT")
 	if webPort == "" {
-		log.Fatal().Msg("BACKEND_PORT environment variable required")
+		logger.Fatal().Msg("BACKEND_PORT environment variable required")
 	}
 
 	// Start HTTP server
@@ -74,13 +74,13 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Info().Msg("Shutting down server...")
+	logger.Info().Msg("Shutting down server...")
 }
 
 func setupLogging() {
 	logFolder := os.Getenv("LOG_FOLDER")
 	if logFolder == "" {
-		log.Fatal().Msg("LOG_FOLDER required")
+		logger.Fatal().Msg("LOG_FOLDER required")
 	}
 
 	instanceName := os.Getenv("INSTANCE_NAME")
@@ -98,7 +98,7 @@ func setupLogging() {
 	}
 
 	multiWriter := zerolog.MultiLevelWriter(logFile, os.Stdout)
-	log.Logger = zerolog.New(multiWriter).With().Timestamp().Logger()
+	logger.Logger = zerolog.New(multiWriter).With().Timestamp().Logger()
 }
 
 func setupDatabase(ctx context.Context) *pgxpool.Pool {
@@ -112,20 +112,20 @@ func setupDatabase(ctx context.Context) *pgxpool.Pool {
 		MaxDelay:      1 * time.Minute,
 	}
 
-	log.Info().Msg("Creating Connection Pool")
+	logger.Info().Msg("Creating Connection Pool")
 	connPool, err := connector.ConnectWithRetry(ctx)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Cannot create Pool")
+		logger.Fatal().Err(err).Msg("Cannot create Pool")
 	}
 
-	log.Info().Msg("Connection Pool created")
+	logger.Info().Msg("Connection Pool created")
 
 	err = connPool.Ping(ctx)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Cannot ping database")
+		logger.Fatal().Err(err).Msg("Cannot ping database")
 	}
 
-	log.Info().Msg("Database connection verified")
+	logger.Info().Msg("Database connection verified")
 	return connPool
 }
 
@@ -155,10 +155,10 @@ func runServer(
 
 	// Start server
 	address := ":" + port
-	log.Info().Str("address", address).Msg("Starting HTTP server")
+	logger.Info().Str("address", address).Msg("Starting HTTP server")
 
 	if err := router.Run(address); err != nil {
-		log.Fatal().Err(err).Msg("Failed to start server")
+		logger.Fatal().Err(err).Msg("Failed to start server")
 	}
 }
 
@@ -265,7 +265,7 @@ func getResources(c *gin.Context) {
 	// Get authenticated user
 	user := service.GetAuthenticatedUser(c)
 
-	log.Info().
+	logger.Info().
 		Str("tenant_id", tenantID).
 		Str("subdomain", subdomain).
 		Str("user_id", user.UserID).

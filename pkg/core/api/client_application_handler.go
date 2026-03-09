@@ -14,7 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/rs/zerolog/log"
 )
 
 // ClientApplicationHandler handles client application endpoints
@@ -194,6 +193,7 @@ func toAPIAuditLog(auditLog repository.CoreApiTokenAuditLog) core.APITokenAuditL
 
 // ListClientApplications returns all client applications
 func (h *ClientApplicationHandler) ListClientApplications(c *gin.Context, params core.ListClientApplicationsParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	// The middleware should already check for SUPER_ADMIN role
 	userID, exists := c.Get(auth.AUTH_USER_ID)
@@ -242,7 +242,7 @@ func (h *ClientApplicationHandler) ListClientApplications(c *gin.Context, params
 	)
 
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Msg("Failed to list client applications")
+		logger.Err(err).Str("userID", userID.(string)).Msg("Failed to list client applications")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -258,6 +258,7 @@ func (h *ClientApplicationHandler) ListClientApplications(c *gin.Context, params
 
 // CreateClientApplication creates a new client application
 func (h *ClientApplicationHandler) CreateClientApplication(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
@@ -268,6 +269,7 @@ func (h *ClientApplicationHandler) CreateClientApplication(c *gin.Context) {
 	// Parse request body
 	var req core.CreateClientApplicationJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Str("userID", userID.(string)).Msg("Failed to bind JSON for client application creation")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -284,7 +286,7 @@ func (h *ClientApplicationHandler) CreateClientApplication(c *gin.Context) {
 	)
 
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("name", req.Name).Msg("Failed to create client application")
+		logger.Err(err).Str("userID", userID.(string)).Str("name", req.Name).Msg("Failed to create client application")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -294,9 +296,11 @@ func (h *ClientApplicationHandler) CreateClientApplication(c *gin.Context) {
 
 // GetClientApplicationById returns a client application by ID
 func (h *ClientApplicationHandler) GetClientApplicationById(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
+		logger.Error().Msg("User not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
@@ -308,7 +312,7 @@ func (h *ClientApplicationHandler) GetClientApplicationById(c *gin.Context, id u
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
 		}
-		log.Error().Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to get client application")
+		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to get client application")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -318,6 +322,7 @@ func (h *ClientApplicationHandler) GetClientApplicationById(c *gin.Context, id u
 
 // UpdateClientApplication updates a client application
 func (h *ClientApplicationHandler) UpdateClientApplication(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
@@ -328,6 +333,7 @@ func (h *ClientApplicationHandler) UpdateClientApplication(c *gin.Context, id uu
 	// Parse request body
 	var req core.UpdateClientApplicationJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to bind JSON for client application update")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -335,11 +341,11 @@ func (h *ClientApplicationHandler) UpdateClientApplication(c *gin.Context, id uu
 	// Get current application
 	app, err := h.clientAppService.GetClientApplicationByID(c, id, "")
 	if err != nil {
+		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to get client application for update")
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
 		}
-		log.Error().Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to get client application for update")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -357,7 +363,7 @@ func (h *ClientApplicationHandler) UpdateClientApplication(c *gin.Context, id uu
 	)
 
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to update client application")
+		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to update client application")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -367,6 +373,7 @@ func (h *ClientApplicationHandler) UpdateClientApplication(c *gin.Context, id uu
 
 // DeleteClientApplication deletes a client application
 func (h *ClientApplicationHandler) DeleteClientApplication(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
@@ -376,7 +383,7 @@ func (h *ClientApplicationHandler) DeleteClientApplication(c *gin.Context, id uu
 	// Delete application
 	err := h.clientAppService.DeleteClientApplication(c, id, "")
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to delete client application")
+		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to delete client application")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -386,9 +393,11 @@ func (h *ClientApplicationHandler) DeleteClientApplication(c *gin.Context, id uu
 
 // DeactivateClientApplication deactivates a client application
 func (h *ClientApplicationHandler) DeactivateClientApplication(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
+		logger.Error().Msg("User not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
@@ -396,7 +405,7 @@ func (h *ClientApplicationHandler) DeactivateClientApplication(c *gin.Context, i
 	// Deactivate application
 	err := h.clientAppService.DeactivateClientApplication(c, id, "")
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to deactivate client application")
+		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to deactivate client application")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -406,9 +415,11 @@ func (h *ClientApplicationHandler) DeactivateClientApplication(c *gin.Context, i
 
 // ListAPITokens lists API tokens for a client application
 func (h *ClientApplicationHandler) ListAPITokens(c *gin.Context, id uuid.UUID, params core.ListAPITokensParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
+		logger.Error().Msg("User not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
@@ -452,7 +463,7 @@ func (h *ClientApplicationHandler) ListAPITokens(c *gin.Context, id uuid.UUID, p
 	)
 
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to list API tokens")
+		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to list API tokens")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -468,9 +479,12 @@ func (h *ClientApplicationHandler) ListAPITokens(c *gin.Context, id uuid.UUID, p
 
 // CreateAPIToken creates a new API token for a client application
 func (h *ClientApplicationHandler) CreateAPIToken(c *gin.Context, id uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
+		logger.Error().Msg("User not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
@@ -478,7 +492,7 @@ func (h *ClientApplicationHandler) CreateAPIToken(c *gin.Context, id uuid.UUID) 
 	// Parse request body
 	var req core.CreateAPITokenJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to bind JSON for API token creation")
+		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to bind JSON for API token creation")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -513,7 +527,7 @@ func (h *ClientApplicationHandler) CreateAPIToken(c *gin.Context, id uuid.UUID) 
 	)
 
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to create API token")
+		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to create API token")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -524,9 +538,11 @@ func (h *ClientApplicationHandler) CreateAPIToken(c *gin.Context, id uuid.UUID) 
 
 // GetAPITokenById retrieves an API token by ID
 func (h *ClientApplicationHandler) GetAPITokenById(c *gin.Context, id uuid.UUID, tokenId uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
+		logger.Error().Msg("User not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
@@ -534,16 +550,18 @@ func (h *ClientApplicationHandler) GetAPITokenById(c *gin.Context, id uuid.UUID,
 	// Get token
 	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, "")
 	if err != nil {
+		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", id.String()).Msg("Failed to get API token")
+
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
 		}
-		log.Error().Err(err).Str("userID", userID.(string)).Str("tokenID", id.String()).Msg("Failed to get API token")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	if token.ClientApplicationID != id {
+		logger.Error().Msg("API token does not belong to the specified client application")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 		return
 	}
@@ -553,25 +571,28 @@ func (h *ClientApplicationHandler) GetAPITokenById(c *gin.Context, id uuid.UUID,
 
 // DeleteAPIToken deletes an API token
 func (h *ClientApplicationHandler) DeleteAPIToken(c *gin.Context, id uuid.UUID, tokenId uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
+		logger.Error().Msg("User not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 	// Verify token exists and belongs to the client application
 	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, "")
 	if err != nil {
+		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to get API token for deletion")
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
 		}
-		log.Error().Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to get API token for deletion")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	if token.ClientApplicationID != id {
+		logger.Error().Msg("API token does not belong to the specified client application")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 		return
 	}
@@ -579,7 +600,7 @@ func (h *ClientApplicationHandler) DeleteAPIToken(c *gin.Context, id uuid.UUID, 
 	// Delete token
 	err = h.clientAppService.DeleteAPIToken(c, tokenId)
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to delete API token")
+		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to delete API token")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -589,9 +610,11 @@ func (h *ClientApplicationHandler) DeleteAPIToken(c *gin.Context, id uuid.UUID, 
 
 // RevokeAPIToken revokes an API token
 func (h *ClientApplicationHandler) RevokeAPIToken(c *gin.Context, id uuid.UUID, tokenId uuid.UUID) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
+		logger.Error().Msg("User not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
@@ -599,15 +622,17 @@ func (h *ClientApplicationHandler) RevokeAPIToken(c *gin.Context, id uuid.UUID, 
 	// Verify token exists and belongs to the client application
 	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, "")
 	if err != nil {
+		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", id.String()).Msg("Failed to get API token for revocation")
+
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
 		}
-		log.Error().Err(err).Str("userID", userID.(string)).Str("tokenID", id.String()).Msg("Failed to get API token for revocation")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	if token.ClientApplicationID != id {
+		logger.Error().Msg("API token does not belong to the specified client application")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 		return
 	}
@@ -615,6 +640,7 @@ func (h *ClientApplicationHandler) RevokeAPIToken(c *gin.Context, id uuid.UUID, 
 	// Parse request body
 	var req core.RevokeAPITokenJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to bind JSON for API token revocation")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -625,7 +651,7 @@ func (h *ClientApplicationHandler) RevokeAPIToken(c *gin.Context, id uuid.UUID, 
 	// Revoke token
 	revokedToken, err := h.clientAppService.RevokeAPIToken(c, tokenId, reason, userID.(string))
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to revoke API token")
+		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to revoke API token")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -669,6 +695,8 @@ func (h *ClientApplicationHandler) RevokeAPIToken(c *gin.Context, id uuid.UUID, 
 
 // GetAPITokenAuditLogs retrieves audit logs for an API token
 func (h *ClientApplicationHandler) GetAPITokenAuditLogs(c *gin.Context, id uuid.UUID, tokenId uuid.UUID, params core.GetAPITokenAuditLogsParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	// Only super admins can access this endpoint
 	userID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
@@ -679,16 +707,17 @@ func (h *ClientApplicationHandler) GetAPITokenAuditLogs(c *gin.Context, id uuid.
 	// Verify token exists and belongs to the client application
 	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, "")
 	if err != nil {
+		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to get API token for audit logs")
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
 		}
-		log.Error().Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to get API token for audit logs")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	if token.ClientApplicationID != id {
+		logger.Error().Msg("API token does not belong to the specified client application")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 		return
 	}
@@ -709,7 +738,7 @@ func (h *ClientApplicationHandler) GetAPITokenAuditLogs(c *gin.Context, id uuid.
 	// Get audit logs
 	logs, err := h.clientAppService.GetAPITokenAuditLogs(c, tokenId, pageSize, offset)
 	if err != nil {
-		log.Error().Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to get API token audit logs")
+		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to get API token audit logs")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

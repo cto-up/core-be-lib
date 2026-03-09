@@ -39,7 +39,7 @@ func NewWSAuthMiddleware(authProvider auth.AuthProvider) gin.HandlerFunc {
 
 		user, err := authProvider.VerifyToken(c)
 		if err != nil {
-			log.Error().Err(err).Msg("Token verification failed")
+			log.Err(err).Msg("Token verification failed")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Invalid session"})
 			c.Abort()
 			return

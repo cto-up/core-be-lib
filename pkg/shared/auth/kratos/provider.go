@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ctoup.com/coreapp/pkg/shared/auth"
+	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
 	ory "github.com/ory/kratos-client-go"
 	"github.com/rs/zerolog/log"
@@ -409,15 +410,18 @@ func (k *KratosAuthClient) BuildGlobalRoleClaims(roles []string) map[string]inte
 }
 
 func (k *KratosAuthClient) EmailVerificationLink(ctx context.Context, email string) (string, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// For Kratos, we need to use the Admin API to create verification links
 	// The browser flow approach doesn't work from backend because it requires CSRF tokens
 
 	// First, get the user by email to get their ID
 	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
 	if err != nil {
+		logger.Err(err).Msg("Failed to list identities")
 		return "", auth.ConvertKratosError(err)
 	}
 	if len(idents) == 0 {
+		logger.Err(err).Msg("User not found")
 		return "", &auth.AuthError{Code: auth.ErrorCodeUserNotFound, Message: "user not found"}
 	}
 
@@ -435,6 +439,7 @@ func (k *KratosAuthClient) EmailVerificationLink(ctx context.Context, email stri
 	}
 
 	if addressID == "" {
+		logger.Err(err).Msg("Verifiable address not found for user")
 		return "", &auth.AuthError{Code: "address-not-found", Message: "verifiable address not found"}
 	}
 
@@ -446,23 +451,26 @@ func (k *KratosAuthClient) EmailVerificationLink(ctx context.Context, email stri
 		Execute()
 
 	if err != nil {
+		logger.Err(err).Msg("Failed to create verification link")
 		return "", auth.ConvertKratosError(err)
 	}
 
-	log.Info().Str("email", email).Str("identity_id", identityID).Msg("Verification link created via Admin API")
 	return verificationLink.RecoveryLink, nil
 }
 
 func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) (string, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// For Kratos, we need to use the Admin API to create recovery links
 	// The browser flow approach doesn't work from backend because it requires CSRF tokens
 
 	// First, get the user by email to get their ID
 	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).CredentialsIdentifier(email).Execute()
 	if err != nil {
+		logger.Err(err).Msg("Failed to list identities")
 		return "", auth.ConvertKratosError(err)
 	}
 	if len(idents) == 0 {
+		logger.Err(err).Msg("User not found")
 		return "", &auth.AuthError{Code: auth.ErrorCodeUserNotFound, Message: "user not found"}
 	}
 
@@ -476,14 +484,14 @@ func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) 
 		Execute()
 
 	if err != nil {
+		logger.Err(err).Msg("Failed to create recovery link")
 		return "", auth.ConvertKratosError(err)
 	}
-
-	log.Info().Str("email", email).Str("identity_id", identityID).Str("recovery_link", recoveryLink.RecoveryLink).Msg("Recovery link created via Admin API")
 	return recoveryLink.RecoveryLink, nil
 }
 
 func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, sessionToken string) (*auth.Token, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Construct the cookie string manually
 	cookieString := fmt.Sprintf("ory_kratos_session=%s", sessionToken)
 
@@ -494,10 +502,12 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, sessionToken strin
 		Execute()
 
 	if err != nil {
+		logger.Err(err).Msg("Failed to verify session token with Kratos")
 		return nil, auth.ConvertKratosError(err)
 	}
 
 	if !*session.Active {
+		logger.Warn().Str("session_id", session.Id).Msg("Kratos session is inactive")
 		return nil, &auth.AuthError{Code: auth.ErrorCodeInvalidToken, Message: "session inactive"}
 	}
 
@@ -512,7 +522,7 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, sessionToken strin
 		// Extract tenant and role information from metadata_public
 		if metadataPublic, ok := session.Identity.MetadataPublic.(map[string]interface{}); ok {
 			// Debug logging
-			log.Debug().
+			logger.Debug().
 				Str("identity_id", session.Identity.Id).
 				Interface("metadata_public", metadataPublic).
 				Msg("Processing metadata_public from Kratos session")
@@ -533,18 +543,18 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, sessionToken strin
 				for _, role := range globalRolesArr {
 					if roleStr, ok := role.(string); ok {
 						claims[roleStr] = true // e.g., claims["SUPER_ADMIN"] = true
-						log.Debug().
+						logger.Debug().
 							Str("role", roleStr).
 							Msg("Setting global role as boolean claim")
 					}
 				}
 			} else {
-				log.Debug().
+				logger.Debug().
 					Str("identity_id", session.Identity.Id).
 					Msg("No global_roles found in metadata_public")
 			}
 		} else {
-			log.Debug().
+			logger.Debug().
 				Str("identity_id", session.Identity.Id).
 				Msg("No metadata_public found in session identity")
 		}
@@ -561,9 +571,11 @@ func (k *KratosAuthClient) EmailVerificationLinkWithSettings(ctx context.Context
 }
 
 func (k *KratosAuthClient) PasswordResetLinkWithSettings(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Get the Kratos recovery link
 	kratosLink, err := k.PasswordResetLink(ctx, email)
 	if err != nil {
+		logger.Err(err).Msg("Failed to get Kratos recovery link")
 		return "", err
 	}
 
@@ -591,7 +603,7 @@ func (k *KratosAuthClient) PasswordResetLinkWithSettings(ctx context.Context, em
 			// Construct the frontend recovery URL
 			// This URL will be opened by the user and will call our backend proxy
 			frontendLink := fmt.Sprintf("%s/recovery?%s", baseURL, queryPart)
-			log.Info().
+			logger.Info().
 				Str("kratos_link", kratosLink).
 				Str("settings_url", settings.URL).
 				Str("base_url", baseURL).
@@ -606,6 +618,8 @@ func (k *KratosAuthClient) PasswordResetLinkWithSettings(ctx context.Context, em
 }
 
 func (k *KratosAuthClient) EmailSignInLink(ctx context.Context, email string, settings *auth.ActionCodeSettings) (string, error) {
+	logger := util.GetLoggerFromCtx(ctx)
+	logger.Warn().Msg("Email link sign-in is not implemented for Kratos. Returning error.")
 	return "", &auth.AuthError{Code: "not-implemented"}
 }
 
@@ -699,6 +713,7 @@ func hasAnyMFAConfigured(credentials map[string]ory.IdentityCredentials) bool {
 // GetSessionAALInfo returns both current and available AAL levels
 // This is the single source of truth for AAL information
 func (k *KratosAuthProvider) GetSessionAALInfo(c *gin.Context) (*auth.AALInfo, error) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Check cache first
 	if aalInfo, exists := c.Get(auth.AUTH_AAL_INFO_KEY); exists {
 		if info, ok := aalInfo.(*auth.AALInfo); ok {
@@ -724,6 +739,7 @@ func (k *KratosAuthProvider) GetSessionAALInfo(c *gin.Context) (*auth.AALInfo, e
 	// Get session from Kratos
 	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
 	if err != nil || resp.StatusCode != 200 {
+		logger.Err(err).Msg("Failed to get session from Kratos")
 		return nil, auth.ConvertKratosError(err)
 	}
 
@@ -777,7 +793,7 @@ func (k *KratosAuthProvider) GetSessionAALInfo(c *gin.Context) (*auth.AALInfo, e
 	c.Set(auth.AUTH_CURRENT_AAL_KEY, currentAAL)
 	c.Set(auth.AUTH_AVAILABLE_AAL_KEY, availableAAL)
 
-	log.Debug().
+	logger.Debug().
 		Str("identity_id", session.Identity.Id).
 		Str("current_aal", currentAAL).
 		Str("available_aal", availableAAL).
@@ -789,9 +805,11 @@ func (k *KratosAuthProvider) GetSessionAALInfo(c *gin.Context) (*auth.AALInfo, e
 
 // GetMFAStatus returns the MFA configuration status for the current user
 func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Get AAL info (reuses cached value if available)
 	aalInfo, err := k.GetSessionAALInfo(c)
 	if err != nil {
+		logger.Err(err).Msg("Failed to get AAL info")
 		return MFAStatus{}, auth.NewAuthError(auth.ErrorCodeUnauthorized, "Not authenticated")
 	}
 
@@ -807,7 +825,7 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
 
 	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
 	if err != nil || resp.StatusCode != 200 {
-		log.Error().Err(err).Msg("Failed to get session")
+		logger.Err(err).Msg("Failed to get session")
 		return MFAStatus{}, auth.ConvertKratosError(err)
 	}
 
@@ -822,21 +840,11 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
 		Execute()
 
 	if err != nil || adminResp.StatusCode != 200 {
-		log.Error().Err(err).Msg("Failed to get identity from admin API")
+		logger.Err(err).Msg("Failed to get identity from admin API")
 		return MFAStatus{}, auth.ConvertKratosError(err)
 	}
-	rawJson, _ := identity.MarshalJSON()
-	fmt.Printf("DEBUG RAW IDENTITY: %s\n", string(rawJson))
 	// Parse credentials to determine MFA status
 	status := parseMFAStatusFromIdentity(identity, aalInfo.Current)
-
-	log.Info().
-		Str("identity_id", identityID).
-		Bool("totp_enabled", status.TOTPEnabled).
-		Bool("webauthn_enabled", status.WebAuthnEnabled).
-		Bool("recovery_codes_set", status.RecoveryCodesSet).
-		Str("aal", aalInfo.Current).
-		Msg("📊 MFA status retrieved via admin API (no AAL2 required)")
 
 	return status, nil
 }
@@ -913,6 +921,7 @@ func parseMFAStatusFromIdentity(identity *ory.Identity, aal string) MFAStatus {
 
 // InitializeSettingsFlow creates a new settings flow for MFA configuration
 func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.SettingsFlow, error) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	cookieHeader := c.GetHeader("Cookie")
 	if cookieHeader == "" {
 		return nil, &auth.AuthError{Code: "unauthorized", Message: "Not authenticated"}
@@ -929,7 +938,7 @@ func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.Settin
 	flow, resp, err := k.publicClient.FrontendAPI.CreateBrowserSettingsFlow(ctx).Cookie(cookieHeader).Execute()
 
 	if err != nil || resp.StatusCode != 200 {
-		log.Error().Err(err).Msg("Failed to create settings flow")
+		logger.Err(err).Msg("Failed to create settings flow")
 		return nil, auth.ConvertKratosError(err)
 	}
 	return flow, nil
@@ -937,6 +946,7 @@ func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.Settin
 
 // DisableWebAuthn completely removes all WebAuthn credentials using Admin API
 func (k *KratosAuthProvider) DisableWebAuthn(c *gin.Context) error {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Get session to extract identity ID
 	cookieHeader := c.GetHeader("Cookie")
 	if cookieHeader == "" {
@@ -949,7 +959,7 @@ func (k *KratosAuthProvider) DisableWebAuthn(c *gin.Context) error {
 
 	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
 	if err != nil || resp.StatusCode != 200 {
-		log.Error().Err(err).Msg("Failed to get session")
+		logger.Err(err).Msg("Failed to get session")
 		return auth.ConvertKratosError(err)
 	}
 
@@ -963,40 +973,31 @@ func (k *KratosAuthProvider) DisableWebAuthn(c *gin.Context) error {
 		Execute()
 
 	if err != nil || adminResp.StatusCode != 200 {
-		log.Error().Err(err).Msg("Failed to get identity from admin API")
+		logger.Err(err).Msg("Failed to get identity from admin API")
 		return auth.ConvertKratosError(err)
 	}
 
 	// Check if WebAuthn credentials exist
 	if identity.Credentials == nil {
-		log.Info().Str("identity_id", identityID).Msg("No credentials found")
+		logger.Info().Str("identity_id", identityID).Msg("No credentials found")
 		return nil // Already disabled
 	}
 
 	credentials := *identity.Credentials
 	_, exists := credentials["webauthn"]
 	if !exists {
-		log.Info().Str("identity_id", identityID).Msg("No WebAuthn credential found")
+		logger.Info().Str("identity_id", identityID).Msg("No WebAuthn credential found")
 		return nil // Already disabled
 	}
-
-	// Delete the WebAuthn credential using Admin API
-	log.Info().
-		Str("identity_id", identityID).
-		Msg("🔐 Removing WebAuthn credential via Admin API")
 
 	// Use the DeleteIdentityCredentials endpoint
 	deleteResp, err := k.adminClient.IdentityAPI.DeleteIdentityCredentials(adminCtx, identityID, "webauthn").
 		Execute()
 
 	if err != nil || deleteResp.StatusCode != 204 {
-		log.Error().Err(err).Msg("Failed to delete WebAuthn credential")
+		logger.Err(err).Msg("Failed to delete WebAuthn credential")
 		return auth.ConvertKratosError(err)
 	}
-
-	log.Info().
-		Str("identity_id", identityID).
-		Msg("✅ WebAuthn credential removed successfully")
 
 	return nil
 }

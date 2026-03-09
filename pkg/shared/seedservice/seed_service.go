@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rs/zerolog/log"
-
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
+	"github.com/rs/zerolog/log"
 )
 
 type SeedService struct {
@@ -65,7 +64,7 @@ func (ss *SeedService) Seed() error {
 
 	_, err = ss.seedAdminUser(c, qtx, userEmail, userPassword)
 	if err != nil {
-		log.Error().Err(err).Msg("Error seeding admin user")
+		log.Err(err).Msg("Error seeding admin user")
 		return err
 	}
 
@@ -80,7 +79,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 	// Check if admin user exists
 	exists, err := ss.userExists(adminEmail)
 	if err != nil {
-		log.Error().Err(err).Msg("Error checking if admin user exists")
+		log.Err(err).Msg("Error checking if admin user exists")
 	}
 
 	if exists {
@@ -98,7 +97,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 
 		userRecord, err := ss.client.CreateUser(c, params)
 		if err != nil {
-			log.Error().Err(err).Msg("Error creating admin user")
+			log.Err(err).Msg("Error creating admin user")
 			return user, err
 		}
 
@@ -109,7 +108,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 		err = ss.client.SetCustomUserClaims(c, userRecord.UID, claims)
 
 		if err != nil {
-			log.Error().Err(err).Msg("Error setting custom user claims")
+			log.Err(err).Msg("Error setting custom user claims")
 			return user, err
 		}
 

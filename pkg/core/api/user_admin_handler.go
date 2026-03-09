@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/rs/zerolog/log"
-
 	"ctoup.com/coreapp/api/helpers"
 	core "ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
@@ -51,52 +49,56 @@ func NewUserAdminHandler(store *db.Store, authProvider auth.AuthProvider) *UserA
 
 // AddUser implements openapi.ServerInterface.
 func (uh *UserAdminHandler) AddUser(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 	var req core.AddUserJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+		logger.Err(err).Msg("Failed to check user roles")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), req, nil)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to add user")
+		logger.Err(err).Msg("Failed to add user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	url, err := getResetPasswordURL(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get reset password URL")
+		logger.Err(err).Msg("Failed to get reset password URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 	err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to send welcome email")
+		logger.Err(err).Msg("Failed to send welcome email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -105,38 +107,43 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 
 // (PUT /api/v1/users/{userid})
 func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 	var req core.UpdateUserJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+		logger.Err(err).Msg("Failed to check user roles")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = uh.userService.UpdateUser(c, baseAuthClient, tenantID.(string), userid, req)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to update user")
+		logger.Err(err).Msg("Failed to update user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -145,19 +152,24 @@ func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
 
 // DeleteUser implements openapi.ServerInterface.
 func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
 	// check if user is deleting self
 	if userid == c.GetString(auth.AUTH_USER_ID) {
+		logger.Error().Msg("Cannot delete self")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot delete self"})
 		return
 	}
 	// check if user has rights to delete user CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN
 	if !access.IsCustomerAdmin(c) && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user"})
 		return
 	}
@@ -166,13 +178,13 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 
 	if tenantID == "" {
 		if !access.IsSuperAdmin(c) {
-			log.Error().Msg("Only SUPER_ADMIN can delete user without tenant")
+			logger.Error().Msg("Only SUPER_ADMIN can delete user without tenant")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Only SUPER_ADMIN can delete user without tenant"})
 			return
 		}
 		user, err = uh.userService.GetUserByID(c, userid)
 		if err != nil {
-			log.Error().Err(err).Msg("failed to get user by ID")
+			logger.Err(err).Msg("failed to get user by ID")
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
@@ -180,7 +192,7 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 
 		user, err = uh.userService.GetUserByTenantIDByID(c, tenantID.(string), userid)
 		if err != nil {
-			log.Error().Err(err).Msg("failed to get user by ID")
+			logger.Err(err).Msg("failed to get user by ID")
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
@@ -188,28 +200,28 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 
 	err = access.HasRightsForRoles(c, user.Roles)
 	if err != nil {
-		log.Error().Err(err).Msg("user does not have rights to be deleted")
+		logger.Err(err).Msg("user does not have rights to be deleted")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = uh.userService.DeleteUser(c, baseAuthClient, tenantID.(string), userid)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to delete user")
+		logger.Err(err).Msg("Failed to delete user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -219,20 +231,25 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 // RemoveUserFromTenant removes a user from the current tenant (deletes membership only)
 // (DELETE /api/v1/users/{userid}/remove-from-tenant)
 func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
 	// Check if user is removing self
 	if userid == c.GetString(auth.AUTH_USER_ID) {
+		logger.Error().Msg("Cannot remove self from tenant")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Cannot remove self from tenant"})
 		return
 	}
 
 	// Check if user has rights to remove user (CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN)
 	if !access.IsCustomerAdmin(c) && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove user from tenant")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove user from tenant"})
 		return
 	}
@@ -244,7 +261,7 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 		TenantID: tenantID.(string),
 	})
 	if err != nil || !isMember {
-		log.Error().Err(err).Msg("failed to check user membership")
+		logger.Err(err).Msg("failed to check user membership")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(errors.New("user not found in this tenant")))
 		return
 	}
@@ -255,7 +272,7 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("failed to get user roles")
+		logger.Err(err).Msg("failed to get user roles")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -268,7 +285,7 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 	err = access.HasRightsForRoles(c, result)
 
 	if err != nil {
-		log.Error().Err(err).Msg("user does not have rights to be removed from tenant")
+		logger.Err(err).Msg("user does not have rights to be removed from tenant")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
@@ -276,7 +293,7 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 	// Remove user from tenant (delete membership)
 	err = uh.userService.RemoveUserFromTenant(c, uh.authProvider.GetAuthClient(), tenantID.(string), userid)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to remove user from tenant")
+		logger.Err(err).Msg("Failed to remove user from tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -286,8 +303,10 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 
 // GetUserByID implements openapi.ServerInterface.
 func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -295,14 +314,14 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 	// in case root domain is used
 	if tenantID == "" {
 		if !access.IsSuperAdmin(c) {
-			log.Error().Msg("Only SUPER_ADMIN can get user without tenant")
+			logger.Error().Msg("Only SUPER_ADMIN can get user without tenant")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Only SUPER_ADMIN can get user without tenant"})
 			return
 		}
 
 		user, err := uh.userService.GetUserByID(c, id)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to get user by ID")
+			logger.Err(err).Msg("Failed to get user by ID")
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
@@ -312,7 +331,7 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 
 	user, err := uh.userService.GetUserByTenantIDByID(c, tenantID.(string), id)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get user by ID")
+		logger.Err(err).Msg("Failed to get user by ID")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -322,8 +341,10 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 
 // GetUsers implements openapi.ServerInterface.
 func (u *UserAdminHandler) ListUsers(c *gin.Context, params core.ListUsersParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -351,7 +372,7 @@ func (u *UserAdminHandler) ListUsers(c *gin.Context, params core.ListUsersParams
 
 	users, err := u.userService.ListUsers(c, tenantID.(string), pagingSql, like)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to list users")
+		logger.Err(err).Msg("Failed to list users")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -372,6 +393,7 @@ func (u *UserAdminHandler) ListUsers(c *gin.Context, params core.ListUsersParams
 
 // AssignRole implements openopenapi.ServerInterface.
 func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, role core.Role) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
@@ -380,21 +402,21 @@ func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, role core.
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = uh.userService.AssignRole(c, baseAuthClient, tenantID.(string), userID, role)
 	if err != nil {
-		log.Printf("error %v\n", err)
+		logger.Printf("error %v\n", err)
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -403,29 +425,31 @@ func (uh *UserAdminHandler) AssignRole(c *gin.Context, userID string, role core.
 
 // UnassignRole implements openopenapi.ServerInterface.
 func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, role core.Role) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = uh.userService.UnassignRole(c, baseAuthClient, tenantID.(string), userID, role)
 	if err != nil {
-		log.Printf("error %v\n", err)
+		logger.Err(err).Msg("Failed to unassign role")
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -435,35 +459,38 @@ func (uh *UserAdminHandler) UnassignRole(c *gin.Context, userID string, role cor
 
 // UpdateUserStatus implements openopenapi.ServerInterface.
 func (uh *UserAdminHandler) UpdateUserStatus(c *gin.Context, userID string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
 	var req core.UpdateUserStatusJSONBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	err = uh.userService.UpdateUserStatus(c, baseAuthClient, tenantID.(string), userID, (string)(req.Name), req.Value)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to update user status")
+		logger.Err(err).Msg("Failed to update user status")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -472,8 +499,10 @@ func (uh *UserAdminHandler) UpdateUserStatus(c *gin.Context, userID string) {
 }
 
 func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -481,53 +510,55 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 		Email string `json:"email"`
 	}
 	if err := c.BindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// check if authorized user is admin
-	if !access.IsAdmin(c) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only admin can reset password"})
+	if !access.IsAdmin(c) || !access.IsSuperAdmin(c) {
+		logger.Error().Msg("Only admin or super admin can reset password")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only admin or super admin can reset password"})
 		return
 	}
 
 	user, err := uh.userService.GetUserByTenantIDByID(c, tenantID.(string), userID)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get user by ID")
+		logger.Err(err).Msg("Failed to get user by ID")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	if user.Email != req.Email {
-		log.Error().Msg("Email does not match user ID")
+		logger.Error().Msg("Email does not match user ID")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email"})
 		return
 	}
 
 	url, err := getResetPasswordURL(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get reset password URL")
+		logger.Err(err).Msg("Failed to get reset password URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get auth client"})
 		return
 	}
 
 	err = resetPasswordRequest(c, baseAuthClient, url, req.Email)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to send password reset email")
+		logger.Err(err).Msg("Failed to send password reset email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -537,8 +568,10 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 
 // CheckUserExists checks if a user exists globally by email
 func (uh *UserAdminHandler) CheckUserExists(c *gin.Context, params core.CheckUserExistsParams) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -548,6 +581,7 @@ func (uh *UserAdminHandler) CheckUserExists(c *gin.Context, params core.CheckUse
 	// Check if user exists globally (across all tenants)
 	user, err := uh.userService.GetUserByEmailGlobal(c, email)
 	if err != nil {
+		logger.Err(err).Msg("Failed to get user by email")
 		// User doesn't exist
 		c.JSON(http.StatusOK, gin.H{
 			"exists": false,
@@ -561,7 +595,7 @@ func (uh *UserAdminHandler) CheckUserExists(c *gin.Context, params core.CheckUse
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to check tenant membership")
+		logger.Err(err).Msg("Failed to check tenant membership")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -569,7 +603,7 @@ func (uh *UserAdminHandler) CheckUserExists(c *gin.Context, params core.CheckUse
 	// Count how many tenants the user belongs to
 	tenantCount, err := uh.store.CountUserTenants(c, user.Id)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to count user tenants")
+		logger.Err(err).Msg("Failed to count user tenants")
 		tenantCount = 0
 	}
 
@@ -587,26 +621,32 @@ func (uh *UserAdminHandler) CheckUserExists(c *gin.Context, params core.CheckUse
 
 // AddUserMembership adds an existing user to the current tenant
 func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
 
 	byUserID, exists := c.Get(auth.AUTH_USER_ID)
 	if !exists {
+		logger.Error().Msg("ByUserID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("ByUserID not found"))
 		return
 	}
 
 	var req core.AddUserMembershipJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Err(err).Msg("Failed to bind JSON")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	// Check authorization for roles
 	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+		logger.Err(err).Msg("Failed to check authorization for roles")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
 	}
@@ -617,26 +657,27 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to check tenant membership")
+		logger.Err(err).Msg("Failed to check tenant membership")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
 	if isMember {
+		logger.Error().Msg("User is already a member of this tenant")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User is already a member of this tenant"})
 		return
 	}
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
@@ -644,7 +685,7 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 	// Add user to tenant (create membership)
 	err = uh.userService.AddUserToTenant(c, baseAuthClient, tenantID.(string), userid, req.Roles, byUserID.(string))
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to add user to tenant")
+		logger.Err(err).Msg("Failed to add user to tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -652,7 +693,7 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 	// Get updated user info
 	user, err := uh.userService.GetUserByTenantIDByID(c, tenantID.(string), userid)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get user after adding membership")
+		logger.Err(err).Msg("Failed to get user after adding membership")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -661,12 +702,12 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 	userEmail := user.Email
 	url, err := getResetPasswordURL(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get URL for notification")
+		logger.Err(err).Msg("Failed to get URL for notification")
 		// Don't fail the request if email fails
 	} else {
 		err = sendTenantAddedEmail(c, baseAuthClient, url, userEmail, subdomain)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to send tenant added notification")
+			logger.Err(err).Msg("Failed to send tenant added notification")
 			// Don't fail the request if email fails
 		}
 	}
@@ -675,8 +716,10 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 }
 
 func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
+		logger.Error().Msg("TenantID not found")
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
@@ -684,14 +727,14 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	// Get Firebase auth client for tenant
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get subdomain")
+		logger.Err(err).Msg("Failed to get subdomain")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
 
 	baseAuthClient, err := uh.authProvider.GetAuthClientForSubdomain(c, subdomain)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get auth client for subdomain")
+		logger.Err(err).Msg("Failed to get auth client for subdomain")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -699,7 +742,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	// Get file from form
 	file, err := c.FormFile("file")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get uploaded file")
+		logger.Err(err).Msg("Failed to get uploaded file")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(fmt.Errorf("file upload error: %v", err)))
 		return
 	}
@@ -707,7 +750,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	// Open the file
 	src, err := file.Open()
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to open uploaded file")
+		logger.Err(err).Msg("Failed to open uploaded file")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(fmt.Errorf("error opening file: %v", err)))
 		return
 	}
@@ -720,7 +763,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	// Read header
 	header, err := reader.Read()
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to read CSV header")
+		logger.Err(err).Msg("Failed to read CSV header")
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(fmt.Errorf("error reading CSV header: %v", err)))
 		return
 	}
@@ -833,6 +876,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			var req core.AddUserJSONRequestBody
 			req.Email = email
 			req.Name = firstname + " " + lastname
+			req.Roles = []core.Role{}
 
 			// check if user has rights to assign roles
 			if isCustomerAdmin && (!access.IsSuperAdmin(c) && !access.IsAdmin(c) && !access.IsCustomerAdmin(c)) {
@@ -849,6 +893,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			}
 			_, err = uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), req, nil)
 			if err != nil {
+				logger.Err(err).Msg("Failed to create user")
 				// check if error is a firebase error and if so, check if it is a duplicate email error
 				if auth.IsEmailAlreadyExists(err) {
 					errors = append(errors, ImportError{
@@ -915,7 +960,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			return msg.EventType != "ERROR" && msg.Progress != 100
 		case err := <-errorChan:
 			// Send error as SSE event instead of trying to change status code
-			log.Printf("Error in streaming: %v", err)
+			logger.Printf("Error in streaming: %v", err)
 			errEvent := event.NewProgressEvent("ERROR", err.Error(), 100)
 			c.SSEvent("message", errEvent)
 			return false

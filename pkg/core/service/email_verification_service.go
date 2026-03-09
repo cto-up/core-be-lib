@@ -11,9 +11,9 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/emailservice"
+	"ctoup.com/coreapp/pkg/shared/util"
 	utils "ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -54,18 +54,20 @@ func (s *EmailVerificationService) GenerateVerificationToken() (string, []byte, 
 
 // CreateEmailVerificationToken creates and stores a new verification token
 func (s *EmailVerificationService) CreateEmailVerificationToken(ctx *gin.Context, userID, tenantID string) (string, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Delete any existing tokens for this user
 	if err := s.store.DeleteEmailVerificationTokensByUserID(ctx, repository.DeleteEmailVerificationTokensByUserIDParams{
 		UserID:   userID,
 		TenantID: tenantID,
 	}); err != nil {
-		log.Error().Err(err).Msg("Failed to delete existing verification tokens")
+		logger.Err(err).Msg("Failed to delete existing verification tokens")
 		// Continue anyway, as this is not critical
 	}
 
 	// Generate new token
 	token, tokenHash, err := s.GenerateVerificationToken()
 	if err != nil {
+		logger.Err(err).Msg("Failed to generate verification token")
 		return "", fmt.Errorf("failed to generate verification token: %w", err)
 	}
 
@@ -79,6 +81,7 @@ func (s *EmailVerificationService) CreateEmailVerificationToken(ctx *gin.Context
 		ExpiresAt: expiresAt,
 	})
 	if err != nil {
+		logger.Err(err).Msg("Failed to store verification token")
 		return "", fmt.Errorf("failed to store verification token: %w", err)
 	}
 
@@ -87,29 +90,34 @@ func (s *EmailVerificationService) CreateEmailVerificationToken(ctx *gin.Context
 
 // VerifyEmailToken verifies a token and marks the user's email as verified in Firebase
 func (s *EmailVerificationService) VerifyEmailToken(ctx *gin.Context, token string, tenantID string) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Get token from database
 	tokenRecord, err := s.store.GetEmailVerificationToken(ctx, repository.GetEmailVerificationTokenParams{
 		Token:    token,
 		TenantID: tenantID,
 	})
 	if err != nil {
+		logger.Err(err).Msg("Failed to get verification token")
 		return fmt.Errorf("invalid or expired verification token")
 	}
 
 	subdomain, err := utils.GetSubdomain(ctx)
 	if err != nil {
-		return err
+		logger.Err(err).Msg("Failed to get subdomain")
+		return fmt.Errorf("failed to get subdomain: %w", err)
 	}
 
 	// Get auth client for the tenant
 	authClient, err := s.authProvider.GetAuthClientForSubdomain(ctx, subdomain)
 	if err != nil {
+		logger.Err(err).Msg("Failed to get auth client for tenant")
 		return fmt.Errorf("failed to get auth client: %w", err)
 	}
 
 	// Update user's email verification status
 	userUpdate := (&auth.UserToUpdate{}).EmailVerified(true)
 	if _, err := authClient.UpdateUser(ctx, tokenRecord.UserID, userUpdate); err != nil {
+		logger.Err(err).Msg("Failed to update user email verification status")
 		return fmt.Errorf("failed to update user email verification status: %w", err)
 	}
 
@@ -118,7 +126,7 @@ func (s *EmailVerificationService) VerifyEmailToken(ctx *gin.Context, token stri
 		Token:    token,
 		TenantID: tenantID,
 	}); err != nil {
-		log.Error().Err(err).Msg("Failed to mark token as used")
+		logger.Err(err).Msg("Failed to mark token as used")
 		// Continue anyway, as the main operation (Firebase update) succeeded
 	}
 
@@ -127,6 +135,8 @@ func (s *EmailVerificationService) VerifyEmailToken(ctx *gin.Context, token stri
 
 // SendVerificationEmail sends a verification email to the user
 func (s *EmailVerificationService) SendVerificationEmail(ctx *gin.Context, email, token, baseFrontendURL string) error {
+	logger := util.GetLoggerFromCtx(ctx)
+
 	fromEmail := getSystemEmail()
 
 	// Create verification URL
@@ -145,13 +155,13 @@ func (s *EmailVerificationService) SendVerificationEmail(ctx *gin.Context, email
 	r := emailservice.NewEmailRequest(fromEmail, []string{email}, "Please verify your email address", "")
 
 	if err := r.ParseTemplateWithDomain(ctx, "email-verification.html", templateData); err != nil {
-		log.Error().Err(err).Msg("Failed to parse email verification template")
+		logger.Err(err).Msg("Failed to parse email verification template")
 		return fmt.Errorf("failed to prepare verification email: %w", err)
 	}
 
 	// Send email
 	if err := r.SendEmail(); err != nil {
-		log.Error().Err(err).Msg("Failed to send verification email")
+		logger.Err(err).Msg("Failed to send verification email")
 		return fmt.Errorf("failed to send verification email: %w", err)
 	}
 
@@ -160,19 +170,23 @@ func (s *EmailVerificationService) SendVerificationEmail(ctx *gin.Context, email
 
 // ResendVerificationEmail creates a new token and resends verification email with rate limiting
 func (s *EmailVerificationService) ResendVerificationEmail(ctx *gin.Context, userID, tenantID, email, baseFrontendURL string) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Check rate limit
 	if err := CheckEmailVerificationRateLimit(ctx, userID); err != nil {
+		logger.Err(err).Msg("Failed to check email verification rate limit")
 		return err
 	}
 
 	// Create new verification token
 	token, err := s.CreateEmailVerificationToken(ctx, userID, tenantID)
 	if err != nil {
+		logger.Err(err).Msg("Failed to create verification token")
 		return fmt.Errorf("failed to create verification token: %w", err)
 	}
 
 	// Send verification email
 	if err := s.SendVerificationEmail(ctx, email, token, baseFrontendURL); err != nil {
+		logger.Err(err).Msg("Failed to send verification email")
 		return fmt.Errorf("failed to send verification email: %w", err)
 	}
 
@@ -181,15 +195,19 @@ func (s *EmailVerificationService) ResendVerificationEmail(ctx *gin.Context, use
 
 // GetUserVerificationStatus returns the email verification status of a user
 func (s *EmailVerificationService) GetUserVerificationStatus(ctx *gin.Context, userID, tenantID string) (bool, error) {
+	logger := util.GetLoggerFromCtx(ctx)
+
 	// Get auth client for the tenant
 	authClient, err := s.authProvider.GetAuthClientForTenant(ctx, tenantID)
 	if err != nil {
+		logger.Err(err).Msg("Failed to get auth client for tenant")
 		return false, fmt.Errorf("failed to get auth client: %w", err)
 	}
 
 	// Get user record
 	userRecord, err := authClient.GetUser(ctx, userID)
 	if err != nil {
+		logger.Err(err).Msg("Failed to get user record")
 		return false, fmt.Errorf("failed to get user: %w", err)
 	}
 

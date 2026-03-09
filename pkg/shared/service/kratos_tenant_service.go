@@ -7,7 +7,7 @@ import (
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/auth/kratos"
-	"github.com/rs/zerolog/log"
+	"ctoup.com/coreapp/pkg/shared/util"
 )
 
 // KratosTenantService handles tenant-user associations for Kratos
@@ -51,12 +51,6 @@ func (kts *KratosTenantService) AssignUserToTenant(ctx context.Context, userID s
 		return fmt.Errorf("failed to set tenant metadata: %w", err)
 	}
 
-	log.Info().
-		Str("user_id", userID).
-		Str("tenant_id", tenant.TenantID).
-		Str("subdomain", subdomain).
-		Msg("User assigned to tenant")
-
 	return nil
 }
 
@@ -73,6 +67,7 @@ func (kts *KratosTenantService) GetUserTenant(ctx context.Context, userID string
 
 // RemoveUserFromTenant removes tenant association from a user
 func (kts *KratosTenantService) RemoveUserFromTenant(ctx context.Context, userID string) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	authClient := kts.authProvider.GetAuthClient()
 	kratosClient, ok := authClient.(*kratos.KratosAuthClient)
 	if !ok {
@@ -87,21 +82,19 @@ func (kts *KratosTenantService) RemoveUserFromTenant(ctx context.Context, userID
 
 	err := kratosClient.SetTenantMetadata(ctx, userID, metadata)
 	if err != nil {
+		logger.Err(err).Str("user_id", userID).Msg("Failed to remove tenant metadata")
 		return fmt.Errorf("failed to remove tenant metadata: %w", err)
 	}
-
-	log.Info().
-		Str("user_id", userID).
-		Msg("User removed from tenant")
-
 	return nil
 }
 
 // CreateUserWithTenant creates a new user and assigns them to a tenant
 func (kts *KratosTenantService) CreateUserWithTenant(ctx context.Context, email string, password string, subdomain string, roles []string) (*auth.UserRecord, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Get tenant from database
 	tenant, err := kts.store.GetTenantBySubdomain(ctx, subdomain)
 	if err != nil {
+		logger.Err(err).Str("subdomain", subdomain).Msg("Failed to get tenant")
 		return nil, fmt.Errorf("failed to get tenant: %w", err)
 	}
 
@@ -109,6 +102,7 @@ func (kts *KratosTenantService) CreateUserWithTenant(ctx context.Context, email 
 	authClient := kts.authProvider.GetAuthClient()
 	kratosClient, ok := authClient.(*kratos.KratosAuthClient)
 	if !ok {
+		logger.Error().Msg("Auth provider is not Kratos")
 		return nil, fmt.Errorf("auth provider is not Kratos")
 	}
 
@@ -119,6 +113,7 @@ func (kts *KratosTenantService) CreateUserWithTenant(ctx context.Context, email 
 
 	record, err := kratosClient.CreateUserWithTenant(ctx, user, tenant.TenantID, tenant.Subdomain)
 	if err != nil {
+		logger.Err(err).Str("email", email).Str("subdomain", subdomain).Msg("Failed to create user with tenant")
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
@@ -130,26 +125,20 @@ func (kts *KratosTenantService) CreateUserWithTenant(ctx context.Context, email 
 		}
 		err = authClient.SetCustomUserClaims(ctx, record.UID, customClaims)
 		if err != nil {
-			log.Error().Err(err).Str("user_id", record.UID).Msg("Failed to set user roles")
+			logger.Err(err).Str("user_id", record.UID).Msg("Failed to set user roles")
 			// Don't fail the entire operation, just log the error
 		}
 	}
-
-	log.Info().
-		Str("user_id", record.UID).
-		Str("email", email).
-		Str("tenant_id", tenant.TenantID).
-		Str("subdomain", subdomain).
-		Msg("User created with tenant")
-
 	return record, nil
 }
 
 // ListTenantUsers lists all users belonging to a tenant
 func (kts *KratosTenantService) ListTenantUsers(ctx context.Context, subdomain string) ([]*auth.UserRecord, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Get tenant from database
 	tenant, err := kts.store.GetTenantBySubdomain(ctx, subdomain)
 	if err != nil {
+		logger.Err(err).Str("subdomain", subdomain).Msg("Failed to get tenant")
 		return nil, fmt.Errorf("failed to get tenant: %w", err)
 	}
 
@@ -157,6 +146,7 @@ func (kts *KratosTenantService) ListTenantUsers(ctx context.Context, subdomain s
 	authClient := kts.authProvider.GetAuthClient()
 	kratosClient, ok := authClient.(*kratos.KratosAuthClient)
 	if !ok {
+		logger.Error().Msg("Auth provider is not Kratos")
 		return nil, fmt.Errorf("auth provider is not Kratos")
 	}
 
@@ -165,15 +155,18 @@ func (kts *KratosTenantService) ListTenantUsers(ctx context.Context, subdomain s
 
 // ValidateUserTenantAccess checks if a user has access to a specific tenant
 func (kts *KratosTenantService) ValidateUserTenantAccess(ctx context.Context, userID string, subdomain string) (bool, error) {
+	logger := util.GetLoggerFromCtx(ctx)
 	// Get user's tenant metadata
 	userTenant, err := kts.GetUserTenant(ctx, userID)
 	if err != nil {
+		logger.Err(err).Str("user_id", userID).Msg("Failed to get user tenant metadata")
 		return false, fmt.Errorf("failed to get user tenant: %w", err)
 	}
 
 	// Get requested tenant from database
 	tenant, err := kts.store.GetTenantBySubdomain(ctx, subdomain)
 	if err != nil {
+		logger.Err(err).Str("subdomain", subdomain).Msg("Failed to get tenant")
 		return false, fmt.Errorf("failed to get tenant: %w", err)
 	}
 

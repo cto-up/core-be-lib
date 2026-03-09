@@ -819,7 +819,7 @@ Always log SUPER_ADMIN actions for security auditing:
 
 ```go
 func AuditLog(c *gin.Context, action string, resource string) {
-    log.Info().
+    logger.Info().
         Str("action", action).
         Str("resource", resource).
         Str("user_id", c.GetString(auth.AUTH_USER_ID)).

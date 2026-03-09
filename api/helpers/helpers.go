@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 func ErrorResponse(err error) gin.H {
-	log.Printf("error: %v\n", err)
+	log.Err(err).Msg("Error occurred")
 	return gin.H{
 		"message": err.Error(),
 	}

@@ -26,13 +26,13 @@ import "ctoup.com/coreapp/pkg/shared/auth"
 // Initialize from environment (reads AUTH_PROVIDER env var)
 provider, err := auth.InitializeAuthProvider(ctx, multitenantService)
 if err != nil {
-    log.Fatal(err)
+    logger.Fatal(err)
 }
 
 // Get auth client for a subdomain
 authClient, err := provider.GetAuthClientForSubdomain(ctx, "tenant-subdomain")
 if err != nil {
-    log.Fatal(err)
+    logger.Fatal(err)
 }
 
 // Create a user
@@ -233,7 +233,7 @@ if err != nil {
     } else if auth.IsEmailAlreadyExists(err) {
         // Handle duplicate email
     } else if authErr, ok := err.(*auth.AuthError); ok {
-        log.Printf("Auth error: %s - %s", authErr.Code, authErr.Message)
+        logger.Printf("Auth error: %s - %s", authErr.Code, authErr.Message)
     }
 }
 ```

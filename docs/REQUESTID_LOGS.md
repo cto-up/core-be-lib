@@ -86,7 +86,7 @@ Always use the request-scoped logger (`logger` from `GetLoggerFromContext`) and 
 - **Error Level:** For errors that prevent a request from completing successfully. Always include the error object using **`.Err(err)`**.
   ```go
   if err := someFailingOperation(); err != nil {
-      logger.Error().Err(err).Msg("Failed to perform critical operation")
+      logger.Err(err).Msg("Failed to perform critical operation")
   }
   ```
 - **Fatal/Panic Level:** Use with caution. These will exit the application after logging. Often used for unrecoverable errors during startup.
