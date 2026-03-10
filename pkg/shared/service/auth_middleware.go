@@ -129,7 +129,7 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.Authentica
 	if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
 		util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
 
-		if claims["SUPER_ADMIN"] == true || claims["ADMIN"] == true || claims["CUSTOMER_ADMIN"] == true || claims["IS_ACTING_RESELLER"] == true {
+		if claims["SUPER_ADMIN"] == true || claims["ADMIN"] == true || claims["CUSTOMER_ADMIN"] == true || claims["ACTING_RESELLER"] == true {
 			return true
 		}
 		c.JSON(http.StatusForbidden, gin.H{
