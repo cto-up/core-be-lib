@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"ctoup.com/coreapp/api/openapi/core"
@@ -77,6 +78,8 @@ func (uh *SharedUserService) InitUserInDatabase(ctx context.Context, tenantId st
 // CreateUser creates a new user in the auth provider and the database
 func (uh *SharedUserService) CreateUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
 	user := repository.CoreUser{}
+
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {

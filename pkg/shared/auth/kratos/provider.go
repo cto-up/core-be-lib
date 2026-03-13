@@ -278,8 +278,13 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 	}
 
 	traits := existing.Traits.(map[string]interface{})
-	if email := user.GetEmail(); email != nil {
-		traits["email"] = *email
+
+	if emailPtr := user.GetEmail(); emailPtr != nil {
+		// Dereference to get the value, then transform it
+		cleanEmail := strings.ToLower(strings.TrimSpace(*emailPtr))
+
+		// Assign the new string to your map (original pointer remains unchanged)
+		traits["email"] = cleanEmail
 	}
 
 	state := ""

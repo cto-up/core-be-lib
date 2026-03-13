@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/util"
@@ -20,6 +21,7 @@ import (
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -240,6 +242,8 @@ func (uh *UserHandler) ResetPasswordRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
@@ -509,6 +513,7 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
+	req.Email = openapi_types.Email(strings.ToLower(strings.TrimSpace(string(req.Email))))
 
 	origin := c.Request.Header.Get("Origin")
 	if origin == "" {
