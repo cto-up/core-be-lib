@@ -10,7 +10,6 @@ import (
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/shared/auth"
-	access "ctoup.com/coreapp/pkg/shared/service"
 	"ctoup.com/coreapp/pkg/shared/util"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +47,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
-	if !access.IsAdmin(c) && !access.IsSuperAdmin(c) && !access.IsCustomerAdmin(c) {
+	if !auth.IsAdmin(c) && !auth.IsSuperAdmin(c) && !auth.IsCustomerAdmin(c) {
 		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can upload tenant pictures")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can upload tenant pictures"})
 		return

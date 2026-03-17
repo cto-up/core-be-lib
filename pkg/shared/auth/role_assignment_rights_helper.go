@@ -1,4 +1,4 @@
-package service
+package auth
 
 import (
 	"errors"
@@ -7,35 +7,25 @@ import (
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
-	"ctoup.com/coreapp/pkg/shared/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-// GlobalRole represents possible roles with global scope
-type GlobalRole string
-
+// Context keys for tenant role information
 const (
-	GlobalRoleSuperAdmin GlobalRole = "SUPER_ADMIN"
-)
-
-// TenantRole represents possible roles within a tenant
-type TenantRole string
-
-const (
-	TenantRoleCustomerAdmin TenantRole = "CUSTOMER_ADMIN"
-	TenantRoleAdmin         TenantRole = "ADMIN"
-	TenantRoleUser          TenantRole = "USER"
+	CONTEXT_KEY_TENANT_ROLES = "tenant_roles"
+	TENANT_IS_RESELLER       = "TENANT_IS_RESELLER"
+	ACTING_RESELLER          = "ACTING_RESELLER"
 )
 
 func HasRightsForRole(c *gin.Context, role core.Role) error {
-	if role == "CUSTOMER_ADMIN" && (!IsCustomerAdmin(c) && !IsSuperAdmin(c) && !IsAdmin(c)) {
+	if role == core.CUSTOMERADMIN && (!IsCustomerAdmin(c) && !IsSuperAdmin(c) && !IsAdmin(c)) {
 		return errors.New("must be at a CUSTOMER_ADMIN or SUPER_ADMIN or ADMIN to perform such operation")
 	}
-	if role == "ADMIN" && (!IsSuperAdmin(c) && !IsAdmin(c)) {
+	if role == core.ADMIN && (!IsSuperAdmin(c) && !IsAdmin(c)) {
 		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
 	}
-	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
+	if role == core.SUPERADMIN && !IsSuperAdmin(c) {
 		return errors.New("must be an SUPER_ADMIN to perform such operation")
 	}
 	return nil
@@ -51,16 +41,16 @@ func HasRightsForRoles(c *gin.Context, roles []core.Role) error {
 }
 
 func IsCustomerAdmin(c *gin.Context) bool {
-	claims, exist := c.Get(auth.AUTH_CLAIMS)
+	claims, exist := c.Get(AUTH_CLAIMS)
 	if !exist {
 		return false
 	}
-	isCustomerAdmin := claims.((map[string]interface{}))["CUSTOMER_ADMIN"] == true
+	isCustomerAdmin := claims.((map[string]interface{}))[string(core.CUSTOMERADMIN)] == true
 	return isCustomerAdmin
 }
 
 func IsActingReseller(c *gin.Context) bool {
-	claims, exist := c.Get(auth.AUTH_CLAIMS)
+	claims, exist := c.Get(AUTH_CLAIMS)
 	if !exist {
 		return false
 	}
@@ -69,22 +59,22 @@ func IsActingReseller(c *gin.Context) bool {
 }
 
 func IsAdmin(c *gin.Context) bool {
-	claims, exist := c.Get(auth.AUTH_CLAIMS)
+	claims, exist := c.Get(AUTH_CLAIMS)
 	if !exist {
 		return false
 	}
-	isAdmin := claims.((map[string]interface{}))["ADMIN"] == true
+	isAdmin := claims.((map[string]interface{}))[string(core.ADMIN)] == true
 	return isAdmin
 }
 func IsSuperAdmin(c *gin.Context) bool {
-	claims, exist := c.Get(auth.AUTH_CLAIMS)
+	claims, exist := c.Get(AUTH_CLAIMS)
 	if !exist {
 		return false
 	}
 	// Works for both Firebase and Kratos:
 	// - Firebase: Sets SUPER_ADMIN as custom claim boolean
 	// - Kratos: Extracts from global_roles array and sets as boolean for backward compatibility
-	isSuperAdmin := claims.((map[string]interface{}))["SUPER_ADMIN"] == true
+	isSuperAdmin := claims.((map[string]interface{}))[string(core.SUPERADMIN)] == true
 	return isSuperAdmin
 }
 
@@ -98,7 +88,7 @@ func IsAllowedToManageTenantByID(c *gin.Context, store *db.Store, id uuid.UUID) 
 		return false, err
 	}
 
-	authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+	authTenantID := c.GetString(AUTH_TENANT_ID_KEY)
 	if IsReseller(c) {
 		if !existing.ResellerID.Valid || existing.ResellerID.String != authTenantID {
 			return false, errors.New("not allowed to manage this tenant")
@@ -113,7 +103,7 @@ func IsAllowedToManageTenant(c *gin.Context, tenant repository.CoreTenant) bool 
 		return true
 	}
 	if IsReseller(c) {
-		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+		authTenantID := c.GetString(AUTH_TENANT_ID_KEY)
 		if tenant.ResellerID.Valid && tenant.ResellerID.String == authTenantID {
 			return true
 		}
@@ -122,11 +112,11 @@ func IsAllowedToManageTenant(c *gin.Context, tenant repository.CoreTenant) bool 
 }
 
 func IsReseller(c *gin.Context) bool {
-	claims, exist := c.Get(auth.AUTH_CLAIMS)
+	claims, exist := c.Get(AUTH_CLAIMS)
 	if !exist {
 		return false
 	}
-	isReseller := claims.((map[string]interface{}))["IS_RESELLER"] == true
+	isReseller := claims.((map[string]interface{}))[TENANT_IS_RESELLER] == true
 	return isReseller
 }
 
@@ -146,7 +136,7 @@ func GetUserTenantRoles(c *gin.Context) ([]string, error) {
 }
 
 // HasTenantRole checks if the user has a specific role in the current tenant
-func HasTenantRole(c *gin.Context, requiredRole TenantRole) bool {
+func HasTenantRole(c *gin.Context, requiredRole string) bool {
 	roles, err := GetUserTenantRoles(c)
 	if err != nil {
 		return false
@@ -161,7 +151,7 @@ func HasTenantRole(c *gin.Context, requiredRole TenantRole) bool {
 }
 
 // HasAnyTenantRole checks if the user has any of the specified roles
-func HasAnyTenantRole(c *gin.Context, requiredRoles ...TenantRole) bool {
+func HasAnyTenantRole(c *gin.Context, requiredRoles ...string) bool {
 	roles, err := GetUserTenantRoles(c)
 	if err != nil {
 		return false
@@ -179,7 +169,7 @@ func HasAnyTenantRole(c *gin.Context, requiredRoles ...TenantRole) bool {
 
 // HasMinimumTenantRole checks if the user has at least the specified role level
 // Role hierarchy: ADMIN > CUSTOMER_ADMIN > USER
-func HasMinimumTenantRole(c *gin.Context, minimumRole TenantRole) bool {
+func HasMinimumTenantRole(c *gin.Context, minimumRole string) bool {
 	roles, err := GetUserTenantRoles(c)
 	if err != nil {
 		return false
@@ -188,7 +178,7 @@ func HasMinimumTenantRole(c *gin.Context, minimumRole TenantRole) bool {
 	minimumLevel := GetRoleLevel(minimumRole)
 
 	for _, role := range roles {
-		if GetRoleLevel(TenantRole(role)) >= minimumLevel {
+		if GetRoleLevel(role) >= minimumLevel {
 			return true
 		}
 	}
@@ -197,13 +187,13 @@ func HasMinimumTenantRole(c *gin.Context, minimumRole TenantRole) bool {
 
 // GetRoleLevel returns the hierarchical level of a role
 // Higher number = more permissions
-func GetRoleLevel(role TenantRole) int {
+func GetRoleLevel(role string) int {
 	switch role {
-	case TenantRoleAdmin:
+	case string(core.ADMIN):
 		return 3
-	case TenantRoleCustomerAdmin:
+	case string(core.CUSTOMERADMIN):
 		return 2
-	case TenantRoleUser:
+	case string(core.USER):
 		return 1
 	default:
 		return 0
@@ -221,7 +211,7 @@ func IsTenantAdmin(c *gin.Context) bool {
 		return false
 	}
 	for _, role := range roles {
-		if role == string(TenantRoleAdmin) {
+		if role == string(core.ADMIN) {
 			return true
 		}
 	}
@@ -239,7 +229,7 @@ func IsTenantCustomerAdmin(c *gin.Context) bool {
 		return false
 	}
 	for _, role := range roles {
-		if role == string(TenantRoleCustomerAdmin) {
+		if role == string(core.CUSTOMERADMIN) {
 			return true
 		}
 	}
@@ -257,7 +247,7 @@ func IsTenantAdminOrCustomerAdmin(c *gin.Context) bool {
 		return false
 	}
 	for _, role := range roles {
-		if role == string(TenantRoleAdmin) || role == string(TenantRoleCustomerAdmin) {
+		if role == string(core.ADMIN) || role == string(core.CUSTOMERADMIN) {
 			return true
 		}
 	}

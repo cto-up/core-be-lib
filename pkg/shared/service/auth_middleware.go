@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/auth/kratos"
 	"ctoup.com/coreapp/pkg/shared/util"
@@ -129,7 +130,7 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.Authentica
 	if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
 		util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
 
-		if claims["SUPER_ADMIN"] == true || claims["ADMIN"] == true || claims["CUSTOMER_ADMIN"] == true || claims["ACTING_RESELLER"] == true {
+		if claims[string(core.SUPERADMIN)] == true || claims[string(core.ADMIN)] == true || claims[string(core.CUSTOMERADMIN)] == true || claims[string(auth.ACTING_RESELLER)] == true {
 			return true
 		}
 		c.JSON(http.StatusForbidden, gin.H{
@@ -142,7 +143,7 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.Authentica
 
 	// Admin API access
 	if strings.HasPrefix(c.Request.URL.Path, "/admin-api") {
-		if claims["SUPER_ADMIN"] == true || claims["ADMIN"] == true {
+		if claims[string(core.SUPERADMIN)] == true || claims[string(core.ADMIN)] == true {
 			return true
 		}
 		c.JSON(http.StatusForbidden, gin.H{
@@ -155,11 +156,11 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.Authentica
 
 	// Super admin API access
 	if strings.HasPrefix(c.Request.URL.Path, "/superadmin-api") {
-		if claims["SUPER_ADMIN"] == true {
+		if claims[string(core.SUPERADMIN)] == true {
 			return true
 		}
-		// Allow IS_RESELLER if tenant is a reseller for tenant-related operations
-		if claims["IS_RESELLER"] == true {
+		// Allow TENANT_IS_RESELLER if tenant is a reseller for tenant-related operations
+		if claims[string(auth.TENANT_IS_RESELLER)] == true {
 			if strings.HasPrefix(c.Request.URL.Path, "/superadmin-api/v1/tenant") {
 				return true
 			}

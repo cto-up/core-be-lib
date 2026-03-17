@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"ctoup.com/coreapp/api/helpers"
+	api "ctoup.com/coreapp/api/openapi/core"
 	core "ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
@@ -64,7 +65,7 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		return
 	}
 
-	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+	if err := auth.HasRightsForRoles(c, req.Roles); err != nil {
 		logger.Err(err).Msg("Failed to check user roles")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
@@ -121,7 +122,7 @@ func (uh *UserAdminHandler) UpdateUser(c *gin.Context, userid string) {
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+	if err := auth.HasRightsForRoles(c, req.Roles); err != nil {
 		logger.Err(err).Msg("Failed to check user roles")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
@@ -168,7 +169,7 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		return
 	}
 	// check if user has rights to delete user CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN
-	if !access.IsCustomerAdmin(c) && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+	if !auth.IsCustomerAdmin(c) && !auth.IsAdmin(c) && !auth.IsSuperAdmin(c) {
 		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user"})
 		return
@@ -177,7 +178,7 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 	var err error
 
 	if tenantID == "" {
-		if !access.IsSuperAdmin(c) {
+		if !auth.IsSuperAdmin(c) {
 			logger.Error().Msg("Only SUPER_ADMIN can delete user without tenant")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Only SUPER_ADMIN can delete user without tenant"})
 			return
@@ -198,7 +199,7 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		}
 	}
 
-	err = access.HasRightsForRoles(c, user.Roles)
+	err = auth.HasRightsForRoles(c, user.Roles)
 	if err != nil {
 		logger.Err(err).Msg("user does not have rights to be deleted")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
@@ -248,7 +249,7 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 	}
 
 	// Check if user has rights to remove user (CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN)
-	if !access.IsCustomerAdmin(c) && !access.IsAdmin(c) && !access.IsSuperAdmin(c) {
+	if !auth.IsCustomerAdmin(c) && !auth.IsAdmin(c) && !auth.IsSuperAdmin(c) {
 		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove user from tenant")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove user from tenant"})
 		return
@@ -282,7 +283,7 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 		result[i] = core.Role(r)
 	}
 
-	err = access.HasRightsForRoles(c, result)
+	err = auth.HasRightsForRoles(c, result)
 
 	if err != nil {
 		logger.Err(err).Msg("user does not have rights to be removed from tenant")
@@ -313,7 +314,7 @@ func (uh *UserAdminHandler) GetUserByID(c *gin.Context, id string) {
 
 	// in case root domain is used
 	if tenantID == "" {
-		if !access.IsSuperAdmin(c) {
+		if !auth.IsSuperAdmin(c) {
 			logger.Error().Msg("Only SUPER_ADMIN can get user without tenant")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Only SUPER_ADMIN can get user without tenant"})
 			return
@@ -516,7 +517,7 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 	}
 
 	// check if authorized user is admin
-	if !access.IsAdmin(c) || !access.IsSuperAdmin(c) {
+	if !auth.IsAdmin(c) || !auth.IsSuperAdmin(c) {
 		logger.Error().Msg("Only admin or super admin can reset password")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only admin or super admin can reset password"})
 		return
@@ -645,7 +646,7 @@ func (uh *UserAdminHandler) AddUserMembership(c *gin.Context, userid string) {
 	}
 
 	// Check authorization for roles
-	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+	if err := auth.HasRightsForRoles(c, req.Roles); err != nil {
 		logger.Err(err).Msg("Failed to check authorization for roles")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
@@ -879,7 +880,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			req.Roles = []core.Role{}
 
 			// check if user has rights to assign roles
-			if isCustomerAdmin && (!access.IsSuperAdmin(c) && !access.IsAdmin(c) && !access.IsCustomerAdmin(c)) {
+			if isCustomerAdmin && (!auth.IsSuperAdmin(c) && !auth.IsAdmin(c) && !auth.IsCustomerAdmin(c)) {
 				errors = append(errors, ImportError{
 					Line:  lineNum,
 					Email: email,
@@ -889,7 +890,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 				continue
 			}
 			if isCustomerAdmin {
-				req.Roles = []core.Role{"CUSTOMER_ADMIN"}
+				req.Roles = []core.Role{api.CUSTOMERADMIN}
 			}
 			_, err = uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), req, nil)
 			if err != nil {

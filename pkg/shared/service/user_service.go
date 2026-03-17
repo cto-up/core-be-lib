@@ -14,11 +14,6 @@ import (
 	sqlservice "ctoup.com/coreapp/pkg/shared/sql"
 )
 
-// Context keys for tenant role information
-const (
-	CONTEXT_KEY_TENANT_ROLES = "tenant_roles"
-)
-
 type UserService interface {
 	// Lifecycle
 	CreateUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error)

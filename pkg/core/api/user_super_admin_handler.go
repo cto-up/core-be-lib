@@ -10,7 +10,6 @@ import (
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	sharedauth "ctoup.com/coreapp/pkg/shared/auth"
-	"ctoup.com/coreapp/pkg/shared/service"
 	access "ctoup.com/coreapp/pkg/shared/service"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
@@ -50,7 +49,7 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
@@ -62,7 +61,7 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 		return
 	}
 
-	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+	if err := auth.HasRightsForRoles(c, req.Roles); err != nil {
 		logger.Err(err).Msg("User does not have rights for the requested roles")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
@@ -105,7 +104,7 @@ func (uh *UserSuperAdminHandler) UpdateUserFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
@@ -116,7 +115,7 @@ func (uh *UserSuperAdminHandler) UpdateUserFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(err))
 		return
 	}
-	if err := access.HasRightsForRoles(c, req.Roles); err != nil {
+	if err := auth.HasRightsForRoles(c, req.Roles); err != nil {
 		logger.Err(err).Msg("User does not have rights for the requested roles")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 		return
@@ -145,7 +144,7 @@ func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
 	}
@@ -174,7 +173,7 @@ func (uh *UserSuperAdminHandler) RemoveUserFromTenantFromSuperAdmin(c *gin.Conte
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
@@ -217,7 +216,7 @@ func (uh *UserSuperAdminHandler) GetUserByIDFromSuperAdmin(c *gin.Context, tenan
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
@@ -241,7 +240,7 @@ func (uh *UserSuperAdminHandler) ListUsersFromSuperAdmin(c *gin.Context, tenantI
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
@@ -287,12 +286,12 @@ func (uh *UserSuperAdminHandler) AssignRoleFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
 	}
-	if access.IsReseller(c) && access.GetRoleLevel(access.TenantRole(role)) > access.GetRoleLevel(access.TenantRoleCustomerAdmin) {
+	if auth.IsReseller(c) && auth.GetRoleLevel(string(role)) > auth.GetRoleLevel(string(core.CUSTOMERADMIN)) {
 		logger.Error().Msg("Resellers are not allowed to assign roles higher than CUSTOMER_ADMIN")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("resellers are not allowed to assign roles higher than CUSTOMER_ADMIN")))
 		return
@@ -321,7 +320,7 @@ func (uh *UserSuperAdminHandler) UnassignRoleFromSuperAdmin(c *gin.Context, tena
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
@@ -351,7 +350,7 @@ func (uh *UserSuperAdminHandler) UpdateUserStatusFromSuperAdmin(c *gin.Context, 
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
@@ -400,13 +399,13 @@ func (uh *UserHandler) ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantId
 	// We need to check authorization here too. But uh is UserHandler or UserSuperAdminHandler?
 	// The receiver in ResetPasswordRequestBySuperAdmin is UserHandler!
 	// Wait, I should probably check it anyway.
-	if access.IsReseller(c) {
+	if auth.IsReseller(c) {
 		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
 		if !tenant.ResellerID.Valid || tenant.ResellerID.String != authTenantID {
 			c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 			return
 		}
-	} else if !access.IsSuperAdmin(c) {
+	} else if !auth.IsSuperAdmin(c) {
 		logger.Error().Msg("Not allowed to perform this operation")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to perform this operation")))
 		return
@@ -444,7 +443,7 @@ func (uh *UserSuperAdminHandler) CheckUserExistsFromSuperAdmin(c *gin.Context, t
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return
@@ -502,7 +501,7 @@ func (uh *UserSuperAdminHandler) AddUserMembershipFromSuperAdmin(c *gin.Context,
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	if !service.IsAllowedToManageTenant(c, tenant) {
+	if !auth.IsAllowedToManageTenant(c, tenant) {
 		logger.Error().Msg("Not allowed to manage this tenant")
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
 		return

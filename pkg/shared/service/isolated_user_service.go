@@ -290,16 +290,16 @@ func (uh *IsolatedUserService) ListUsers(c *gin.Context, tenantId string, paging
 
 func (uh *IsolatedUserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
 	logger := util.GetLoggerFromCtx(c)
-	if !IsAdmin(c) || !IsSuperAdmin(c) {
+	if !auth.IsAdmin(c) || !auth.IsSuperAdmin(c) {
 		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
 	}
-	if role == "CUSTOMER_ADMIN" && (!IsCustomerAdmin(c) && !IsSuperAdmin(c) && !IsAdmin(c)) {
+	if role == core.CUSTOMERADMIN && (!auth.IsCustomerAdmin(c) && !auth.IsSuperAdmin(c) && !auth.IsAdmin(c)) {
 		return errors.New("must be at a CUSTOMER_ADMIN or SUPER_ADMIN or ADMIN to perform such operation")
 	}
-	if role == "ADMIN" && (!IsSuperAdmin(c) && !IsAdmin(c)) {
+	if role == core.ADMIN && (!auth.IsSuperAdmin(c) && !auth.IsAdmin(c)) {
 		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
 	}
-	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
+	if role == core.SUPERADMIN && !auth.IsSuperAdmin(c) {
 		return errors.New("must be an SUPER_ADMIN to perform such operation")
 	}
 
@@ -352,14 +352,14 @@ func (uh *IsolatedUserService) AssignRole(c *gin.Context, authClient auth.AuthCl
 
 func (uh *IsolatedUserService) UnassignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
 	logger := util.GetLoggerFromCtx(c)
-	if !IsAdmin(c) && !IsSuperAdmin(c) && !IsCustomerAdmin(c) {
+	if !auth.IsAdmin(c) && !auth.IsSuperAdmin(c) && !auth.IsCustomerAdmin(c) {
 		return errors.New("must be an CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN to perform such operation")
 	}
-	if role == "ADMIN" && (!IsAdmin(c) || !IsSuperAdmin(c)) {
+	if role == core.ADMIN && (!auth.IsAdmin(c) || !auth.IsSuperAdmin(c)) {
 		return errors.New("must be an CUSTOMER_ADMIN to perform such operation")
 	}
 
-	if role == "SUPER_ADMIN" && !IsSuperAdmin(c) {
+	if role == core.SUPERADMIN && !auth.IsSuperAdmin(c) {
 		return errors.New("must be an SUPER_ADMIN to perform such operation")
 	}
 

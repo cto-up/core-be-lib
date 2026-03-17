@@ -116,12 +116,12 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 		return
 	}
 
-	// If current user is a IS_RESELLER of a reseller, set reseller_id
+	// If current user is a TENANT_IS_RESELLER of a reseller, set reseller_id
 	var resellerID pgtype.Text
 	claims, exists := c.Get(auth.AUTH_CLAIMS)
 	if exists {
 		claimsMap := claims.(map[string]interface{})
-		if claimsMap["IS_RESELLER"] == true {
+		if claimsMap[auth.TENANT_IS_RESELLER] == true {
 			authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
 			if authTenantID != "" {
 				resellerID = pgtype.Text{String: authTenantID, Valid: true}
@@ -135,7 +135,7 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 	}
 
 	var isReseller bool
-	if req.IsReseller != nil && service.IsSuperAdmin(c) {
+	if req.IsReseller != nil && auth.IsSuperAdmin(c) {
 		isReseller = *req.IsReseller
 	}
 
@@ -202,7 +202,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 	}
 
 	// Authorization check
-	isAllowed, err := service.IsAllowedToManageTenantByID(c, exh.store, id)
+	isAllowed, err := auth.IsAllowedToManageTenantByID(c, exh.store, id)
 	if err != nil {
 		logger.Err(err).Msg("Failed to check tenant management permissions")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
@@ -230,7 +230,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 	}
 
 	// Only SUPER_ADMIN can update reseller_id and is_reseller fields
-	if !service.IsSuperAdmin(c) {
+	if !auth.IsSuperAdmin(c) {
 		existing, err := exh.store.GetTenantByID(c, id)
 		if err != nil {
 			logger.Err(err).Msg("Failed to get existing tenant for update")
@@ -268,7 +268,7 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 	}
 
 	// Authorization check
-	isAllowed, err := service.IsAllowedToManageTenantByID(c, exh.store, id)
+	isAllowed, err := auth.IsAllowedToManageTenantByID(c, exh.store, id)
 	if err != nil {
 		logger.Err(err).Msg("Failed to check tenant management permissions")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
@@ -318,7 +318,7 @@ func (exh *TenantHandler) GetTenantByID(c *gin.Context, id uuid.UUID) {
 		return
 	}
 	// Authorization check
-	isAllowed, err := service.IsAllowedToManageTenantByID(c, exh.store, id)
+	isAllowed, err := auth.IsAllowedToManageTenantByID(c, exh.store, id)
 	if err != nil {
 		logger.Err(err).Msg("Failed to check tenant management permissions")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
@@ -370,11 +370,11 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 		query.ResellerID = pgtype.Text{String: *params.ResellerId, Valid: true}
 	}
 
-	// If user is IS_RESELLER of a reseller, force reseller_id filter
+	// If user is TENANT_IS_RESELLER of a reseller, force reseller_id filter
 	claims, exists := c.Get(auth.AUTH_CLAIMS)
 	if exists {
 		claimsMap := claims.(map[string]interface{})
-		if claimsMap["IS_RESELLER"] == true {
+		if claimsMap[auth.TENANT_IS_RESELLER] == true {
 			authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
 			isReseller, _ := exh.multiTenantService.IsReseller(c, authTenantID)
 			if isReseller && authTenantID != "" {

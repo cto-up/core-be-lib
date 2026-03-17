@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/auth"
@@ -104,7 +105,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 		// Set global roles using provider-specific format
 		// Firebase: {"SUPER_ADMIN": true, "ADMIN": true}
 		// Kratos: {"global_roles": ["SUPER_ADMIN", "ADMIN"]}
-		claims := ss.client.BuildGlobalRoleClaims([]string{"SUPER_ADMIN", "ADMIN"})
+		claims := ss.client.BuildGlobalRoleClaims([]string{string(core.SUPERADMIN), string(core.ADMIN)})
 		err = ss.client.SetCustomUserClaims(c, userRecord.UID, claims)
 
 		if err != nil {
@@ -118,7 +119,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 			Profile: subentity.UserProfile{
 				Name: adminName,
 			},
-			Roles: []string{"SUPER_ADMIN", "ADMIN"},
+			Roles: []string{string(core.SUPERADMIN), string(core.ADMIN)},
 		})
 	}
 }

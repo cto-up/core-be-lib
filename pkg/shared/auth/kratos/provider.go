@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
@@ -111,7 +112,7 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 			if roleStr, ok := role.(string); ok {
 				claims[roleStr] = true
 
-				if roleStr == "SUPER_ADMIN" {
+				if roleStr == string(core.SUPERADMIN) {
 					isSuperAdmin = true
 				}
 
@@ -147,7 +148,7 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 	isReseller, err := k.multitenantService.IsReseller(ctx, tenantID)
 	if err == nil {
 		user.IsReseller = isReseller
-		claims["IS_RESELLER"] = isReseller
+		claims[auth.TENANT_IS_RESELLER] = isReseller
 	}
 
 	if membershipsInterface, ok := token.Claims[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
@@ -156,6 +157,13 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 				membership := auth.TenantMembership{}
 				if tid, ok := membershipMap["tenant_id"].(string); ok {
 					membership.TenantID = tid
+				}
+				if roles, ok := membershipMap["roles"].([]interface{}); ok {
+					for _, item := range roles {
+						if s, ok := item.(string); ok {
+							membership.Roles = append(membership.Roles, s)
+						}
+					}
 				}
 
 				// Only validate for the current tenant
@@ -168,25 +176,25 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 						for _, r := range rolesInterface {
 							if roleStr, ok := r.(string); ok {
 								claims[roleStr] = true
-								if roleStr == "CUSTOMER_ADMIN" {
+								if roleStr == string(core.CUSTOMERADMIN) {
 									hasCustAdmin = true
 								}
 							}
 						}
 					}
 
-					// Always derive IS_RESELLER from DB so it stays accurate when:
+					// Always derive TENANT_IS_RESELLER from DB so it stays accurate when:
 					//   - a tenant's reseller_id is assigned/removed
 					//   - a tenant is deleted by the reseller
 					// Only CUSTOMER_ADMIN users of a reseller-managed tenant get this flag.
 					if hasCustAdmin {
 						if managed, err := k.multitenantService.IsActingReseller(ctx, tenantID); err == nil && managed {
 							user.IsActingReseller = true
-							claims["ACTING_RESELLER"] = true
+							claims[auth.ACTING_RESELLER] = true
 						}
 						resellerMembership := auth.TenantMembership{
 							TenantID: tenantID,
-							Roles:    []string{"ACTING_RESELLER"},
+							Roles:    []string{auth.ACTING_RESELLER},
 						}
 						user.TenantMemberships = append(user.TenantMemberships, resellerMembership)
 						return user, nil

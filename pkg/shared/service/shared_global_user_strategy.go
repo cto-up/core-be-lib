@@ -85,7 +85,7 @@ func (g *GlobalUserStrategy) UpdateSharedProfile(ctx context.Context, store *db.
 func (g *GlobalUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
 	// Query via user_tenant_memberships table
 	adminUsers, err := store.ListSharedUsersByRoles(c, repository.ListSharedUsersByRolesParams{
-		RequestedRoles: []string{"SUPER_ADMIN", "ADMIN"},
+		RequestedRoles: []string{string(core.SUPERADMIN), string(core.ADMIN)},
 		Limit:          pagingSql.PageSize,
 		Offset:         pagingSql.Offset,
 		SearchPrefix:   like,
@@ -111,7 +111,7 @@ func (g *GlobalUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSq
 }
 
 func (g *GlobalUserStrategy) AssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
-	err := HasRightsForRole(c, role)
+	err := auth.HasRightsForRole(c, role)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func (g *GlobalUserStrategy) AssignRole(qtx *repository.Queries, c *gin.Context,
 }
 
 func (g *GlobalUserStrategy) UnAssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
-	err := HasRightsForRole(c, role)
+	err := auth.HasRightsForRole(c, role)
 	if err != nil {
 		return err
 	}

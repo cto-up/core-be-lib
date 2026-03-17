@@ -31,7 +31,7 @@ func NewSuperAdminHandler(authProvider auth.AuthProvider) *SuperAdminHandler {
 func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Check if user has SUPER_ADMIN role
-	if !service.IsSuperAdmin(c) {
+	if !auth.IsSuperAdmin(c) {
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("requires SUPER_ADMIN role")))
 		return
 	}
@@ -66,7 +66,7 @@ func (exh *SuperAdminHandler) AddAuthorizedDomains(c *gin.Context) {
 func (exh *SuperAdminHandler) RemoveAuthorizedDomains(c *gin.Context) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Check if user has SUPER_ADMIN role
-	if !service.IsSuperAdmin(c) {
+	if !auth.IsSuperAdmin(c) {
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("requires SUPER_ADMIN role")))
 		return
 	}

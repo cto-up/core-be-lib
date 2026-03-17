@@ -5,8 +5,8 @@ import (
 
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/repository/subentity"
-	"ctoup.com/coreapp/pkg/shared/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -17,7 +17,7 @@ func (s *TenantHandler) GetTenantFeatures(ctx *gin.Context, id uuid.UUID) {
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	isAllowed, err := service.IsAllowedToManageTenantByID(ctx, s.store, id)
+	isAllowed, err := auth.IsAllowedToManageTenantByID(ctx, s.store, id)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 		return
@@ -36,7 +36,7 @@ func (s *TenantHandler) UpdateTenantFeatures(ctx *gin.Context, id uuid.UUID) {
 		return
 	}
 
-	isAllowed, err := service.IsAllowedToManageTenantByID(ctx, s.store, id)
+	isAllowed, err := auth.IsAllowedToManageTenantByID(ctx, s.store, id)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 		return
