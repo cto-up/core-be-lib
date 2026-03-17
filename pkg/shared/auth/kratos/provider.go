@@ -157,11 +157,17 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 				membership := auth.TenantMembership{}
 				if tid, ok := membershipMap["tenant_id"].(string); ok {
 					membership.TenantID = tid
-				}
-				if roles, ok := membershipMap["roles"].([]interface{}); ok {
-					for _, item := range roles {
-						if s, ok := item.(string); ok {
-							membership.Roles = append(membership.Roles, s)
+
+					if roles, ok := membershipMap["roles"].([]interface{}); ok {
+						for _, item := range roles {
+							if s, ok := item.(string); ok {
+								membership.Roles = append(membership.Roles, s)
+								if s == string(core.CUSTOMERADMIN) {
+									claims[string(core.CUSTOMERADMIN)] = true
+								} else if s == string(core.ADMIN) {
+									claims[string(core.ADMIN)] = true
+								}
+							}
 						}
 					}
 				}

@@ -28,13 +28,11 @@ Stored in `metadata_public.roles` array in Kratos identity:
 Stored in `core_user_tenant_memberships.role` column:
 
 - **ADMIN**: Full control within the tenant
-
   - Can manage all members and settings
   - Can delete the tenant
   - Can change other members' roles
 
 - **CUSTOMER_ADMIN**: Administrative access within the tenant
-
   - Can manage users and content
   - Cannot change owner or delete tenant
   - Can invite new members
@@ -282,12 +280,12 @@ router.Use(
 ```go
 // Require specific role
 router.POST("/admin/settings",
-    roleService.RequireTenantRole(service.TenantRoleAdmin),
+    roleService.RequireTenantRole(service.core.ADMIN),
     updateSettingsHandler)
 
 // Require minimum role level
 router.DELETE("/members/:id",
-    roleService.RequireMinimumTenantRole(service.TenantRoleAdmin),
+    roleService.RequireMinimumTenantRole(service.core.ADMIN),
     removeMemberHandler)
 
 // Owner-only routes
