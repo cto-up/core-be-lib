@@ -59,6 +59,15 @@ func IsCustomerAdmin(c *gin.Context) bool {
 	return isCustomerAdmin
 }
 
+func IsActingReseller(c *gin.Context) bool {
+	claims, exist := c.Get(auth.AUTH_CLAIMS)
+	if !exist {
+		return false
+	}
+	isActingReseller := claims.((map[string]interface{}))["ACTING_RESELLER"] == true
+	return isActingReseller
+}
+
 func IsAdmin(c *gin.Context) bool {
 	claims, exist := c.Get(auth.AUTH_CLAIMS)
 	if !exist {
