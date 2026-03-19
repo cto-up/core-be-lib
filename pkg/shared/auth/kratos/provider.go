@@ -661,7 +661,6 @@ func (k *KratosAuthClient) RequiresRecoveryProxy() bool {
 }
 
 // KratosTenantManager implements TenantManager for Kratos
-// Note: Kratos doesn't have built-in tenant management like Firebase.
 // These methods are no-ops that return success to maintain interface compatibility.
 // Actual tenant data is managed in the database (core_tenants table).
 type KratosTenantManager struct {

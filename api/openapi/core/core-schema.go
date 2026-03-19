@@ -375,13 +375,13 @@ type NewSignUp struct {
 
 // NewTenant defines model for NewTenant.
 type NewTenant struct {
-	// AllowPasswordSignUp Firebase setting to Allow password sign up (can skip)
+	// AllowPasswordSignUp Auth Provider setting to Allow password sign up (can skip)
 	AllowPasswordSignUp bool `json:"allow_password_sign_up"`
 
 	// AllowSignUp Allow users to sign up for this tenant
 	AllowSignUp bool `json:"allow_sign_up"`
 
-	// EnableEmailLinkSignIn Firebase setting to Enable email link sign in (can skip)
+	// EnableEmailLinkSignIn Auth Provider setting to Enable email link sign in (TODO is really used?)
 	EnableEmailLinkSignIn bool    `json:"enable_email_link_sign_in"`
 	IsReseller            *bool   `json:"is_reseller,omitempty"`
 	Name                  string  `json:"name"`
@@ -433,13 +433,13 @@ type PromptResponse struct {
 
 // PublicTenantSchema defines model for PublicTenantSchema.
 type PublicTenantSchema struct {
-	// AllowPasswordSignUp Firebase setting to Allow password sign up (can skip)
+	// AllowPasswordSignUp Auth Provider setting to Allow password sign up (can skip)
 	AllowPasswordSignUp bool `json:"allow_password_sign_up"`
 
 	// AllowSignUp Allow users to sign up for this tenant
 	AllowSignUp bool `json:"allow_sign_up"`
 
-	// EnableEmailLinkSignIn Firebase setting to Enable email link sign in (can skip)
+	// EnableEmailLinkSignIn Auth Provider setting to Enable email link sign in (TODO is really used?)
 	EnableEmailLinkSignIn bool `json:"enable_email_link_sign_in"`
 
 	// Features Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
@@ -565,13 +565,13 @@ type SettingsFlow struct {
 
 // Tenant defines model for Tenant.
 type Tenant struct {
-	// AllowPasswordSignUp Firebase setting to Allow password sign up (can skip)
+	// AllowPasswordSignUp Auth Provider setting to Allow password sign up (can skip)
 	AllowPasswordSignUp bool `json:"allow_password_sign_up"`
 
 	// AllowSignUp Allow users to sign up for this tenant
 	AllowSignUp bool `json:"allow_sign_up"`
 
-	// EnableEmailLinkSignIn Firebase setting to Enable email link sign in (can skip)
+	// EnableEmailLinkSignIn Auth Provider setting to Enable email link sign in (TODO is really used?)
 	EnableEmailLinkSignIn bool               `json:"enable_email_link_sign_in"`
 	Id                    openapi_types.UUID `json:"id"`
 	IsReseller            *bool              `json:"is_reseller,omitempty"`

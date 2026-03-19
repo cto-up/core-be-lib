@@ -140,8 +140,6 @@ paths:
     $ref: "./parts/admin/tenants-id-path.yaml"
   /superadmin-api/v1/tenant/{tenantid}/features:
     $ref: "./parts/admin/super-admin-tenant-features-path.yaml"
-  /superadmin-api/v1/config/authorized-domains:
-    $ref: "./parts/admin/authorized-domains-path.yaml"
 
   # Client Applications and API Tokens (ADMIN & SUPER_ADMIN only)
   /admin-api/v1/client-applications:

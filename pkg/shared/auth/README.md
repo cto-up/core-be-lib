@@ -1,10 +1,10 @@
 # Authentication Provider Abstraction
 
-A flexible, provider-agnostic authentication layer that supports multiple authentication backends (Firebase, Ory Kratos, etc.) using the Strategy design pattern.
+A flexible, provider-agnostic authentication layer that supports multiple authentication backends (Ory Kratos, etc.) using the Strategy design pattern.
 
 ## Features
 
-- 🔄 **Swappable Providers**: Switch between Firebase, Kratos, or custom providers
+- 🔄 **Auth Providers**: Kratos, or custom providers
 - 🔌 **Plugin Architecture**: Easy to add new authentication providers
 - 🏢 **Multi-tenant**: Built-in support for multi-tenant applications
 - 🧪 **Testable**: Mock providers for easy unit testing
@@ -23,7 +23,6 @@ go get ctoup.com/coreapp/pkg/shared/auth
 ```go
 import "ctoup.com/coreapp/pkg/shared/auth"
 
-// Initialize from environment (reads AUTH_PROVIDER env var)
 provider, err := auth.InitializeAuthProvider(ctx, multitenantService)
 if err != nil {
     logger.Fatal(err)
@@ -49,14 +48,6 @@ record, err := authClient.CreateUser(ctx, user)
 ### Environment Variables
 
 ```bash
-# Provider selection
-AUTH_PROVIDER=firebase  # or 'kratos'
-
-# Firebase configuration
-FIREBASE_CREDENTIALS_FILE=/path/to/credentials.json
-# OR
-FIREBASE_CREDENTIALS_JSON='{"type":"service_account",...}'
-
 # Kratos configuration (when using Kratos)
 KRATOS_ADMIN_URL=http://localhost:4434
 ```
@@ -75,32 +66,25 @@ KRATOS_ADMIN_URL=http://localhost:4434
 │  - GetAuthClient()                      │
 │  - GetTenantManager()                   │
 │  - GetAuthClientForSubdomain()          │
-└──────┬──────────────────────┬───────────┘
-       │                      │
-       ▼                      ▼
-┌──────────────┐      ┌──────────────┐
-│   Firebase   │      │   Kratos     │
-│   Provider   │      │   Provider   │
-└──────────────┘      └──────────────┘
+└─────────────────────────────┬───────────┘
+                              │
+                              ▼
+                      ┌──────────────┐
+                      │   Kratos     │
+                      │   Provider   │
+                      └──────────────┘
 ```
 
 ## Supported Providers
 
-### Firebase Authentication
+### Ory Kratos
 
 - ✅ Full implementation
 - ✅ Multi-tenant support
 - ✅ Custom claims (roles)
-- ✅ Email actions (verification, password reset)
+- ✅ Webauth
+- ✅ Authenticators
 - ✅ Token verification
-
-### Ory Kratos
-
-- 🚧 Basic implementation
-- 🚧 Identity management
-- 🚧 Custom claims via metadata
-- ⏳ Email flows (in progress)
-- ⏳ Session management (in progress)
 
 ### Custom Providers
 
@@ -261,44 +245,6 @@ mockClient.On("CreateUser", mock.Anything, mock.Anything).
 ## Migration Guide
 
 See [AUTH_HANDLER_MIGRATION_EXAMPLE.md](../../../docs/AUTH_HANDLER_MIGRATION_EXAMPLE.md) for detailed migration instructions.
-
-### Quick Migration Steps
-
-1. Update imports:
-
-```go
-import "ctoup.com/coreapp/pkg/shared/auth"
-```
-
-2. Update type declarations:
-
-```go
-// Before
-authClientPool *service.FirebaseTenantClientConnectionPool
-
-// After
-authProvider auth.AuthProvider
-```
-
-3. Update initialization:
-
-```go
-// Before
-authClientPool, err := service.NewFirebaseTenantClientConnectionPool(ctx, multitenantService)
-
-// After
-authProvider, err := auth.InitializeAuthProvider(ctx, multitenantService)
-```
-
-4. Use direct methods:
-
-```go
-// Before
-authClient, err := authClientPool.GetBaseAuthClient(ctx, subdomain)
-
-// After
-authClient, err := authProvider.GetAuthClientForSubdomain(ctx, subdomain)
-```
 
 ## Performance
 

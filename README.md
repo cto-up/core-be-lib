@@ -5,7 +5,7 @@ A production-ready **Go** framework designed for building scalable, multi-tenant
 ## Key Capabilities
 
 - **Contract-First API**: Automated code generation for Go (server) and TypeScript (Axios client) via OpenAPI.
-- **Dual-Provider Auth**: Seamlessly toggle between **Firebase** (to be **DEPRECATED**) and **Ory Kratos** (supporting MFA and native multi-tenancy).
+- **Ory Kratos** (supporting MFA and native multi-tenancy).
 - **Enterprise Multi-tenancy**: Subdomain-based isolation with built-in **Reseller support** (`IsActingReseller`) for hierarchical account management.
 - **AI/LLM Native**: Unified interface for OpenAI, Anthropic, Gemini, and Ollama, paired with **pgvector** for RAG patterns.
 - **Type-Safe Persistence**: SQLC-driven database layer for high-performance, compile-time safe PostgreSQL operations.
@@ -71,15 +71,6 @@ We use **Goose** for versioned migrations. After updating SQL files, generate ty
 
 ```bash
 make sqlc
-
-```
-
-### Authentication Configuration
-
-Switch providers via environment variables:
-
-```bash
-AUTH_PROVIDER=kratos
 
 ```
 

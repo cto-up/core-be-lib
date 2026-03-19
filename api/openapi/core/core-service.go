@@ -545,18 +545,6 @@ type VerifyEmailJSONBody struct {
 	Token string `json:"token"`
 }
 
-// RemoveAuthorizedDomainsJSONBody defines parameters for RemoveAuthorizedDomains.
-type RemoveAuthorizedDomainsJSONBody struct {
-	// Domains List of domains to remove
-	Domains []string `json:"domains"`
-}
-
-// AddAuthorizedDomainsJSONBody defines parameters for AddAuthorizedDomains.
-type AddAuthorizedDomainsJSONBody struct {
-	// Domains List of domains to authorize
-	Domains []string `json:"domains"`
-}
-
 // ListGlobalConfigsParams defines parameters for ListGlobalConfigs.
 type ListGlobalConfigsParams struct {
 	// Page page number
@@ -749,12 +737,6 @@ type SignupJSONRequestBody = NewSignUp
 
 // VerifyEmailJSONRequestBody defines body for VerifyEmail for application/json ContentType.
 type VerifyEmailJSONRequestBody VerifyEmailJSONBody
-
-// RemoveAuthorizedDomainsJSONRequestBody defines body for RemoveAuthorizedDomains for application/json ContentType.
-type RemoveAuthorizedDomainsJSONRequestBody RemoveAuthorizedDomainsJSONBody
-
-// AddAuthorizedDomainsJSONRequestBody defines body for AddAuthorizedDomains for application/json ContentType.
-type AddAuthorizedDomainsJSONRequestBody AddAuthorizedDomainsJSONBody
 
 // AddGlobalConfigJSONRequestBody defines body for AddGlobalConfig for application/json ContentType.
 type AddGlobalConfigJSONRequestBody AddGlobalConfigJSONBody
@@ -995,12 +977,6 @@ type ServerInterface interface {
 
 	// (POST /public-api/v1/verify-email)
 	VerifyEmail(c *gin.Context)
-
-	// (DELETE /superadmin-api/v1/config/authorized-domains)
-	RemoveAuthorizedDomains(c *gin.Context)
-
-	// (PATCH /superadmin-api/v1/config/authorized-domains)
-	AddAuthorizedDomains(c *gin.Context)
 
 	// (GET /superadmin-api/v1/configs/global-configs)
 	ListGlobalConfigs(c *gin.Context, params ListGlobalConfigsParams)
@@ -3037,32 +3013,6 @@ func (siw *ServerInterfaceWrapper) VerifyEmail(c *gin.Context) {
 	siw.Handler.VerifyEmail(c)
 }
 
-// RemoveAuthorizedDomains operation middleware
-func (siw *ServerInterfaceWrapper) RemoveAuthorizedDomains(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.RemoveAuthorizedDomains(c)
-}
-
-// AddAuthorizedDomains operation middleware
-func (siw *ServerInterfaceWrapper) AddAuthorizedDomains(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.AddAuthorizedDomains(c)
-}
-
 // ListGlobalConfigs operation middleware
 func (siw *ServerInterfaceWrapper) ListGlobalConfigs(c *gin.Context) {
 
@@ -3957,8 +3907,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/public-api/v1/tenant/pictures/logo", wrapper.GetTenantLogo)
 	router.GET(options.BaseURL+"/public-api/v1/users/:userid/profile/picture", wrapper.GetProfilePicture)
 	router.POST(options.BaseURL+"/public-api/v1/verify-email", wrapper.VerifyEmail)
-	router.DELETE(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.RemoveAuthorizedDomains)
-	router.PATCH(options.BaseURL+"/superadmin-api/v1/config/authorized-domains", wrapper.AddAuthorizedDomains)
 	router.GET(options.BaseURL+"/superadmin-api/v1/configs/global-configs", wrapper.ListGlobalConfigs)
 	router.POST(options.BaseURL+"/superadmin-api/v1/configs/global-configs", wrapper.AddGlobalConfig)
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/configs/global-configs/:id", wrapper.DeleteGlobalConfig)

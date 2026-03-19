@@ -54,7 +54,7 @@ func extractBaseDomain(host string) string {
 }
 
 // NewRecoveryHandler creates a RecoveryHandler only if the provider requires recovery proxy
-// Returns nil if provider doesn't require proxy (e.g., Firebase)
+// Returns nil if provider doesn't require proxy
 func NewRecoveryHandler(authProvider auth.AuthProvider) *RecoveryHandler {
 	// Check if provider requires recovery proxy
 	authClient := authProvider.GetAuthClient()

@@ -182,7 +182,7 @@ type Token struct {
 }
 
 // AuthClient defines the interface for authentication operations
-// This abstraction allows swapping between Firebase, Ory/Kratos, or other providers
+// This abstraction allows swapping Ory/Kratos, or other providers
 type AuthClient interface {
 	// User Management
 	CreateUser(ctx context.Context, user *UserToCreate) (*UserRecord, error)
@@ -195,7 +195,6 @@ type AuthClient interface {
 	SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error
 
 	// BuildGlobalRoleClaims creates a provider-specific claims map for global roles
-	// Firebase: {"SUPER_ADMIN": true, "ADMIN": true}
 	// Kratos: {"global_roles": ["SUPER_ADMIN", "ADMIN"]}
 	BuildGlobalRoleClaims(roles []string) map[string]interface{}
 
@@ -251,7 +250,7 @@ type Tenant struct {
 }
 
 // AuthProvider defines the top-level interface for authentication providers
-// Implementations: FirebaseAuthProvider, KratosAuthProvider
+// Implementations: KratosAuthProvider
 type AuthProvider interface {
 	// Token Verification (Middleware use)
 	VerifyToken(c *gin.Context) (*AuthenticatedUser, error)
@@ -312,6 +311,5 @@ type ProviderConfig struct {
 type ProviderType string
 
 const (
-	ProviderTypeFirebase ProviderType = "firebase"
-	ProviderTypeKratos   ProviderType = "kratos"
+	ProviderTypeKratos ProviderType = "kratos"
 )

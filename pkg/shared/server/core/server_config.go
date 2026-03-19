@@ -14,7 +14,6 @@ import (
 	// [DO NOT REMOVE COMMENT - Import]
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/shared/auth"
-	_ "ctoup.com/coreapp/pkg/shared/auth/firebase"
 	_ "ctoup.com/coreapp/pkg/shared/auth/kratos"
 	"ctoup.com/coreapp/pkg/shared/service"
 
@@ -89,7 +88,6 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 
 	multiTenantService := service.NewMultitenantService(coreStore)
 
-	// Initialize the auth provider based on environment (Firebase or Kratos)
 	authProvider, err := auth.InitializeAuthProvider(context.Background(), multiTenantService)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize auth provider")

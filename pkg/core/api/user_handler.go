@@ -62,7 +62,7 @@ func getProfilePictureFilePath(userId any) string {
 }
 
 /**
-* in case user was created in firebase but not in the store
+* in case user was created in auth provider but not in the store
  */
 func (s *UserHandler) CreateMeUser(ctx *gin.Context) {
 	logger := util.GetLoggerFromCtx(ctx.Request.Context())

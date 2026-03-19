@@ -103,7 +103,6 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 		}
 
 		// Set global roles using provider-specific format
-		// Firebase: {"SUPER_ADMIN": true, "ADMIN": true}
 		// Kratos: {"global_roles": ["SUPER_ADMIN", "ADMIN"]}
 		claims := ss.client.BuildGlobalRoleClaims([]string{string(core.SUPERADMIN), string(core.ADMIN)})
 		err = ss.client.SetCustomUserClaims(c, userRecord.UID, claims)

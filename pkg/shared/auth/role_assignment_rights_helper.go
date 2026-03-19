@@ -71,8 +71,7 @@ func IsSuperAdmin(c *gin.Context) bool {
 	if !exist {
 		return false
 	}
-	// Works for both Firebase and Kratos:
-	// - Firebase: Sets SUPER_ADMIN as custom claim boolean
+	// Works for both Kratos:
 	// - Kratos: Extracts from global_roles array and sets as boolean for backward compatibility
 	isSuperAdmin := claims.((map[string]interface{}))[string(core.SUPERADMIN)] == true
 	return isSuperAdmin

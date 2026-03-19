@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// TenantMiddleware is middleware for Firebase Authentication
+// TenantMiddleware is middleware to extract tenant information from the request and set it in the context
 type TenantMiddleware struct {
 	multitenantService *MultitenantService
 }

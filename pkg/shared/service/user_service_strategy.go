@@ -9,17 +9,7 @@ import (
 type UserServiceStrategyFactory struct{}
 
 func (f *UserServiceStrategyFactory) CreateUserServiceStrategy(store *db.Store, authClientPool auth.AuthClientPool) UserService {
-	providerName := authClientPool.GetProviderName()
-
-	switch providerName {
-	case "kratos":
-		return NewSharedUserService(store, authClientPool)
-	case "firebase":
-		return NewIsolatedUserService(store, authClientPool)
-	default:
-		// Default to Firebase for backward compatibility
-		return NewIsolatedUserService(store, authClientPool)
-	}
+	return NewSharedUserService(store, authClientPool)
 }
 
 func NewUserServiceStrategyFactory() *UserServiceStrategyFactory {

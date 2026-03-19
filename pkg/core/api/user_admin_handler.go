@@ -725,7 +725,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 		return
 	}
 
-	// Get Firebase auth client for tenant
+	// Get auth client for tenant
 	subdomain, err := util.GetSubdomain(c)
 	if err != nil {
 		logger.Err(err).Msg("Failed to get subdomain")
@@ -895,7 +895,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			_, err = uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), req, nil)
 			if err != nil {
 				logger.Err(err).Msg("Failed to create user")
-				// check if error is a firebase error and if so, check if it is a duplicate email error
+				// check if error is a auth provider error and if so, check if it is a duplicate email error
 				if auth.IsEmailAlreadyExists(err) {
 					errors = append(errors, ImportError{
 						Line:  lineNum,

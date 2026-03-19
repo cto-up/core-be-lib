@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"fmt"
-	"os"
 )
 
 // DefaultAuthProviderFactory implements AuthProviderFactory
@@ -23,10 +22,7 @@ func (f *DefaultAuthProviderFactory) CreateProvider(ctx context.Context, config 
 
 // CreateProviderFromEnv creates an auth provider based on environment configuration
 func CreateProviderFromEnv(ctx context.Context, multitenantService MultitenantService) (AuthProvider, error) {
-	providerType := os.Getenv("AUTH_PROVIDER")
-	if providerType == "" {
-		providerType = "firebase" // Default to Firebase
-	}
+	providerType := "kratos"
 
 	factory := NewAuthProviderFactory()
 
@@ -36,13 +32,6 @@ func CreateProviderFromEnv(ctx context.Context, multitenantService MultitenantSe
 			"multitenantService": multitenantService,
 		},
 	}
-
-	// For backward compatibility, the caller might need to handle credentials
-	// In the new system, each provider's init() should handle its own defaults if possible,
-	// or we pass credentials via config.Credentials.
-
-	// If it's firebase, we might need the auth.Client if it's already initialized
-	// But usually it's initialized by the factory.
 
 	return factory.CreateProvider(ctx, config)
 }

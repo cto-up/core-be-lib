@@ -19,7 +19,6 @@ type Handlers struct {
 	*core.UserHandler
 	*core.UserAdminHandler
 	*core.UserSuperAdminHandler
-	*core.SuperAdminHandler
 	*core.ClientApplicationHandler
 	*core.TranslationHandler
 	*core.RecoveryHandler
@@ -37,7 +36,6 @@ func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool auth.AuthProvider
 		UserHandler:              core.NewUserHandler(store, authClientPool),
 		UserAdminHandler:         core.NewUserAdminHandler(store, authClientPool),
 		UserSuperAdminHandler:    core.NewUserSuperAdminHandler(store, authClientPool),
-		SuperAdminHandler:        core.NewSuperAdminHandler(authClientPool),
 		ClientApplicationHandler: core.NewClientApplicationHandler(store, clientAppService),
 		TranslationHandler:       core.NewTranslationHandler(store),
 		RecoveryHandler:          core.NewRecoveryHandler(authClientPool),

@@ -49,7 +49,7 @@ func main() {
 	store := db.NewStore(connPool)
 	multitenantService := service.NewMultitenantService(store)
 
-	// Initialize auth provider (Kratos or Firebase based on env)
+	// Initialize auth provider (Kratos based on env)
 	authProvider, err := auth.InitializeAuthProvider(ctx, multitenantService)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to initialize auth provider")
@@ -589,15 +589,10 @@ BACKEND_PORT=8080
 INSTANCE_NAME=main
 LOG_FOLDER=/app/log
 
-# Auth Provider
-AUTH_PROVIDER=kratos  # or 'firebase'
-
 # Kratos Configuration
 KRATOS_ADMIN_URL=http://localhost:4434
 KRATOS_PUBLIC_URL=http://localhost:4433
 
-# Firebase Configuration (if using Firebase)
-FIREBASE_CREDENTIALS_FILE=/path/to/credentials.json
 ```
 
 ## Kratos Configuration

@@ -564,48 +564,11 @@ describe("useTenant", () => {
 });
 ```
 
-## Migration from Firebase
-
-### 1. Update Auth Provider
-
-```go
-// Before
-authProvider, err := auth.InitializeAuthProvider(ctx, multitenantService)
-// Provider automatically selected based on AUTH_PROVIDER env var
-
-// Set AUTH_PROVIDER=kratos in environment
-```
-
-### 2. Migrate User Data
-
-```go
-// For each Firebase user
-firebaseUser := getFirebaseUser(uid)
-
-// Create in Kratos
-kratosUser, err := kratosClient.CreateUser(ctx, &auth.UserToCreate{}.
-    Email(firebaseUser.Email).
-    DisplayName(firebaseUser.DisplayName))
-
-// Set tenant metadata
-err = kratosClient.SetTenantMetadata(ctx, kratosUser.UID, kratos.TenantMetadata{
-    TenantID:  firebaseUser.TenantID,
-    Subdomain: firebaseUser.Subdomain,
-})
-
-// Set roles
-err = kratosClient.SetCustomUserClaims(ctx, kratosUser.UID, firebaseUser.GetClaimsArray())
-```
-
 ### 3. Update Frontend
 
 ```typescript
-// Replace Firebase imports
-// import { getAuth } from "firebase/auth";
 import { kratosService } from "core-fe-lib/authentication/services/kratos.service";
 
-// Replace Firebase auth calls
-// const user = getAuth().currentUser;
 const session = await kratosService.getSession();
 ```
 

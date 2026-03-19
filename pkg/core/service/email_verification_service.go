@@ -88,7 +88,7 @@ func (s *EmailVerificationService) CreateEmailVerificationToken(ctx *gin.Context
 	return token, nil
 }
 
-// VerifyEmailToken verifies a token and marks the user's email as verified in Firebase
+// VerifyEmailToken verifies a token and marks the user's email as verified in Auth provider
 func (s *EmailVerificationService) VerifyEmailToken(ctx *gin.Context, token string, tenantID string) error {
 	logger := util.GetLoggerFromCtx(ctx)
 	// Get token from database
@@ -127,7 +127,7 @@ func (s *EmailVerificationService) VerifyEmailToken(ctx *gin.Context, token stri
 		TenantID: tenantID,
 	}); err != nil {
 		logger.Err(err).Msg("Failed to mark token as used")
-		// Continue anyway, as the main operation (Firebase update) succeeded
+		// Continue anyway, as the main operation (Auth provider update) succeeded
 	}
 
 	return nil
