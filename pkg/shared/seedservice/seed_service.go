@@ -2,7 +2,6 @@ package seedservice
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -63,7 +62,7 @@ func (ss *SeedService) Seed() error {
 	defer tx.Rollback(c)
 	qtx := ss.store.Queries.WithTx(tx)
 
-	_, err = ss.seedAdminUser(c, qtx, userEmail, userPassword)
+	err = ss.seedAdminUser(c, qtx, userEmail, userPassword)
 	if err != nil {
 		log.Err(err).Msg("Error seeding admin user")
 		return err
@@ -74,8 +73,7 @@ func (ss *SeedService) Seed() error {
 	return err
 }
 
-func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries, adminEmail, adminPassword string) (repository.CoreUser, error) {
-	user := repository.CoreUser{}
+func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries, adminEmail, adminPassword string) error {
 	adminName := "Admin User"
 	// Check if admin user exists
 	exists, err := ss.userExists(adminEmail)
@@ -85,7 +83,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 
 	if exists {
 		fmt.Println("Admin user already exists.")
-		return user, errors.New("admin user already exists")
+		return nil
 	} else {
 
 		params := (&auth.UserToCreate{}).
@@ -99,7 +97,7 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 		userRecord, err := ss.client.CreateUser(c, params)
 		if err != nil {
 			log.Err(err).Msg("Error creating admin user")
-			return user, err
+			return err
 		}
 
 		// Set global roles using provider-specific format
@@ -109,10 +107,10 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 
 		if err != nil {
 			log.Err(err).Msg("Error setting custom user claims")
-			return user, err
+			return err
 		}
 
-		return qtx.CreateUserByTenant(c, repository.CreateUserByTenantParams{
+		_, err = qtx.CreateUserByTenant(c, repository.CreateUserByTenantParams{
 			ID:    userRecord.UID,
 			Email: adminEmail,
 			Profile: subentity.UserProfile{
@@ -120,5 +118,12 @@ func (ss *SeedService) seedAdminUser(c context.Context, qtx *repository.Queries,
 			},
 			Roles: []string{string(core.SUPERADMIN), string(core.ADMIN)},
 		})
+		if err != nil {
+			log.Err(err).Msg("Error creating user in database")
+			return err
+		}
+
+		fmt.Println("Admin user created successfully.")
+		return nil
 	}
 }
