@@ -159,6 +159,55 @@ func (q *Queries) GetTenantByTenantID(ctx context.Context, tenantID string) (Cor
 	return i, err
 }
 
+const listResellerTenants = `-- name: ListResellerTenants :many
+WITH reseller AS (
+    SELECT t.tenant_id FROM core_tenants t
+    INNER JOIN core_user_tenant_memberships utm ON utm.tenant_id = t.tenant_id
+    WHERE utm.user_id = $1
+    AND t.is_reseller = true
+    AND 'CUSTOMER_ADMIN' = ANY(utm.roles)
+)
+SELECT ct.id, ct.tenant_id, ct.name, ct.subdomain, ct.enable_email_link_sign_in, ct.allow_password_sign_up, ct.user_id, ct.created_at, ct.updated_at, ct.profile, ct.features, ct.allow_sign_up, ct.is_reseller, ct.reseller_id FROM core_tenants ct
+WHERE ct.tenant_id IN (SELECT tenant_id FROM reseller)
+   OR ct.reseller_id IN (SELECT tenant_id FROM reseller)
+ORDER BY ct.name ASC
+`
+
+func (q *Queries) ListResellerTenants(ctx context.Context, userID string) ([]CoreTenant, error) {
+	rows, err := q.db.Query(ctx, listResellerTenants, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CoreTenant{}
+	for rows.Next() {
+		var i CoreTenant
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Name,
+			&i.Subdomain,
+			&i.EnableEmailLinkSignIn,
+			&i.AllowPasswordSignUp,
+			&i.UserID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Profile,
+			&i.Features,
+			&i.AllowSignUp,
+			&i.IsReseller,
+			&i.ResellerID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTenants = `-- name: ListTenants :many
 SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id FROM core_tenants
 WHERE (UPPER(name) LIKE UPPER($3) OR $3 IS NULL)

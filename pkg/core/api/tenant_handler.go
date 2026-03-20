@@ -392,6 +392,27 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 	c.JSON(http.StatusOK, tenants)
 }
 
+// (GET /api/v1/reseller/tenants)
+func (exh *TenantHandler) ListResellerTenants(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
+	// Caller must be a CUSTOMER_ADMIN of a reseller tenant
+	if !auth.IsActingReseller(c) && !auth.IsReseller(c) {
+		c.JSON(http.StatusForbidden, helpers.ErrorResponse(fmt.Errorf("forbidden: must be a CUSTOMER_ADMIN of a reseller tenant")))
+		return
+	}
+
+	userID := c.GetString(auth.AUTH_USER_ID)
+
+	tenants, err := exh.store.ListResellerTenants(c, userID)
+	if err != nil {
+		logger.Err(err).Msg("Failed to list reseller tenants")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	c.JSON(http.StatusOK, tenants)
+}
+
 func NewTenantHandler(store *db.Store, authProvider auth.AuthProvider, multiTenantService *service.MultitenantService) *TenantHandler {
 	fileService := fileservice.NewFileService()
 	return &TenantHandler{

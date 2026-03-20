@@ -1,0 +1,14 @@
+get:
+  description: |
+    Returns all tenants belonging to the current user's reseller tenant, including the reseller itself.
+    The caller must be a CUSTOMER_ADMIN of a tenant that has the reseller flag set.
+  operationId: listResellerTenants
+  responses:
+    "200":
+      description: tenant response
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../../core-schema.yaml#/components/schemas/Tenant"

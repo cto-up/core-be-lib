@@ -55,6 +55,19 @@ RETURNING id
 ;
 
 
+-- name: ListResellerTenants :many
+WITH reseller AS (
+    SELECT t.tenant_id FROM core_tenants t
+    INNER JOIN core_user_tenant_memberships utm ON utm.tenant_id = t.tenant_id
+    WHERE utm.user_id = sqlc.arg('user_id')
+    AND t.is_reseller = true
+    AND 'CUSTOMER_ADMIN' = ANY(utm.roles)
+)
+SELECT ct.* FROM core_tenants ct
+WHERE ct.tenant_id IN (SELECT tenant_id FROM reseller)
+   OR ct.reseller_id IN (SELECT tenant_id FROM reseller)
+ORDER BY ct.name ASC;
+
 -- name: UpdateTenantProfile :one
 UPDATE core_tenants 
 SET profile = $1

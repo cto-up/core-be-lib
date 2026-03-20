@@ -870,6 +870,9 @@ type ServerInterface interface {
 	// (PUT /api/v1/prompts/{id})
 	UpdatePrompt(c *gin.Context, id openapi_types.UUID)
 
+	// (GET /api/v1/reseller/tenants)
+	ListResellerTenants(c *gin.Context)
+
 	// (POST /api/v1/tenant/pictures/background)
 	UploadTenantBackground(c *gin.Context)
 
@@ -2016,6 +2019,19 @@ func (siw *ServerInterfaceWrapper) UpdatePrompt(c *gin.Context) {
 	}
 
 	siw.Handler.UpdatePrompt(c, id)
+}
+
+// ListResellerTenants operation middleware
+func (siw *ServerInterfaceWrapper) ListResellerTenants(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListResellerTenants(c)
 }
 
 // UploadTenantBackground operation middleware
@@ -3871,6 +3887,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/api/v1/prompts/:id", wrapper.DeletePrompt)
 	router.GET(options.BaseURL+"/api/v1/prompts/:id", wrapper.GetPromptByID)
 	router.PUT(options.BaseURL+"/api/v1/prompts/:id", wrapper.UpdatePrompt)
+	router.GET(options.BaseURL+"/api/v1/reseller/tenants", wrapper.ListResellerTenants)
 	router.POST(options.BaseURL+"/api/v1/tenant/pictures/background", wrapper.UploadTenantBackground)
 	router.POST(options.BaseURL+"/api/v1/tenant/pictures/background-mobile", wrapper.UploadTenantBackgroundMobile)
 	router.POST(options.BaseURL+"/api/v1/tenant/pictures/logo", wrapper.UploadTenantLogo)
