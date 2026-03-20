@@ -306,6 +306,15 @@ func (fs *FileService) FileExists(ctx context.Context, filename string) (bool, e
 	return exists, nil
 }
 
+func (fs *FileService) ReadFileBytes(ctx context.Context, filename string) ([]byte, error) {
+	reader, err := fs.bucket.NewReader(ctx, filename, nil)
+	if err != nil {
+		return nil, fmt.Errorf("open file %s: %w", filename, err)
+	}
+	defer reader.Close()
+	return io.ReadAll(reader)
+}
+
 // GetFile retrieves a file from the specified bucket and writes its contents to the HTTP response.
 // It supports ETag-based caching for improved performance.
 func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {
