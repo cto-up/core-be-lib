@@ -154,9 +154,9 @@ func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenant
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	err = uh.userService.DeleteUser(c, baseAuthClient, tenant.TenantID, userid)
+	err = uh.userService.RemoveUserFromTenant(c, baseAuthClient, tenant.TenantID, userid)
 	if err != nil {
-		logger.Err(err).Msg("Failed to delete user")
+		logger.Err(err).Msg("Failed to remove user from tenant")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

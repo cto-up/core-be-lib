@@ -220,7 +220,13 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		return
 	}
 
-	err = uh.userService.DeleteUser(c, baseAuthClient, tenantID.(string), userid)
+	if tenantID == "" {
+		// No tenant context — hard delete the user globally
+		err = uh.userService.DeleteUser(c, baseAuthClient, "", userid)
+	} else {
+		// Tenant context present — soft delete (set membership status to inactive)
+		err = uh.userService.RemoveUserFromTenant(c, baseAuthClient, tenantID.(string), userid)
+	}
 	if err != nil {
 		logger.Err(err).Msg("Failed to delete user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))

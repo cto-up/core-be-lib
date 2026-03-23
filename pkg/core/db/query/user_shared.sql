@@ -165,8 +165,7 @@ FULL OUTER JOIN updated_membership ON updated_user.id = updated_membership.user_
 -- The user record itself remains (they may belong to other tenants)
 UPDATE core_user_tenant_memberships
 SET status = 'inactive',
-    updated_at = NOW(),
-    left_at = NOW()
+    updated_at = NOW()
 WHERE user_id = $1 
     AND tenant_id = sqlc.arg(tenant_id)
 RETURNING user_id as id;

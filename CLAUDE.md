@@ -2,9 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What This Is
+## Before you start any task
 
-`ctoup.com/coreapp` — a Go backend library providing multi-tenant, contract-first API infrastructure. It is used as a dependency by application repositories, not run standalone in production (though `cmd/full/main.go` serves as a reference server).
+1. Use the domain map below to identify which module docs to read
+2. Glob-triggered rules in `.claude/rules/` load automatically when you touch matching files
+3. Architecture Decision Records are in `docs/adr`folder
+4. If touching database, OpenAPI, or a frontend — those rules files enforce mandatory workflows
+5. The application is using ctoup.com/coreapp for user, tenant management. If improvement is required for ctoup.com/coreapp , source code is found in folder: ../core-be-lib
+6. Never modify vendor folder directly
 
 ## Build & Development Commands
 

@@ -317,8 +317,7 @@ func (q *Queries) DeleteSharedUser(ctx context.Context, id string) (string, erro
 const deleteSharedUserByTenant = `-- name: DeleteSharedUserByTenant :one
 UPDATE core_user_tenant_memberships
 SET status = 'inactive',
-    updated_at = NOW(),
-    left_at = NOW()
+    updated_at = NOW()
 WHERE user_id = $1 
     AND tenant_id = $2
 RETURNING user_id as id
