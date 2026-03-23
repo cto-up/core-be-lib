@@ -809,6 +809,78 @@ func (q *Queries) ListSharedUsersByTenant(ctx context.Context, arg ListSharedUse
 	return items, nil
 }
 
+const listSharedUsersByTenantAllStatuses = `-- name: ListSharedUsersByTenantAllStatuses :many
+SELECT
+    u.id, u.profile, u.email, u.created_at, u.tenant_id, u.roles,
+    utm.roles as tenant_roles,
+    utm.status as membership_status,
+    utm.joined_at
+FROM core_users u
+INNER JOIN core_user_tenant_memberships utm ON u.id = utm.user_id
+WHERE utm.tenant_id = $3
+    AND (
+        email ILIKE $4::text || '%'
+        OR $4 IS NULL
+    )
+ORDER BY u.created_at
+LIMIT $1
+OFFSET $2
+`
+
+type ListSharedUsersByTenantAllStatusesParams struct {
+	Limit        int32       `json:"limit"`
+	Offset       int32       `json:"offset"`
+	TenantID     string      `json:"tenant_id"`
+	SearchPrefix pgtype.Text `json:"search_prefix"`
+}
+
+type ListSharedUsersByTenantAllStatusesRow struct {
+	ID               string                `json:"id"`
+	Profile          subentity.UserProfile `json:"profile"`
+	Email            pgtype.Text           `json:"email"`
+	CreatedAt        time.Time             `json:"created_at"`
+	TenantID         pgtype.Text           `json:"tenant_id"`
+	Roles            []string              `json:"roles"`
+	TenantRoles      []string              `json:"tenant_roles"`
+	MembershipStatus string                `json:"membership_status"`
+	JoinedAt         pgtype.Timestamptz    `json:"joined_at"`
+}
+
+func (q *Queries) ListSharedUsersByTenantAllStatuses(ctx context.Context, arg ListSharedUsersByTenantAllStatusesParams) ([]ListSharedUsersByTenantAllStatusesRow, error) {
+	rows, err := q.db.Query(ctx, listSharedUsersByTenantAllStatuses,
+		arg.Limit,
+		arg.Offset,
+		arg.TenantID,
+		arg.SearchPrefix,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSharedUsersByTenantAllStatusesRow{}
+	for rows.Next() {
+		var i ListSharedUsersByTenantAllStatusesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Profile,
+			&i.Email,
+			&i.CreatedAt,
+			&i.TenantID,
+			&i.Roles,
+			&i.TenantRoles,
+			&i.MembershipStatus,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTenantMembers = `-- name: ListTenantMembers :many
 SELECT utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles
 FROM core_user_tenant_memberships utm
@@ -914,6 +986,22 @@ func (q *Queries) ListUserTenantMemberships(ctx context.Context, arg ListUserTen
 		return nil, err
 	}
 	return items, nil
+}
+
+const reactivateUserMembership = `-- name: ReactivateUserMembership :exec
+UPDATE core_user_tenant_memberships
+SET status = 'active', updated_at = NOW()
+WHERE user_id = $1 AND tenant_id = $2
+`
+
+type ReactivateUserMembershipParams struct {
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+func (q *Queries) ReactivateUserMembership(ctx context.Context, arg ReactivateUserMembershipParams) error {
+	_, err := q.db.Exec(ctx, reactivateUserMembership, arg.UserID, arg.TenantID)
+	return err
 }
 
 const removeRoleFromUserTenantMembership = `-- name: RemoveRoleFromUserTenantMembership :one

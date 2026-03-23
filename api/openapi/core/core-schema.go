@@ -685,14 +685,17 @@ type Translation struct {
 
 // User defines model for User.
 type User struct {
-	CreatedAt     *time.Time         `json:"created_at,omitempty"`
-	Disabled      *bool              `json:"disabled,omitempty"`
-	Email         string             `json:"email"`
-	EmailVerified *bool              `json:"email_verified,omitempty"`
-	Id            string             `json:"id"`
-	Name          string             `json:"name"`
-	Profile       *UserProfileSchema `json:"profile,omitempty"`
-	Roles         []Role             `json:"roles"`
+	CreatedAt     *time.Time `json:"created_at,omitempty"`
+	Disabled      *bool      `json:"disabled,omitempty"`
+	Email         string     `json:"email"`
+	EmailVerified *bool      `json:"email_verified,omitempty"`
+	Id            string     `json:"id"`
+
+	// MembershipStatus Membership status (active, inactive, etc.)
+	MembershipStatus *string            `json:"membership_status"`
+	Name             string             `json:"name"`
+	Profile          *UserProfileSchema `json:"profile,omitempty"`
+	Roles            []Role             `json:"roles"`
 }
 
 // UserActionSchema defines model for UserActionSchema.

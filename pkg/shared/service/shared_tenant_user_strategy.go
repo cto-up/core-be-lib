@@ -91,8 +91,8 @@ func (g *TenantUserStrategy) UpdateSharedProfile(ctx context.Context, store *db.
 }
 
 func (g *TenantUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
-	// Query via user_tenant_memberships table
-	memberships, err := store.ListSharedUsersByTenant(c, repository.ListSharedUsersByTenantParams{
+	// Query via user_tenant_memberships table (all statuses)
+	memberships, err := store.ListSharedUsersByTenantAllStatuses(c, repository.ListSharedUsersByTenantAllStatusesParams{
 		TenantID:     g.tenantID,
 		Limit:        pagingSql.PageSize,
 		Offset:       pagingSql.Offset,
@@ -105,12 +105,14 @@ func (g *TenantUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSq
 	// Convert memberships to users
 	users := make([]core.User, len(memberships))
 	for j, membership := range memberships {
+		membershipStatus := membership.MembershipStatus
 		user := core.User{
-			Id:        membership.ID,
-			Name:      membership.Profile.Name,
-			Email:     membership.Email.String,
-			Roles:     convertToRoleDTOs(membership.TenantRoles),
-			CreatedAt: &membership.CreatedAt,
+			Id:               membership.ID,
+			Name:             membership.Profile.Name,
+			Email:            membership.Email.String,
+			Roles:            convertToRoleDTOs(membership.TenantRoles),
+			CreatedAt:        &membership.CreatedAt,
+			MembershipStatus: &membershipStatus,
 		}
 		users[j] = user
 	}

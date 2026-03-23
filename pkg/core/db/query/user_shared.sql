@@ -50,6 +50,28 @@ LIMIT $1
 OFFSET $2;
 
 
+-- name: ReactivateUserMembership :exec
+UPDATE core_user_tenant_memberships
+SET status = 'active', updated_at = NOW()
+WHERE user_id = sqlc.arg(user_id) AND tenant_id = sqlc.arg(tenant_id);
+
+-- name: ListSharedUsersByTenantAllStatuses :many
+SELECT
+    u.*,
+    utm.roles as tenant_roles,
+    utm.status as membership_status,
+    utm.joined_at
+FROM core_users u
+INNER JOIN core_user_tenant_memberships utm ON u.id = utm.user_id
+WHERE utm.tenant_id = sqlc.arg(tenant_id)
+    AND (
+        email ILIKE sqlc.narg('search_prefix')::text || '%'
+        OR sqlc.narg('search_prefix') IS NULL
+    )
+ORDER BY u.created_at
+LIMIT $1
+OFFSET $2;
+
 -- name: CreateSharedUser :one
 -- USED
 INSERT INTO core_users (

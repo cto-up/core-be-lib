@@ -577,3 +577,31 @@ func (uh *UserSuperAdminHandler) AddUserMembershipFromSuperAdmin(c *gin.Context,
 
 	c.JSON(http.StatusCreated, user)
 }
+
+// ReactivateUserFromSuperAdmin sets a user's membership status to 'active' for a specific tenant.
+func (uh *UserSuperAdminHandler) ReactivateUserFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userid string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
+	if err != nil {
+		logger.Err(err).Msg("Failed to get tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !auth.IsAllowedToManageTenant(c, tenant) {
+		logger.Error().Msg("Not allowed to manage this tenant")
+		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
+		return
+	}
+
+	err = uh.store.ReactivateUserMembership(c, repository.ReactivateUserMembershipParams{
+		UserID:   userid,
+		TenantID: tenant.TenantID,
+	})
+	if err != nil {
+		logger.Err(err).Msg("Failed to reactivate user membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}

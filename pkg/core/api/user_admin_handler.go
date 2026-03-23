@@ -505,6 +505,29 @@ func (uh *UserAdminHandler) UpdateUserStatus(c *gin.Context, userID string) {
 	c.Status(http.StatusNoContent)
 }
 
+// ReactivateUser implements openapi.ServerInterface.
+func (uh *UserAdminHandler) ReactivateUser(c *gin.Context, userID string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
+	if !exists {
+		logger.Error().Msg("TenantID not found")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
+		return
+	}
+
+	err := uh.store.ReactivateUserMembership(c, repository.ReactivateUserMembershipParams{
+		UserID:   userID,
+		TenantID: tenantID.(string),
+	})
+	if err != nil {
+		logger.Err(err).Msg("Failed to reactivate user membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID string) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)

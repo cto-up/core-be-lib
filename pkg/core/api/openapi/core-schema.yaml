@@ -72,6 +72,10 @@ components:
         created_at:
           type: string
           format: date-time
+        membership_status:
+          type: string
+          description: Membership status (active, inactive, etc.)
+          nullable: true
     UserProfileSchema:
       $ref: "./parts/users/user-profile-schema.yaml"
     UserActionSchema:

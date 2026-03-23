@@ -936,6 +936,9 @@ type ServerInterface interface {
 	// (POST /api/v1/users/{userid}/password-reset-request)
 	ResetPasswordRequestByAdmin(c *gin.Context, userid string)
 
+	// (POST /api/v1/users/{userid}/reactivate)
+	ReactivateUser(c *gin.Context, userid string)
+
 	// (DELETE /api/v1/users/{userid}/remove-from-tenant)
 	RemoveUserFromTenant(c *gin.Context, userid string)
 
@@ -1040,6 +1043,9 @@ type ServerInterface interface {
 
 	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/password-reset-request)
 	ResetPasswordRequestBySuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
+
+	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/reactivate)
+	ReactivateUserFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
 
 	// (DELETE /superadmin-api/v1/tenants/{tenantid}/users/{userid}/remove-from-tenant)
 	RemoveUserFromTenantFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
@@ -2624,6 +2630,30 @@ func (siw *ServerInterfaceWrapper) ResetPasswordRequestByAdmin(c *gin.Context) {
 	siw.Handler.ResetPasswordRequestByAdmin(c, userid)
 }
 
+// ReactivateUser operation middleware
+func (siw *ServerInterfaceWrapper) ReactivateUser(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ReactivateUser(c, userid)
+}
+
 // RemoveUserFromTenant operation middleware
 func (siw *ServerInterfaceWrapper) RemoveUserFromTenant(c *gin.Context) {
 
@@ -3677,6 +3707,39 @@ func (siw *ServerInterfaceWrapper) ResetPasswordRequestBySuperAdmin(c *gin.Conte
 	siw.Handler.ResetPasswordRequestBySuperAdmin(c, tenantid, userid)
 }
 
+// ReactivateUserFromSuperAdmin operation middleware
+func (siw *ServerInterfaceWrapper) ReactivateUserFromSuperAdmin(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ReactivateUserFromSuperAdmin(c, tenantid, userid)
+}
+
 // RemoveUserFromTenantFromSuperAdmin operation middleware
 func (siw *ServerInterfaceWrapper) RemoveUserFromTenantFromSuperAdmin(c *gin.Context) {
 
@@ -3909,6 +3972,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.PUT(options.BaseURL+"/api/v1/users/:userid", wrapper.UpdateUser)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/membership", wrapper.AddUserMembership)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/password-reset-request", wrapper.ResetPasswordRequestByAdmin)
+	router.POST(options.BaseURL+"/api/v1/users/:userid/reactivate", wrapper.ReactivateUser)
 	router.DELETE(options.BaseURL+"/api/v1/users/:userid/remove-from-tenant", wrapper.RemoveUserFromTenant)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:role/assign", wrapper.AssignRole)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/roles/:role/unassign", wrapper.UnassignRole)
@@ -3944,6 +4008,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.PUT(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.UpdateUserFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/membership", wrapper.AddUserMembershipFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/password-reset-request", wrapper.ResetPasswordRequestBySuperAdmin)
+	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/reactivate", wrapper.ReactivateUserFromSuperAdmin)
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/remove-from-tenant", wrapper.RemoveUserFromTenantFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/roles/:role/assign", wrapper.AssignRoleFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/roles/:role/unassign", wrapper.UnassignRoleFromSuperAdmin)
