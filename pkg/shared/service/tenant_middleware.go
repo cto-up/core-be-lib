@@ -51,6 +51,28 @@ func (fam *TenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			ctx.Abort()
 			return
 		}
+		// Reject requests for disabled tenants
+		if tenantID != "" {
+			disabled, err := fam.multitenantService.IsTenantDisabled(ctx, tenantID)
+			if err != nil {
+				log.Err(err).Msg("Failed to check tenant disabled status")
+				ctx.JSON(http.StatusInternalServerError, gin.H{
+					"status":  http.StatusInternalServerError,
+					"message": err.Error(),
+				})
+				ctx.Abort()
+				return
+			}
+			if disabled {
+				ctx.JSON(http.StatusForbidden, gin.H{
+					"status":  http.StatusForbidden,
+					"message": "Tenant account has been suspended",
+				})
+				ctx.Abort()
+				return
+			}
+		}
+
 		ctx.Set(auth.AUTH_TENANT_ID_KEY, tenantID)
 		ctx.Next()
 	}

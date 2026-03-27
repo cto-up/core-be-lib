@@ -15,23 +15,25 @@ import (
 
 const createTenant = `-- name: CreateTenant :one
 INSERT INTO core_tenants (
-  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up", "reseller_id", "is_reseller"
+  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up", "reseller_id", "is_reseller", "contract_end_date", "is_disabled"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
-RETURNING id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id
+RETURNING id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled
 `
 
 type CreateTenantParams struct {
-	UserID                string      `json:"user_id"`
-	TenantID              string      `json:"tenant_id"`
-	Name                  string      `json:"name"`
-	Subdomain             string      `json:"subdomain"`
-	EnableEmailLinkSignIn bool        `json:"enable_email_link_sign_in"`
-	AllowPasswordSignUp   bool        `json:"allow_password_sign_up"`
-	AllowSignUp           bool        `json:"allow_sign_up"`
-	ResellerID            pgtype.Text `json:"reseller_id"`
-	IsReseller            bool        `json:"is_reseller"`
+	UserID                string             `json:"user_id"`
+	TenantID              string             `json:"tenant_id"`
+	Name                  string             `json:"name"`
+	Subdomain             string             `json:"subdomain"`
+	EnableEmailLinkSignIn bool               `json:"enable_email_link_sign_in"`
+	AllowPasswordSignUp   bool               `json:"allow_password_sign_up"`
+	AllowSignUp           bool               `json:"allow_sign_up"`
+	ResellerID            pgtype.Text        `json:"reseller_id"`
+	IsReseller            bool               `json:"is_reseller"`
+	ContractEndDate       pgtype.Timestamptz `json:"contract_end_date"`
+	IsDisabled            bool               `json:"is_disabled"`
 }
 
 func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (CoreTenant, error) {
@@ -45,6 +47,8 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Cor
 		arg.AllowSignUp,
 		arg.ResellerID,
 		arg.IsReseller,
+		arg.ContractEndDate,
+		arg.IsDisabled,
 	)
 	var i CoreTenant
 	err := row.Scan(
@@ -62,6 +66,8 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Cor
 		&i.AllowSignUp,
 		&i.IsReseller,
 		&i.ResellerID,
+		&i.ContractEndDate,
+		&i.IsDisabled,
 	)
 	return i, err
 }
@@ -79,7 +85,7 @@ func (q *Queries) DeleteTenant(ctx context.Context, id uuid.UUID) (uuid.UUID, er
 }
 
 const getTenantByID = `-- name: GetTenantByID :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
 WHERE id = $1 LIMIT 1
 `
 
@@ -101,12 +107,14 @@ func (q *Queries) GetTenantByID(ctx context.Context, id uuid.UUID) (CoreTenant, 
 		&i.AllowSignUp,
 		&i.IsReseller,
 		&i.ResellerID,
+		&i.ContractEndDate,
+		&i.IsDisabled,
 	)
 	return i, err
 }
 
 const getTenantBySubdomain = `-- name: GetTenantBySubdomain :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
 WHERE subdomain = $1 LIMIT 1
 `
 
@@ -128,12 +136,14 @@ func (q *Queries) GetTenantBySubdomain(ctx context.Context, subdomain string) (C
 		&i.AllowSignUp,
 		&i.IsReseller,
 		&i.ResellerID,
+		&i.ContractEndDate,
+		&i.IsDisabled,
 	)
 	return i, err
 }
 
 const getTenantByTenantID = `-- name: GetTenantByTenantID :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
 WHERE tenant_id = $1 LIMIT 1
 `
 
@@ -155,6 +165,8 @@ func (q *Queries) GetTenantByTenantID(ctx context.Context, tenantID string) (Cor
 		&i.AllowSignUp,
 		&i.IsReseller,
 		&i.ResellerID,
+		&i.ContractEndDate,
+		&i.IsDisabled,
 	)
 	return i, err
 }
@@ -167,7 +179,7 @@ WITH reseller AS (
     AND t.is_reseller = true
     AND 'CUSTOMER_ADMIN' = ANY(utm.roles)
 )
-SELECT ct.id, ct.tenant_id, ct.name, ct.subdomain, ct.enable_email_link_sign_in, ct.allow_password_sign_up, ct.user_id, ct.created_at, ct.updated_at, ct.profile, ct.features, ct.allow_sign_up, ct.is_reseller, ct.reseller_id FROM core_tenants ct
+SELECT ct.id, ct.tenant_id, ct.name, ct.subdomain, ct.enable_email_link_sign_in, ct.allow_password_sign_up, ct.user_id, ct.created_at, ct.updated_at, ct.profile, ct.features, ct.allow_sign_up, ct.is_reseller, ct.reseller_id, ct.contract_end_date, ct.is_disabled FROM core_tenants ct
 WHERE ct.tenant_id IN (SELECT tenant_id FROM reseller)
    OR ct.reseller_id IN (SELECT tenant_id FROM reseller)
 ORDER BY ct.name ASC
@@ -197,6 +209,8 @@ func (q *Queries) ListResellerTenants(ctx context.Context, userID string) ([]Cor
 			&i.AllowSignUp,
 			&i.IsReseller,
 			&i.ResellerID,
+			&i.ContractEndDate,
+			&i.IsDisabled,
 		); err != nil {
 			return nil, err
 		}
@@ -209,7 +223,7 @@ func (q *Queries) ListResellerTenants(ctx context.Context, userID string) ([]Cor
 }
 
 const listTenants = `-- name: ListTenants :many
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
 WHERE (UPPER(name) LIKE UPPER($3) OR $3 IS NULL)
 AND (reseller_id = $4 OR $4 IS NULL)
 ORDER BY
@@ -267,6 +281,8 @@ func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]Cor
 			&i.AllowSignUp,
 			&i.IsReseller,
 			&i.ResellerID,
+			&i.ContractEndDate,
+			&i.IsDisabled,
 		); err != nil {
 			return nil, err
 		}
@@ -279,26 +295,30 @@ func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]Cor
 }
 
 const updateTenant = `-- name: UpdateTenant :one
-UPDATE core_tenants 
-SET 
+UPDATE core_tenants
+SET
     "name" = $2,
     "subdomain" = $3,
     "enable_email_link_sign_in" = $4,
     "allow_password_sign_up" = $5,
     "allow_sign_up" = $6,
-    "is_reseller" = $7
+    "is_reseller" = $7,
+    "contract_end_date" = $8,
+    "is_disabled" = $9
 WHERE id = $1
 RETURNING id
 `
 
 type UpdateTenantParams struct {
-	ID                    uuid.UUID `json:"id"`
-	Name                  string    `json:"name"`
-	Subdomain             string    `json:"subdomain"`
-	EnableEmailLinkSignIn bool      `json:"enable_email_link_sign_in"`
-	AllowPasswordSignUp   bool      `json:"allow_password_sign_up"`
-	AllowSignUp           bool      `json:"allow_sign_up"`
-	IsReseller            bool      `json:"is_reseller"`
+	ID                    uuid.UUID          `json:"id"`
+	Name                  string             `json:"name"`
+	Subdomain             string             `json:"subdomain"`
+	EnableEmailLinkSignIn bool               `json:"enable_email_link_sign_in"`
+	AllowPasswordSignUp   bool               `json:"allow_password_sign_up"`
+	AllowSignUp           bool               `json:"allow_sign_up"`
+	IsReseller            bool               `json:"is_reseller"`
+	ContractEndDate       pgtype.Timestamptz `json:"contract_end_date"`
+	IsDisabled            bool               `json:"is_disabled"`
 }
 
 func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (uuid.UUID, error) {
@@ -310,10 +330,76 @@ func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (uui
 		arg.AllowPasswordSignUp,
 		arg.AllowSignUp,
 		arg.IsReseller,
+		arg.ContractEndDate,
+		arg.IsDisabled,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const disableTenant = `-- name: DisableTenant :exec
+UPDATE core_tenants SET is_disabled = true, updated_at = NOW()
+WHERE tenant_id = $1
+`
+
+func (q *Queries) DisableTenant(ctx context.Context, tenantID string) error {
+	_, err := q.db.Exec(ctx, disableTenant, tenantID)
+	return err
+}
+
+const enableTenant = `-- name: EnableTenant :exec
+UPDATE core_tenants SET is_disabled = false, updated_at = NOW()
+WHERE tenant_id = $1
+`
+
+func (q *Queries) EnableTenant(ctx context.Context, tenantID string) error {
+	_, err := q.db.Exec(ctx, enableTenant, tenantID)
+	return err
+}
+
+const getExpiredEnabledTenants = `-- name: GetExpiredEnabledTenants :many
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
+WHERE contract_end_date IS NOT NULL
+  AND contract_end_date < NOW()
+  AND is_disabled = false
+`
+
+func (q *Queries) GetExpiredEnabledTenants(ctx context.Context) ([]CoreTenant, error) {
+	rows, err := q.db.Query(ctx, getExpiredEnabledTenants)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CoreTenant{}
+	for rows.Next() {
+		var i CoreTenant
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Name,
+			&i.Subdomain,
+			&i.EnableEmailLinkSignIn,
+			&i.AllowPasswordSignUp,
+			&i.UserID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Profile,
+			&i.Features,
+			&i.AllowSignUp,
+			&i.IsReseller,
+			&i.ResellerID,
+			&i.ContractEndDate,
+			&i.IsDisabled,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateTenantFeatures = `-- name: UpdateTenantFeatures :one

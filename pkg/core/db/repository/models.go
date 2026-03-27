@@ -118,6 +118,8 @@ type CoreTenant struct {
 	AllowSignUp           bool                     `json:"allow_sign_up"`
 	IsReseller            bool                     `json:"is_reseller"`
 	ResellerID            pgtype.Text              `json:"reseller_id"`
+	ContractEndDate       pgtype.Timestamptz       `json:"contract_end_date"`
+	IsDisabled            bool                     `json:"is_disabled"`
 }
 
 type CoreTenantConfig struct {

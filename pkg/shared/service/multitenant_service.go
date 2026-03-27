@@ -65,6 +65,18 @@ func (uh *MultitenantService) GetTenantIDWithSubdomain(ctx context.Context, subd
 	return tenantID, nil
 }
 
+// IsTenantDisabled returns true when the tenant's is_disabled flag is set.
+func (uh *MultitenantService) IsTenantDisabled(ctx context.Context, tenantID string) (bool, error) {
+	if tenantID == "" {
+		return false, nil
+	}
+	tenant, err := uh.store.GetTenantByTenantID(ctx, tenantID)
+	if err != nil {
+		return false, err
+	}
+	return tenant.IsDisabled, nil
+}
+
 // Check if tenant is a reseller
 func (uh *MultitenantService) IsReseller(ctx context.Context, tenantID string) (bool, error) {
 	if tenantID == "" {

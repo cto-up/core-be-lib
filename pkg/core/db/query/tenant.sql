@@ -30,23 +30,39 @@ OFFSET $2;
 
 -- name: CreateTenant :one
 INSERT INTO core_tenants (
-  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up", "reseller_id", "is_reseller"
+  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up", "reseller_id", "is_reseller", "contract_end_date", "is_disabled"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
 RETURNING *;
 
 -- name: UpdateTenant :one
-UPDATE core_tenants 
-SET 
+UPDATE core_tenants
+SET
     "name" = $2,
     "subdomain" = $3,
     "enable_email_link_sign_in" = $4,
     "allow_password_sign_up" = $5,
     "allow_sign_up" = $6,
-    "is_reseller" = $7
+    "is_reseller" = $7,
+    "contract_end_date" = $8,
+    "is_disabled" = $9
 WHERE id = $1
 RETURNING id;
+
+-- name: DisableTenant :exec
+UPDATE core_tenants SET is_disabled = true, updated_at = NOW()
+WHERE tenant_id = $1;
+
+-- name: EnableTenant :exec
+UPDATE core_tenants SET is_disabled = false, updated_at = NOW()
+WHERE tenant_id = $1;
+
+-- name: GetExpiredEnabledTenants :many
+SELECT * FROM core_tenants
+WHERE contract_end_date IS NOT NULL
+  AND contract_end_date < NOW()
+  AND is_disabled = false;
 
 -- name: DeleteTenant :one
 DELETE FROM core_tenants

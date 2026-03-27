@@ -139,6 +139,27 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 		isReseller = *req.IsReseller
 	}
 
+	// SUPER_ADMIN, ADMIN, or a reseller can set contract_end_date and is_disabled at creation time.
+	// For resellers the new tenant's reseller_id will be their own tenant_id, so they always qualify.
+	var contractEndDate pgtype.Timestamptz
+	var isDisabled bool
+	canUpdateContract := auth.IsSuperAdmin(c) || auth.IsAdmin(c)
+	if !canUpdateContract {
+		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+		isCallerReseller, _ := exh.multiTenantService.IsReseller(c, authTenantID)
+		if isCallerReseller && resellerID.Valid && resellerID.String == authTenantID {
+			canUpdateContract = true
+		}
+	}
+	if canUpdateContract {
+		if req.ContractEndDate != nil {
+			contractEndDate = pgtype.Timestamptz{Time: *req.ContractEndDate, Valid: true}
+		}
+		if req.IsDisabled != nil {
+			isDisabled = *req.IsDisabled
+		}
+	}
+
 	tenant, err := exh.store.CreateTenant(c,
 		repository.CreateTenantParams{
 			UserID:                userID.(string),
@@ -150,6 +171,8 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 			AllowSignUp:           req.AllowSignUp,
 			ResellerID:            resellerID,
 			IsReseller:            isReseller,
+			ContractEndDate:       contractEndDate,
+			IsDisabled:            isDisabled,
 		})
 	if err != nil {
 		logger.Err(err).Msg("Failed to create tenant")
@@ -220,6 +243,14 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 		return
 	}
 
+	// Fetch existing tenant once for field-level permission checks and fallback values
+	existing, err := exh.store.GetTenantByID(c, id)
+	if err != nil {
+		logger.Err(err).Msg("Failed to get existing tenant for update")
+		c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
+		return
+	}
+
 	updateParams := repository.UpdateTenantParams{
 		ID:                    id,
 		Name:                  req.Name,
@@ -227,24 +258,36 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 		EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
 		AllowPasswordSignUp:   req.AllowPasswordSignUp,
 		AllowSignUp:           req.AllowSignUp,
+		// Preserve existing values by default; overridden below based on role
+		IsReseller:      existing.IsReseller,
+		ContractEndDate: existing.ContractEndDate,
+		IsDisabled:      existing.IsDisabled,
 	}
 
-	// Only SUPER_ADMIN can update reseller_id and is_reseller fields
-	if !auth.IsSuperAdmin(c) {
-		existing, err := exh.store.GetTenantByID(c, id)
-		if err != nil {
-			logger.Err(err).Msg("Failed to get existing tenant for update")
-			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
-			return
-		}
-		updateParams.IsReseller = existing.IsReseller
-	} else if req.IsReseller != nil {
+	// Only SUPER_ADMIN can change is_reseller
+	if auth.IsSuperAdmin(c) && req.IsReseller != nil {
 		updateParams.IsReseller = *req.IsReseller
-	} else {
-		// SUPER_ADMIN but IsReseller not provided, keep existing
-		existing, err := exh.store.GetTenantByID(c, id)
-		if err == nil {
-			updateParams.IsReseller = existing.IsReseller
+	}
+
+	// SUPER_ADMIN, ADMIN, or a reseller managing this specific tenant can update
+	// contract_end_date and is_disabled
+	canUpdateContract := auth.IsSuperAdmin(c) || auth.IsAdmin(c)
+	if !canUpdateContract {
+		authTenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+		isReseller, _ := exh.multiTenantService.IsReseller(c, authTenantID)
+		if isReseller && existing.ResellerID.Valid && existing.ResellerID.String == authTenantID {
+			canUpdateContract = true
+		}
+	}
+
+	if canUpdateContract {
+		if req.ContractEndDate != nil {
+			updateParams.ContractEndDate = pgtype.Timestamptz{Time: *req.ContractEndDate, Valid: true}
+		} else {
+			updateParams.ContractEndDate = pgtype.Timestamptz{}
+		}
+		if req.IsDisabled != nil {
+			updateParams.IsDisabled = *req.IsDisabled
 		}
 	}
 

@@ -24,3 +24,11 @@ properties:
   reseller_id:
     type: string
     nullable: true
+  contract_end_date:
+    type: string
+    format: date-time
+    nullable: true
+    description: Optional contract expiry date. When reached, the tenant is automatically disabled.
+  is_disabled:
+    type: boolean
+    description: When true, all API requests for this tenant are rejected with 403.

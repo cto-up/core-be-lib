@@ -381,12 +381,18 @@ type NewTenant struct {
 	// AllowSignUp Allow users to sign up for this tenant
 	AllowSignUp bool `json:"allow_sign_up"`
 
+	// ContractEndDate Optional contract expiry date. When reached, the tenant is automatically disabled.
+	ContractEndDate *time.Time `json:"contract_end_date"`
+
 	// EnableEmailLinkSignIn Auth Provider setting to Enable email link sign in (TODO is really used?)
-	EnableEmailLinkSignIn bool    `json:"enable_email_link_sign_in"`
-	IsReseller            *bool   `json:"is_reseller,omitempty"`
-	Name                  string  `json:"name"`
-	ResellerId            *string `json:"reseller_id"`
-	Subdomain             string  `json:"subdomain"`
+	EnableEmailLinkSignIn bool `json:"enable_email_link_sign_in"`
+
+	// IsDisabled When true, all API requests for this tenant are rejected with 403.
+	IsDisabled *bool   `json:"is_disabled,omitempty"`
+	IsReseller *bool   `json:"is_reseller,omitempty"`
+	Name       string  `json:"name"`
+	ResellerId *string `json:"reseller_id"`
+	Subdomain  string  `json:"subdomain"`
 }
 
 // NewTranslation defines model for NewTranslation.
@@ -439,14 +445,20 @@ type PublicTenantSchema struct {
 	// AllowSignUp Allow users to sign up for this tenant
 	AllowSignUp bool `json:"allow_sign_up"`
 
+	// ContractEndDate Optional contract expiry date. When reached, the tenant is automatically disabled.
+	ContractEndDate *time.Time `json:"contract_end_date"`
+
 	// EnableEmailLinkSignIn Auth Provider setting to Enable email link sign in (TODO is really used?)
 	EnableEmailLinkSignIn bool `json:"enable_email_link_sign_in"`
 
 	// Features Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
-	Features   map[string]bool    `json:"features"`
-	Id         openapi_types.UUID `json:"id"`
-	IsReseller *bool              `json:"is_reseller,omitempty"`
-	Name       string             `json:"name"`
+	Features map[string]bool    `json:"features"`
+	Id       openapi_types.UUID `json:"id"`
+
+	// IsDisabled When true, all API requests for this tenant are rejected with 403.
+	IsDisabled *bool  `json:"is_disabled,omitempty"`
+	IsReseller *bool  `json:"is_reseller,omitempty"`
+	Name       string `json:"name"`
 	Profile    struct {
 		DarkColors struct {
 			Accent                   *string `json:"accent,omitempty"`
@@ -571,14 +583,20 @@ type Tenant struct {
 	// AllowSignUp Allow users to sign up for this tenant
 	AllowSignUp bool `json:"allow_sign_up"`
 
+	// ContractEndDate Optional contract expiry date. When reached, the tenant is automatically disabled.
+	ContractEndDate *time.Time `json:"contract_end_date"`
+
 	// EnableEmailLinkSignIn Auth Provider setting to Enable email link sign in (TODO is really used?)
 	EnableEmailLinkSignIn bool               `json:"enable_email_link_sign_in"`
 	Id                    openapi_types.UUID `json:"id"`
-	IsReseller            *bool              `json:"is_reseller,omitempty"`
-	Name                  string             `json:"name"`
-	ResellerId            *string            `json:"reseller_id"`
-	Subdomain             string             `json:"subdomain"`
-	TenantId              string             `json:"tenant_id"`
+
+	// IsDisabled When true, all API requests for this tenant are rejected with 403.
+	IsDisabled *bool   `json:"is_disabled,omitempty"`
+	IsReseller *bool   `json:"is_reseller,omitempty"`
+	Name       string  `json:"name"`
+	ResellerId *string `json:"reseller_id"`
+	Subdomain  string  `json:"subdomain"`
+	TenantId   string  `json:"tenant_id"`
 }
 
 // TenantFeatures Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
