@@ -241,6 +241,21 @@ func GetRootDomain(c *gin.Context) (string, error) {
 	return domainInfo.Domain, nil
 }
 
+// ExtractBaseURL derives the full scheme+domain+port from the request with no subdomain.
+// It respects X-Forwarded-Proto for reverse proxy setups.
+// Examples: "https://ctoup.com", "http://localhost:3000"
+func ExtractBaseURL(c *gin.Context) (string, error) {
+	host, err := GetHost(c)
+	if err != nil {
+		return "", fmt.Errorf("could not determine request host: %w", err)
+	}
+	domain, err := GetBaseDomainWithPort(c)
+	if err != nil {
+		return "", fmt.Errorf("could not determine request domain: %w", err)
+	}
+	return fmt.Sprintf("%s://%s", host.Scheme, domain), nil
+}
+
 // GetTLD extracts just the top-level domain
 func GetTLD(c *gin.Context) (string, error) {
 	domainInfo, err := GetDomainInfo(c)
