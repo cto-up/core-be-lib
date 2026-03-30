@@ -19,7 +19,7 @@ INSERT INTO core_tenants (
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
-RETURNING id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled
+RETURNING id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled, feature_licenses
 `
 
 type CreateTenantParams struct {
@@ -68,6 +68,7 @@ func (q *Queries) CreateTenant(ctx context.Context, arg CreateTenantParams) (Cor
 		&i.ResellerID,
 		&i.ContractEndDate,
 		&i.IsDisabled,
+		&i.FeatureLicenses,
 	)
 	return i, err
 }
@@ -85,7 +86,7 @@ func (q *Queries) DeleteTenant(ctx context.Context, id uuid.UUID) (uuid.UUID, er
 }
 
 const getTenantByID = `-- name: GetTenantByID :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled, feature_licenses FROM core_tenants
 WHERE id = $1 LIMIT 1
 `
 
@@ -109,12 +110,13 @@ func (q *Queries) GetTenantByID(ctx context.Context, id uuid.UUID) (CoreTenant, 
 		&i.ResellerID,
 		&i.ContractEndDate,
 		&i.IsDisabled,
+		&i.FeatureLicenses,
 	)
 	return i, err
 }
 
 const getTenantBySubdomain = `-- name: GetTenantBySubdomain :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled, feature_licenses FROM core_tenants
 WHERE subdomain = $1 LIMIT 1
 `
 
@@ -138,12 +140,13 @@ func (q *Queries) GetTenantBySubdomain(ctx context.Context, subdomain string) (C
 		&i.ResellerID,
 		&i.ContractEndDate,
 		&i.IsDisabled,
+		&i.FeatureLicenses,
 	)
 	return i, err
 }
 
 const getTenantByTenantID = `-- name: GetTenantByTenantID :one
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled, feature_licenses FROM core_tenants
 WHERE tenant_id = $1 LIMIT 1
 `
 
@@ -167,6 +170,7 @@ func (q *Queries) GetTenantByTenantID(ctx context.Context, tenantID string) (Cor
 		&i.ResellerID,
 		&i.ContractEndDate,
 		&i.IsDisabled,
+		&i.FeatureLicenses,
 	)
 	return i, err
 }
@@ -179,7 +183,7 @@ WITH reseller AS (
     AND t.is_reseller = true
     AND 'CUSTOMER_ADMIN' = ANY(utm.roles)
 )
-SELECT ct.id, ct.tenant_id, ct.name, ct.subdomain, ct.enable_email_link_sign_in, ct.allow_password_sign_up, ct.user_id, ct.created_at, ct.updated_at, ct.profile, ct.features, ct.allow_sign_up, ct.is_reseller, ct.reseller_id, ct.contract_end_date, ct.is_disabled FROM core_tenants ct
+SELECT ct.id, ct.tenant_id, ct.name, ct.subdomain, ct.enable_email_link_sign_in, ct.allow_password_sign_up, ct.user_id, ct.created_at, ct.updated_at, ct.profile, ct.features, ct.allow_sign_up, ct.is_reseller, ct.reseller_id, ct.contract_end_date, ct.is_disabled, ct.feature_licenses FROM core_tenants ct
 WHERE ct.tenant_id IN (SELECT tenant_id FROM reseller)
    OR ct.reseller_id IN (SELECT tenant_id FROM reseller)
 ORDER BY ct.name ASC
@@ -211,6 +215,7 @@ func (q *Queries) ListResellerTenants(ctx context.Context, userID string) ([]Cor
 			&i.ResellerID,
 			&i.ContractEndDate,
 			&i.IsDisabled,
+			&i.FeatureLicenses,
 		); err != nil {
 			return nil, err
 		}
@@ -223,7 +228,7 @@ func (q *Queries) ListResellerTenants(ctx context.Context, userID string) ([]Cor
 }
 
 const listTenants = `-- name: ListTenants :many
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled, feature_licenses FROM core_tenants
 WHERE (UPPER(name) LIKE UPPER($3) OR $3 IS NULL)
 AND (reseller_id = $4 OR $4 IS NULL)
 ORDER BY
@@ -283,6 +288,7 @@ func (q *Queries) ListTenants(ctx context.Context, arg ListTenantsParams) ([]Cor
 			&i.ResellerID,
 			&i.ContractEndDate,
 			&i.IsDisabled,
+			&i.FeatureLicenses,
 		); err != nil {
 			return nil, err
 		}
@@ -359,7 +365,7 @@ func (q *Queries) EnableTenant(ctx context.Context, tenantID string) error {
 }
 
 const getExpiredEnabledTenants = `-- name: GetExpiredEnabledTenants :many
-SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled FROM core_tenants
+SELECT id, tenant_id, name, subdomain, enable_email_link_sign_in, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled, feature_licenses FROM core_tenants
 WHERE contract_end_date IS NOT NULL
   AND contract_end_date < NOW()
   AND is_disabled = false
@@ -391,6 +397,7 @@ func (q *Queries) GetExpiredEnabledTenants(ctx context.Context) ([]CoreTenant, e
 			&i.ResellerID,
 			&i.ContractEndDate,
 			&i.IsDisabled,
+			&i.FeatureLicenses,
 		); err != nil {
 			return nil, err
 		}
@@ -435,6 +442,25 @@ type UpdateTenantProfileParams struct {
 
 func (q *Queries) UpdateTenantProfile(ctx context.Context, arg UpdateTenantProfileParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, updateTenantProfile, arg.Profile, arg.TenantID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const updateTenantFeatureLicenses = `-- name: UpdateTenantFeatureLicenses :one
+UPDATE core_tenants
+SET feature_licenses = $1
+WHERE id = $2
+RETURNING id
+`
+
+type UpdateTenantFeatureLicensesParams struct {
+	FeatureLicenses subentity.TenantFeatureLicenses `json:"feature_licenses"`
+	ID              uuid.UUID                        `json:"id"`
+}
+
+func (q *Queries) UpdateTenantFeatureLicenses(ctx context.Context, arg UpdateTenantFeatureLicensesParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, updateTenantFeatureLicenses, arg.FeatureLicenses, arg.ID)
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err

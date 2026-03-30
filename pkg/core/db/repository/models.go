@@ -104,22 +104,23 @@ type CoreRole struct {
 }
 
 type CoreTenant struct {
-	ID                    uuid.UUID                `json:"id"`
-	TenantID              string                   `json:"tenant_id"`
-	Name                  string                   `json:"name"`
-	Subdomain             string                   `json:"subdomain"`
-	EnableEmailLinkSignIn bool                     `json:"enable_email_link_sign_in"`
-	AllowPasswordSignUp   bool                     `json:"allow_password_sign_up"`
-	UserID                string                   `json:"user_id"`
-	CreatedAt             time.Time                `json:"created_at"`
-	UpdatedAt             time.Time                `json:"updated_at"`
-	Profile               subentity.TenantProfile  `json:"profile"`
-	Features              subentity.TenantFeatures `json:"features"`
-	AllowSignUp           bool                     `json:"allow_sign_up"`
-	IsReseller            bool                     `json:"is_reseller"`
-	ResellerID            pgtype.Text              `json:"reseller_id"`
-	ContractEndDate       pgtype.Timestamptz       `json:"contract_end_date"`
-	IsDisabled            bool                     `json:"is_disabled"`
+	ID                    uuid.UUID                       `json:"id"`
+	TenantID              string                          `json:"tenant_id"`
+	Name                  string                          `json:"name"`
+	Subdomain             string                          `json:"subdomain"`
+	EnableEmailLinkSignIn bool                            `json:"enable_email_link_sign_in"`
+	AllowPasswordSignUp   bool                            `json:"allow_password_sign_up"`
+	UserID                string                          `json:"user_id"`
+	CreatedAt             time.Time                       `json:"created_at"`
+	UpdatedAt             time.Time                       `json:"updated_at"`
+	Profile               subentity.TenantProfile         `json:"profile"`
+	Features              subentity.TenantFeatures        `json:"features"`
+	AllowSignUp           bool                            `json:"allow_sign_up"`
+	IsReseller            bool                            `json:"is_reseller"`
+	ResellerID            pgtype.Text                     `json:"reseller_id"`
+	ContractEndDate       pgtype.Timestamptz              `json:"contract_end_date"`
+	IsDisabled            bool                            `json:"is_disabled"`
+	FeatureLicenses       subentity.TenantFeatureLicenses `json:"feature_licenses"`
 }
 
 type CoreTenantConfig struct {

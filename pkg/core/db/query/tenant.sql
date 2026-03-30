@@ -92,8 +92,15 @@ RETURNING id
 ;
 
 -- name: UpdateTenantFeatures :one
-UPDATE core_tenants 
+UPDATE core_tenants
 SET features = $1
+WHERE id = $2
+RETURNING id
+;
+
+-- name: UpdateTenantFeatureLicenses :one
+UPDATE core_tenants
+SET feature_licenses = $1
 WHERE id = $2
 RETURNING id
 ;

@@ -9,6 +9,8 @@ components:
       $ref: "./parts/tenant-profile-schema.yaml"
     TenantFeatures:
       $ref: "./parts/tenant-features-schema.yaml"
+    TenantFeatureLicenses:
+      $ref: "./parts/tenant-feature-licenses-schema.yaml"
     ColorSchema:
       $ref: "./parts/tenant-color-schema.yaml"
     # Users

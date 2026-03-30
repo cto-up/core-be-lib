@@ -27,6 +27,11 @@ sql:
               import: ctoup.com/coreapp/pkg/shared/repository/subentity
               package: subentity
               type: TenantFeatures
+          - column: core_tenants.feature_licenses
+            go_type:
+              import: ctoup.com/coreapp/pkg/shared/repository/subentity
+              package: subentity
+              type: TenantFeatureLicenses
           - column: core_tenants.profile
             go_type:
               import: ctoup.com/coreapp/pkg/shared/repository/subentity

@@ -744,6 +744,9 @@ type AddGlobalConfigJSONRequestBody AddGlobalConfigJSONBody
 // UpdateGlobalConfigJSONRequestBody defines body for UpdateGlobalConfig for application/json ContentType.
 type UpdateGlobalConfigJSONRequestBody UpdateGlobalConfigJSONBody
 
+// UpdateTenantFeatureLicensesJSONRequestBody defines body for UpdateTenantFeatureLicenses for application/json ContentType.
+type UpdateTenantFeatureLicensesJSONRequestBody = TenantFeatureLicenses
+
 // UpdateTenantFeaturesJSONRequestBody defines body for UpdateTenantFeatures for application/json ContentType.
 type UpdateTenantFeaturesJSONRequestBody = TenantFeatures
 
@@ -998,6 +1001,12 @@ type ServerInterface interface {
 
 	// (PUT /superadmin-api/v1/configs/global-configs/{id})
 	UpdateGlobalConfig(c *gin.Context, id openapi_types.UUID)
+
+	// (GET /superadmin-api/v1/tenant/{tenantid}/feature-licenses)
+	GetTenantFeatureLicenses(c *gin.Context, tenantid openapi_types.UUID)
+
+	// (PUT /superadmin-api/v1/tenant/{tenantid}/feature-licenses)
+	UpdateTenantFeatureLicenses(c *gin.Context, tenantid openapi_types.UUID)
 
 	// (GET /superadmin-api/v1/tenant/{tenantid}/features)
 	GetTenantFeatures(c *gin.Context, tenantid openapi_types.UUID)
@@ -3210,6 +3219,54 @@ func (siw *ServerInterfaceWrapper) UpdateGlobalConfig(c *gin.Context) {
 	siw.Handler.UpdateGlobalConfig(c, id)
 }
 
+// GetTenantFeatureLicenses operation middleware
+func (siw *ServerInterfaceWrapper) GetTenantFeatureLicenses(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTenantFeatureLicenses(c, tenantid)
+}
+
+// UpdateTenantFeatureLicenses operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTenantFeatureLicenses(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateTenantFeatureLicenses(c, tenantid)
+}
+
 // GetTenantFeatures operation middleware
 func (siw *ServerInterfaceWrapper) GetTenantFeatures(c *gin.Context) {
 
@@ -3993,6 +4050,8 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/configs/global-configs/:id", wrapper.DeleteGlobalConfig)
 	router.GET(options.BaseURL+"/superadmin-api/v1/configs/global-configs/:id", wrapper.GetGlobalConfigByID)
 	router.PUT(options.BaseURL+"/superadmin-api/v1/configs/global-configs/:id", wrapper.UpdateGlobalConfig)
+	router.GET(options.BaseURL+"/superadmin-api/v1/tenant/:tenantid/feature-licenses", wrapper.GetTenantFeatureLicenses)
+	router.PUT(options.BaseURL+"/superadmin-api/v1/tenant/:tenantid/feature-licenses", wrapper.UpdateTenantFeatureLicenses)
 	router.GET(options.BaseURL+"/superadmin-api/v1/tenant/:tenantid/features", wrapper.GetTenantFeatures)
 	router.PUT(options.BaseURL+"/superadmin-api/v1/tenant/:tenantid/features", wrapper.UpdateTenantFeatures)
 	router.GET(options.BaseURL+"/superadmin-api/v1/tenants", wrapper.ListTenants)

@@ -599,6 +599,12 @@ type Tenant struct {
 	TenantId   string  `json:"tenant_id"`
 }
 
+// TenantFeatureLicenses License info per feature for a tenant. Key is the feature name. Only features enabled in TenantFeatures should have an entry.
+type TenantFeatureLicenses map[string]struct {
+	// Code License code for the feature
+	Code string `json:"code"`
+}
+
 // TenantFeatures Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
 type TenantFeatures map[string]bool
 
