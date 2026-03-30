@@ -173,6 +173,9 @@ type ActionCodeSettings struct {
 	AndroidPackageName    string
 	AndroidInstallApp     bool
 	AndroidMinimumVersion string
+	// ReturnTo is the frontend path to redirect to after recovery is complete.
+	// When set, it is appended as &return_to=<encoded> to the recovery link.
+	ReturnTo string
 }
 
 // Token represents an authentication token

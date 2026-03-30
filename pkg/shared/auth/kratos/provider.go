@@ -3,6 +3,7 @@ package kratos
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -634,6 +635,9 @@ func (k *KratosAuthClient) PasswordResetLinkWithSettings(ctx context.Context, em
 			// Construct the frontend recovery URL
 			// This URL will be opened by the user and will call our backend proxy
 			frontendLink := fmt.Sprintf("%s/recovery?%s", baseURL, queryPart)
+			if settings.ReturnTo != "" {
+				frontendLink += "&return_to=" + url.QueryEscape(settings.ReturnTo)
+			}
 			logger.Info().
 				Str("kratos_link", kratosLink).
 				Str("settings_url", settings.URL).
