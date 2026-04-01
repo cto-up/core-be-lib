@@ -31,6 +31,10 @@ func HasRightsForRole(c *gin.Context, role core.Role) error {
 	return nil
 }
 
+func HasAdminPrivileges(c *gin.Context) bool {
+	return IsCustomerAdmin(c) || IsActingReseller(c) || IsSuperAdmin(c) || IsAdmin(c)
+}
+
 func HasRightsForRoles(c *gin.Context, roles []core.Role) error {
 	for _, role := range roles {
 		if err := HasRightsForRole(c, role); err != nil {
