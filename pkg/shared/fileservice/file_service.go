@@ -322,10 +322,11 @@ func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {
 	// Create a new reader to the specified file.
 	reader, err := fs.bucket.NewReader(ctx, filename, nil)
 	if err != nil {
-		logger.Err(err).Msgf("Failed to open file %s", filename)
 		if gcerrors.Code(err) == gcerrors.NotFound {
+			logger.Warn().Msgf("Failed to find file %s", filename)
 			ctx.AbortWithStatus(404)
 		} else {
+			logger.Err(err).Msgf("Failed to open file %s", filename)
 			ctx.AbortWithError(500, err)
 		}
 		return err
