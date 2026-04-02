@@ -169,9 +169,9 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		return
 	}
 	// check if user has rights to delete user CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN
-	if !auth.IsCustomerAdmin(c) && !auth.IsAdmin(c) && !auth.IsSuperAdmin(c) {
-		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user"})
+	if !auth.HasAdminPrivileges(c) {
+		logger.Error().Msg("Only RESELLER, CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only RESELLER, CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can delete user"})
 		return
 	}
 	var user core.User
@@ -255,9 +255,9 @@ func (uh *UserAdminHandler) RemoveUserFromTenant(c *gin.Context, userid string) 
 	}
 
 	// Check if user has rights to remove user (CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN)
-	if !auth.IsCustomerAdmin(c) && !auth.IsAdmin(c) && !auth.IsSuperAdmin(c) {
-		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove user from tenant")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove user from tenant"})
+	if !auth.HasAdminPrivileges(c) {
+		logger.Error().Msg("Only RESELLER, CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove user from tenant")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only RESELLER, CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can remove user from tenant"})
 		return
 	}
 
@@ -546,8 +546,8 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 	}
 
 	// check if authorized user is admin
-	if !auth.IsAdmin(c) || !auth.IsSuperAdmin(c) {
-		logger.Error().Msg("Only admin or super admin can reset password")
+	if !auth.HasAdminPrivileges(c) {
+		logger.Error().Msg("Only RESELLER, admin or super admin can reset password")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only admin or super admin can reset password"})
 		return
 	}
@@ -909,11 +909,11 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			req.Roles = []core.Role{}
 
 			// check if user has rights to assign roles
-			if isCustomerAdmin && (!auth.IsSuperAdmin(c) && !auth.IsAdmin(c) && !auth.IsCustomerAdmin(c)) {
+			if !auth.HasAdminPrivileges(c) {
 				errors = append(errors, ImportError{
 					Line:  lineNum,
 					Email: email,
-					Error: "must be an CUSTOMER_ADMIN or SUPER_ADMIN to assign CUSTOMER_ADMIN role to a user.",
+					Error: "must be an RESELLER, CUSTOMER_ADMIN or SUPER_ADMIN to assign CUSTOMER_ADMIN role to a user.",
 				})
 				failed++
 				continue
