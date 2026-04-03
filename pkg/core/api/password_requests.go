@@ -64,6 +64,16 @@ func getResetPasswordURL(c *gin.Context, subdomains ...string) (string, error) {
 	return buildTenantURL(c, path, subdomain)
 }
 
+// getWelcomeEmailURL always returns the frontoffice signin URL regardless of request origin.
+// New users are always directed to the frontoffice, even when an admin creates them.
+func getWelcomeEmailURL(c *gin.Context, subdomains ...string) (string, error) {
+	var subdomain string
+	if len(subdomains) > 0 {
+		subdomain = subdomains[0]
+	}
+	return buildTenantURL(c, "/signin?from=/", subdomain)
+}
+
 func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	fromEmail := os.Getenv("SYSTEM_EMAIL")

@@ -91,9 +91,9 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	url, err := getResetPasswordURL(c)
+	url, err := getWelcomeEmailURL(c)
 	if err != nil {
-		logger.Err(err).Msg("Failed to get reset password URL")
+		logger.Err(err).Msg("Failed to get welcome email URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
@@ -944,12 +944,12 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 				}
 			}
 
-			url, err := getResetPasswordURL(c)
+			url, err := getWelcomeEmailURL(c)
 			if err != nil {
 				errors = append(errors, ImportError{
 					Line:  lineNum,
 					Email: email,
-					Error: fmt.Sprintf("error getting reset password url: %v", err),
+					Error: fmt.Sprintf("error getting welcome email url: %v", err),
 				})
 				failed++
 				continue
