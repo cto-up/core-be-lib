@@ -677,6 +677,18 @@ func (uh *UserSuperAdminHandler) HardDeleteUserFromSuperAdmin(c *gin.Context, te
 	}
 
 	if err := uh.userService.DeleteUser(c, baseAuthClient, userid); err != nil {
+		if err.Error() == "no rows in result set" {
+			// No core_users record — user is orphaned (exists in Kratos/memberships only).
+			// Still remove the Kratos identity so the account cannot be used.
+			logger.Warn().Str("user_id", userid).Msg("No core_users record found — cleaning up Kratos identity only")
+			if kratosErr := baseAuthClient.DeleteUser(c, userid); kratosErr != nil && !sharedauth.IsUserNotFound(kratosErr) {
+				logger.Err(kratosErr).Msg("Failed to delete orphaned Kratos identity")
+				c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(kratosErr))
+				return
+			}
+			c.Status(http.StatusNoContent)
+			return
+		}
 		logger.Err(err).Msg("Failed to hard delete user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
