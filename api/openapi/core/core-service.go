@@ -1047,6 +1047,9 @@ type ServerInterface interface {
 	// (PUT /superadmin-api/v1/tenants/{tenantid}/users/{userid})
 	UpdateUserFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
 
+	// (DELETE /superadmin-api/v1/tenants/{tenantid}/users/{userid}/hard-delete)
+	HardDeleteUserFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
+
 	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/membership)
 	AddUserMembershipFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
 
@@ -3698,6 +3701,39 @@ func (siw *ServerInterfaceWrapper) UpdateUserFromSuperAdmin(c *gin.Context) {
 	siw.Handler.UpdateUserFromSuperAdmin(c, tenantid, userid)
 }
 
+// HardDeleteUserFromSuperAdmin operation middleware
+func (siw *ServerInterfaceWrapper) HardDeleteUserFromSuperAdmin(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.HardDeleteUserFromSuperAdmin(c, tenantid, userid)
+}
+
 // AddUserMembershipFromSuperAdmin operation middleware
 func (siw *ServerInterfaceWrapper) AddUserMembershipFromSuperAdmin(c *gin.Context) {
 
@@ -4065,6 +4101,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.DeleteUserFromSuperAdmin)
 	router.GET(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.GetUserByIDFromSuperAdmin)
 	router.PUT(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.UpdateUserFromSuperAdmin)
+	router.DELETE(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/hard-delete", wrapper.HardDeleteUserFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/membership", wrapper.AddUserMembershipFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/password-reset-request", wrapper.ResetPasswordRequestBySuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/reactivate", wrapper.ReactivateUserFromSuperAdmin)

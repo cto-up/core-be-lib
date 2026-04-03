@@ -148,7 +148,7 @@ func (uh *SharedUserService) UpdateUserProfileInDatabase(ctx context.Context, te
 	return err
 }
 
-func (uh *SharedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string) error {
+func (uh *SharedUserService) DeleteUser(c *gin.Context, authClient auth.AuthClient, userId string) error {
 	logger := util.GetLoggerFromCtx(c)
 
 	tx, err := uh.store.ConnPool.Begin(c)

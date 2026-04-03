@@ -2,7 +2,9 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
@@ -599,6 +601,83 @@ func (uh *UserSuperAdminHandler) ReactivateUserFromSuperAdmin(c *gin.Context, te
 	})
 	if err != nil {
 		logger.Err(err).Msg("Failed to reactivate user membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// HardDeleteUserFromSuperAdmin permanently deletes a user from the database and the identity provider.
+// Unlike DeleteUserFromSuperAdmin (which only removes the tenant membership), this removes the user globally.
+// Blocked if the user has active memberships in other tenants — deactivate those first.
+// (DELETE /superadmin-api/v1/tenants/{tenantid}/users/{userid}/hard-delete)
+func (uh *UserSuperAdminHandler) HardDeleteUserFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userid string) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
+	callerID, exists := c.Get(sharedauth.AUTH_USER_ID)
+	if !exists {
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("user_id not found in context"))
+		return
+	}
+	if callerID.(string) == userid {
+		c.JSON(http.StatusForbidden, helpers.ErrorStringResponse("Cannot permanently delete yourself"))
+		return
+	}
+
+	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
+	if err != nil {
+		logger.Err(err).Msg("Failed to get tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !auth.IsAllowedToManageTenant(c, tenant) {
+		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
+		return
+	}
+
+	// Block if the user has active memberships in other tenants.
+	// Inactive memberships are fine — they will cascade-delete.
+	activeMemberships, err := uh.store.Queries.ListUserTenantMemberships(c, repository.ListUserTenantMembershipsParams{
+		UserID: userid,
+		Status: "active",
+	})
+	if err != nil {
+		logger.Err(err).Msg("Failed to list active tenant memberships")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	var otherActiveTenants []string
+	for _, m := range activeMemberships {
+		if m.TenantID != tenant.TenantID {
+			otherActiveTenants = append(otherActiveTenants, m.TenantName)
+		}
+	}
+	if len(otherActiveTenants) > 0 {
+		msg := fmt.Sprintf(
+			"user has active memberships in %d other tenant(s): %s — deactivate those first",
+			len(otherActiveTenants),
+			strings.Join(otherActiveTenants, ", "),
+		)
+		c.JSON(http.StatusConflict, helpers.ErrorStringResponse(msg))
+		return
+	}
+
+	logger.Warn().
+		Str("user_id", userid).
+		Str("tenant_id", tenant.TenantID).
+		Str("caller_id", callerID.(string)).
+		Msg("SUPER_ADMIN hard deleting user — irreversible")
+
+	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
+	if err != nil {
+		logger.Err(err).Msg("Failed to get auth client for tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	if err := uh.userService.DeleteUser(c, baseAuthClient, userid); err != nil {
+		logger.Err(err).Msg("Failed to hard delete user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

@@ -68,6 +68,8 @@ paths:
     $ref: "./parts/users/super-admin-users-id-status-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}/reactivate:
     $ref: "./parts/users/super-admin-users-id-reactivate-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/hard-delete:
+    $ref: "./parts/users/super-admin-users-id-hard-delete-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{role}/assign:
     $ref: "./parts/users/super-admin-users-id-role-assign-path.yaml"
   /superadmin-api/v1/tenants/{tenantid}/users/{userid}/roles/{role}/unassign:
