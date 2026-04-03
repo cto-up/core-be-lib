@@ -80,7 +80,7 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	url, err := getResetPasswordURL(c, tenant.Subdomain)
+	url, err := getWelcomeEmailURL(c, tenant.Subdomain)
 	if err != nil {
 		logger.Err(err).Msg("Failed to get reset password URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
