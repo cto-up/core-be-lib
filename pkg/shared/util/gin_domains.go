@@ -209,6 +209,14 @@ func GetSubdomain(c *gin.Context) (string, error) {
 	return domainInfo.Subdomain, nil
 }
 
+// IsAdminSubdomain reports whether the given subdomain should be treated as the
+// admin/root site rather than a specific tenant. It returns true when the
+// subdomain is empty, "www", or "admin". This is the single source of truth for
+// this check across the backend — do not reinvent it locally.
+func IsAdminSubdomain(subdomain string) bool {
+	return subdomain == "" || subdomain == "www" || subdomain == "admin"
+}
+
 // GetDomain extracts the domain (including TLD)
 func GetDomain(c *gin.Context) (string, error) {
 	domainInfo, err := GetDomainInfo(c)

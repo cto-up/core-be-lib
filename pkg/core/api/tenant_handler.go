@@ -39,7 +39,7 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 		return
 	}
 
-	if subdomain == "" || subdomain == "www" {
+	if utils.IsAdminSubdomain(subdomain) {
 		c.JSON(http.StatusOK, repository.CoreTenant{
 			Subdomain: "www",
 			Name:      "Administration",

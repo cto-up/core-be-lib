@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"ctoup.com/coreapp/pkg/core/db"
+	"ctoup.com/coreapp/pkg/shared/util"
 )
 
 type TenantMap struct {
@@ -40,7 +41,7 @@ func (uh *MultitenantService) GetStore() *db.Store {
 
 // Map subdomain to tenant ID
 func (uh *MultitenantService) GetTenantIDWithSubdomain(ctx context.Context, subdomain string) (string, error) {
-	if subdomain == "" || subdomain == "www" || subdomain == "auth" {
+	if util.IsAdminSubdomain(subdomain) || subdomain == "auth" {
 		return "", nil
 	}
 
