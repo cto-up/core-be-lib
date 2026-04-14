@@ -210,6 +210,50 @@ func sendConfirmationEmail(c *gin.Context, url, toEmail string, confirmationToke
 	return nil
 }
 
+// sendAlreadyRegisteredEmail is sent when someone attempts to sign up with an
+// email that already has an account on the tenant. It links to signin and
+// (optionally) to a password-reset flow, without leaking which it was through
+// the signup response.
+func sendAlreadyRegisteredEmail(c *gin.Context, baseAuthClient auth.AuthClient, signinURL, toEmail, tenantName string) error {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+	fromEmail := os.Getenv("SYSTEM_EMAIL")
+	if fromEmail == "" {
+		fromEmail = "noreply@ctoup.com"
+	}
+
+	resetLink, err := baseAuthClient.PasswordResetLinkWithSettings(c, toEmail, &auth.ActionCodeSettings{URL: signinURL})
+	if err != nil {
+		logger.Err(err).Msg("Failed to generate reset link for already-registered email")
+		// Continue without reset link — user can still sign in.
+		resetLink = signinURL
+	}
+
+	templateData := struct {
+		Email      string
+		TenantName string
+		SigninLink string
+		ResetLink  string
+	}{
+		Email:      toEmail,
+		TenantName: tenantName,
+		SigninLink: signinURL,
+		ResetLink:  resetLink,
+	}
+
+	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Sign up attempt on "+tenantName, "")
+	if err := r.ParseTemplateWithDomain(c, "email-already-registered.html", templateData); err != nil {
+		logger.Err(err).Msg("Failed to parse template for already-registered email")
+		return err
+	}
+
+	if err := r.SendEmail(); err != nil {
+		logger.Err(err).Msg("Failed to send already-registered email")
+		return err
+	}
+	logger.Info().Str("email", toEmail).Str("tenant", tenantName).Msg("Already-registered email sent")
+	return nil
+}
+
 func sendTenantAddedEmail(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail, tenantName string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	fromEmail := os.Getenv("SYSTEM_EMAIL")

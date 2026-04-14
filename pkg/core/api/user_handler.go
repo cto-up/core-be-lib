@@ -316,12 +316,57 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		return
 	}
 
+	welcomeURL, err := getWelcomeEmailURL(c, tenant.Subdomain)
+	if err != nil {
+		logger.Err(err).Msg("Failed to get welcome email URL")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// Check if user already exists globally (any tenant)
+	existingUser, err := uh.userService.GetUserByEmailGlobal(c, req.Email)
+	if err == nil && existingUser != nil {
+		// Case 3: user exists and is already a member of this tenant -> no-op
+		isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
+			UserID:   existingUser.Id,
+			TenantID: tenantID.(string),
+		})
+		if err != nil {
+			logger.Err(err).Msg("Failed to check tenant membership")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
+		if isMember {
+			// Case 3: already a member. Don't leak this via the response, but
+			// send an email to the real owner so a confused/legit user gets a
+			// helpful nudge (sign in or reset password).
+			if err := sendAlreadyRegisteredEmail(c, baseAuthClient, welcomeURL, req.Email, tenant.Name); err != nil {
+				logger.Err(err).Msg("Failed to send already-registered email")
+			}
+			c.JSON(http.StatusOK, existingUser)
+			return
+		}
+
+		// Case 2: user exists globally but not a member -> add membership and notify
+		err = uh.userService.AddUserToTenant(c, baseAuthClient, tenantID.(string), existingUser.Id, []core.Role{core.USER}, "")
+		if err != nil {
+			logger.Err(err).Msg("Failed to add existing user to tenant")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
+		if err := sendTenantAddedEmail(c, baseAuthClient, welcomeURL, req.Email, tenant.Name); err != nil {
+			logger.Err(err).Msg("Failed to send tenant added email")
+		}
+		c.JSON(http.StatusOK, existingUser)
+		return
+	}
+
+	// Case 1: new user -> create + send welcome email (password reset link)
 	newUser := core.NewUser{
 		Email: req.Email,
 		Name:  req.Name,
-		Roles: []core.Role{"USER"},
+		Roles: []core.Role{core.USER},
 	}
-
 	user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), newUser, nil)
 	if err != nil {
 		logger.Err(err).Msg("Failed to create user")
@@ -329,15 +374,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		return
 	}
 
-	url, err := getWelcomeEmailURL(c, tenant.Subdomain)
-	if err != nil {
-		logger.Err(err).Msg("Failed to get welcome email URL")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-
-	err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
-	if err != nil {
+	if err := sendWelcomeEmail(c, baseAuthClient, welcomeURL, req.Email); err != nil {
 		logger.Err(err).Msg("Failed to send welcome email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

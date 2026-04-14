@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign up attempt</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css"
+    />
+    <style>
+      .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .logo {
+        max-width: 150px;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="email-container">
+      <img
+        src="https://via.placeholder.com/150x50?text=Your+Logo"
+        alt="Company Logo"
+        class="logo"
+      />
+
+      <div class="box">
+        <h1 class="title is-3">You already have an account</h1>
+        <p class="subtitle is-5">
+          Someone (hopefully you) just tried to sign up with this email.
+        </p>
+
+        <div class="content">
+          <p>
+            An account for <strong>{{.Email}}</strong> already exists on
+            <strong>{{.TenantName}}</strong>. You can sign in now, or reset
+            your password if you've forgotten it.
+          </p>
+
+          <p>
+            <a href="{{.SigninLink}}" class="button is-primary is-medium"
+              >Sign in</a
+            >
+            &nbsp;
+            <a href="{{.ResetLink}}" class="button is-light is-medium"
+              >Reset password</a
+            >
+          </p>
+
+          <p class="mt-4">
+            If this wasn't you, you can safely ignore this message — no
+            changes have been made to your account.
+          </p>
+        </div>
+      </div>
+
+      <div class="has-text-centered mt-4">
+        <p class="is-size-7">© 2024 CTO Up. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>
