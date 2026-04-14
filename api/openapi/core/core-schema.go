@@ -368,9 +368,8 @@ type NewPromptFormat string
 
 // NewSignUp defines model for NewSignUp.
 type NewSignUp struct {
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Password string `json:"password"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
 }
 
 // NewTenant defines model for NewTenant.
@@ -383,9 +382,6 @@ type NewTenant struct {
 
 	// ContractEndDate Optional contract expiry date. When reached, the tenant is automatically disabled.
 	ContractEndDate *time.Time `json:"contract_end_date"`
-
-	// EnableEmailLinkSignIn Auth Provider setting to Enable email link sign in (TODO is really used?)
-	EnableEmailLinkSignIn bool `json:"enable_email_link_sign_in"`
 
 	// IsDisabled When true, all API requests for this tenant are rejected with 403.
 	IsDisabled *bool   `json:"is_disabled,omitempty"`
@@ -447,9 +443,6 @@ type PublicTenantSchema struct {
 
 	// ContractEndDate Optional contract expiry date. When reached, the tenant is automatically disabled.
 	ContractEndDate *time.Time `json:"contract_end_date"`
-
-	// EnableEmailLinkSignIn Auth Provider setting to Enable email link sign in (TODO is really used?)
-	EnableEmailLinkSignIn bool `json:"enable_email_link_sign_in"`
 
 	// Features Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
 	Features map[string]bool    `json:"features"`
@@ -584,11 +577,8 @@ type Tenant struct {
 	AllowSignUp bool `json:"allow_sign_up"`
 
 	// ContractEndDate Optional contract expiry date. When reached, the tenant is automatically disabled.
-	ContractEndDate *time.Time `json:"contract_end_date"`
-
-	// EnableEmailLinkSignIn Auth Provider setting to Enable email link sign in (TODO is really used?)
-	EnableEmailLinkSignIn bool               `json:"enable_email_link_sign_in"`
-	Id                    openapi_types.UUID `json:"id"`
+	ContractEndDate *time.Time         `json:"contract_end_date"`
+	Id              openapi_types.UUID `json:"id"`
 
 	// IsDisabled When true, all API requests for this tenant are rejected with 403.
 	IsDisabled *bool   `json:"is_disabled,omitempty"`

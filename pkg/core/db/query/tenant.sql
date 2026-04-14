@@ -30,9 +30,9 @@ OFFSET $2;
 
 -- name: CreateTenant :one
 INSERT INTO core_tenants (
-  user_id, "tenant_id", "name", "subdomain", "enable_email_link_sign_in", "allow_password_sign_up", "allow_sign_up", "reseller_id", "is_reseller", "contract_end_date", "is_disabled"
+  user_id, "tenant_id", "name", "subdomain", "allow_password_sign_up", "allow_sign_up", "reseller_id", "is_reseller", "contract_end_date", "is_disabled"
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 )
 RETURNING *;
 
@@ -41,12 +41,11 @@ UPDATE core_tenants
 SET
     "name" = $2,
     "subdomain" = $3,
-    "enable_email_link_sign_in" = $4,
-    "allow_password_sign_up" = $5,
-    "allow_sign_up" = $6,
-    "is_reseller" = $7,
-    "contract_end_date" = $8,
-    "is_disabled" = $9
+    "allow_password_sign_up" = $4,
+    "allow_sign_up" = $5,
+    "is_reseller" = $6,
+    "contract_end_date" = $7,
+    "is_disabled" = $8
 WHERE id = $1
 RETURNING id;
 

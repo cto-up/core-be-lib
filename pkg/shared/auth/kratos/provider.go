@@ -677,10 +677,9 @@ func (k *KratosTenantManager) CreateTenant(ctx context.Context, config *auth.Ten
 	tenantID := fmt.Sprintf("%s-%d", config.Subdomain, time.Now().UnixNano())
 
 	return &auth.Tenant{
-		ID:                    tenantID,
-		DisplayName:           config.DisplayName,
-		EnableEmailLinkSignIn: config.EnableEmailLinkSignIn,
-		AllowPasswordSignUp:   config.AllowPasswordSignUp,
+		ID:                  tenantID,
+		DisplayName:         config.DisplayName,
+		AllowPasswordSignUp: config.AllowPasswordSignUp,
 	}, nil
 }
 
@@ -688,10 +687,9 @@ func (k *KratosTenantManager) UpdateTenant(ctx context.Context, tenantID string,
 	// Kratos doesn't manage tenants - return success
 	// The handler will update the database
 	return &auth.Tenant{
-		ID:                    tenantID,
-		DisplayName:           config.DisplayName,
-		EnableEmailLinkSignIn: config.EnableEmailLinkSignIn,
-		AllowPasswordSignUp:   config.AllowPasswordSignUp,
+		ID:                  tenantID,
+		DisplayName:         config.DisplayName,
+		AllowPasswordSignUp: config.AllowPasswordSignUp,
 	}, nil
 }
 

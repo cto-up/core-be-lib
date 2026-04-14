@@ -96,10 +96,9 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 	}
 
 	tenantConfig := &auth.TenantConfig{
-		DisplayName:           req.Name,
-		Subdomain:             req.Subdomain,
-		EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
-		AllowPasswordSignUp:   req.AllowPasswordSignUp,
+		DisplayName:         req.Name,
+		Subdomain:           req.Subdomain,
+		AllowPasswordSignUp: req.AllowPasswordSignUp,
 	}
 
 	newTenant, err := tenantManager.CreateTenant(c, tenantConfig)
@@ -162,17 +161,16 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 
 	tenant, err := exh.store.CreateTenant(c,
 		repository.CreateTenantParams{
-			UserID:                userID.(string),
-			Name:                  req.Name,
-			TenantID:              newTenant.ID,
-			Subdomain:             req.Subdomain,
-			EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
-			AllowPasswordSignUp:   req.AllowPasswordSignUp,
-			AllowSignUp:           req.AllowSignUp,
-			ResellerID:            resellerID,
-			IsReseller:            isReseller,
-			ContractEndDate:       contractEndDate,
-			IsDisabled:            isDisabled,
+			UserID:              userID.(string),
+			Name:                req.Name,
+			TenantID:            newTenant.ID,
+			Subdomain:           req.Subdomain,
+			AllowPasswordSignUp: req.AllowPasswordSignUp,
+			AllowSignUp:         req.AllowSignUp,
+			ResellerID:          resellerID,
+			IsReseller:          isReseller,
+			ContractEndDate:     contractEndDate,
+			IsDisabled:          isDisabled,
 		})
 	if err != nil {
 		logger.Err(err).Msg("Failed to create tenant")
@@ -219,9 +217,8 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 	}
 
 	tenantConfig := &auth.TenantConfig{
-		DisplayName:           req.Name,
-		EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
-		AllowPasswordSignUp:   req.AllowPasswordSignUp,
+		DisplayName:         req.Name,
+		AllowPasswordSignUp: req.AllowPasswordSignUp,
 	}
 
 	// Authorization check
@@ -252,12 +249,11 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 	}
 
 	updateParams := repository.UpdateTenantParams{
-		ID:                    id,
-		Name:                  req.Name,
-		Subdomain:             req.Subdomain,
-		EnableEmailLinkSignIn: req.EnableEmailLinkSignIn,
-		AllowPasswordSignUp:   req.AllowPasswordSignUp,
-		AllowSignUp:           req.AllowSignUp,
+		ID:                  id,
+		Name:                req.Name,
+		Subdomain:           req.Subdomain,
+		AllowPasswordSignUp: req.AllowPasswordSignUp,
+		AllowSignUp:         req.AllowSignUp,
 		// Preserve existing values by default; overridden below based on role
 		IsReseller:      existing.IsReseller,
 		ContractEndDate: existing.ContractEndDate,

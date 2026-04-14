@@ -322,31 +322,23 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		Roles: []core.Role{"USER"},
 	}
 
-	user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), newUser, &req.Password)
+	user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), newUser, nil)
 	if err != nil {
 		logger.Err(err).Msg("Failed to create user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
-	// create email verification token
-	token, err := uh.emailVerificationService.CreateEmailVerificationToken(c, user.ID, tenantID.(string))
+	url, err := getWelcomeEmailURL(c, tenant.Subdomain)
 	if err != nil {
-		logger.Err(err).Msg("Failed to create email verification token")
+		logger.Err(err).Msg("Failed to get welcome email URL")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
-	url, err := getConfirmationEmailURL(c)
+	err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
 	if err != nil {
-		logger.Err(err).Msg("Failed to get confirmation email URL")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-
-	err = sendConfirmationEmail(c, url, req.Email, token)
-	if err != nil {
-		logger.Err(err).Msg("Failed to send confirmation email")
+		logger.Err(err).Msg("Failed to send welcome email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

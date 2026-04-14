@@ -231,12 +231,11 @@ type TenantManager interface {
 
 // TenantConfig represents configuration for a tenant
 type TenantConfig struct {
-	DisplayName           string
-	Subdomain             string
-	EnableEmailLinkSignIn bool
-	AllowPasswordSignUp   bool
-	EnableAnonymousUsers  bool
-	MultiFactorConfig     *MultiFactorConfig
+	DisplayName          string
+	Subdomain            string
+	AllowPasswordSignUp  bool
+	EnableAnonymousUsers bool
+	MultiFactorConfig    *MultiFactorConfig
 }
 
 // MultiFactorConfig represents multi-factor authentication configuration
@@ -246,10 +245,9 @@ type MultiFactorConfig struct {
 
 // Tenant represents a tenant in the authentication system
 type Tenant struct {
-	ID                    string
-	DisplayName           string
-	EnableEmailLinkSignIn bool
-	AllowPasswordSignUp   bool
+	ID                  string
+	DisplayName         string
+	AllowPasswordSignUp bool
 }
 
 // AuthProvider defines the top-level interface for authentication providers
