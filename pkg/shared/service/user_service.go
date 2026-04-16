@@ -43,12 +43,15 @@ type UserService interface {
 
 	// Callbacks
 	SetUserCreatedCallback(callback UserCreatedCallback)
+	SetUserSignedUpCallback(callback UserSignedUpCallback)
+	GetUserSignedUpCallback() UserSignedUpCallback
 	GetStore() *db.Store
 }
 
 type BaseUserService struct {
-	store         *db.Store
-	onUserCreated UserCreatedCallback
+	store          *db.Store
+	onUserCreated  UserCreatedCallback
+	onUserSignedUp UserSignedUpCallback
 }
 
 func NewBaseUserService(store *db.Store) *BaseUserService {
@@ -111,6 +114,17 @@ func (uh *BaseUserService) GetUserByEmailGlobal(c context.Context, email string)
 // SetUserCreatedCallback sets an optional callback function that will be called after a user is successfully created.
 func (uh *BaseUserService) SetUserCreatedCallback(callback UserCreatedCallback) {
 	uh.onUserCreated = callback
+}
+
+// SetUserSignedUpCallback sets an optional callback function that will be called
+// after a user successfully signs up via the self-service signup endpoint.
+func (uh *BaseUserService) SetUserSignedUpCallback(callback UserSignedUpCallback) {
+	uh.onUserSignedUp = callback
+}
+
+// GetUserSignedUpCallback returns the registered signed-up callback (may be nil).
+func (uh *BaseUserService) GetUserSignedUpCallback() UserSignedUpCallback {
+	return uh.onUserSignedUp
 }
 
 func (uh *BaseUserService) GetStore() *db.Store {

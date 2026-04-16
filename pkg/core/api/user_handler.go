@@ -397,6 +397,11 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		return
 	}
 
+	// Call the optional signed-up callback (e.g. provision default credits)
+	if cb := uh.userService.GetUserSignedUpCallback(); cb != nil {
+		cb(c, tenantID.(string), user)
+	}
+
 	c.JSON(http.StatusCreated, user)
 }
 

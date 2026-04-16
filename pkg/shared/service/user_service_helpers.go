@@ -18,6 +18,11 @@ type FullUser struct {
 // It receives the context, tenant ID, and the created user.
 type UserCreatedCallback func(ctx context.Context, tenantID string, user repository.CoreUser)
 
+// UserSignedUpCallback is an optional callback function that is called after a user
+// successfully signs up via the self-service signup endpoint.
+// Unlike UserCreatedCallback, it only fires for self-service signups, not admin-created users.
+type UserSignedUpCallback func(ctx context.Context, tenantID string, user repository.CoreUser)
+
 // UserEventInitFunc is a function that initializes the user event callback in a UserService
 type UserEventInitFunc func(userService UserService)
 
