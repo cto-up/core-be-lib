@@ -9,4 +9,7 @@ type UserProfile struct {
 	SocialMedias         []string `json:"socialMedias"`
 	Interests            []string `json:"interests"`
 	Skills               []string `json:"skills"`
+	PhoneNumber          string   `json:"phoneNumber"`
+	Function             string   `json:"function"`
+	Company              string   `json:"company"`
 }

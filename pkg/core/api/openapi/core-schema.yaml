@@ -26,6 +26,12 @@ components:
           type: string
         email:
           type: string
+        phoneNumber:
+          type: string
+        function:
+          type: string
+        company:
+          type: string
     NewUser:
       type: object
       required:

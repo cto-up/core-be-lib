@@ -368,8 +368,11 @@ type NewPromptFormat string
 
 // NewSignUp defines model for NewSignUp.
 type NewSignUp struct {
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	Company     *string `json:"company,omitempty"`
+	Email       string  `json:"email"`
+	Function    *string `json:"function,omitempty"`
+	Name        string  `json:"name"`
+	PhoneNumber *string `json:"phoneNumber,omitempty"`
 }
 
 // NewTenant defines model for NewTenant.
@@ -725,6 +728,8 @@ type UserActionSchemaName string
 type UserProfileSchema struct {
 	About                *string   `json:"about,omitempty"`
 	BackgroundPictureURL *string   `json:"backgroundPictureURL,omitempty"`
+	Company              *string   `json:"company,omitempty"`
+	Function             *string   `json:"function,omitempty"`
 	Interests            *[]string `json:"interests,omitempty"`
 
 	// IsActingReseller Whether the current tenant is a reseller of a the tenant (read-only, derived from auth claims)
@@ -733,6 +738,7 @@ type UserProfileSchema struct {
 	// IsReseller Whether the current tenant is a reseller (read-only, derived from auth claims)
 	IsReseller   *bool     `json:"is_reseller,omitempty"`
 	Name         string    `json:"name"`
+	PhoneNumber  *string   `json:"phoneNumber,omitempty"`
 	PictureURL   *string   `json:"pictureURL,omitempty"`
 	Skills       *[]string `json:"skills,omitempty"`
 	SocialMedias *[]string `json:"socialMedias,omitempty"`

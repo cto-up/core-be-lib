@@ -374,6 +374,23 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		return
 	}
 
+	// Update profile with extra signup fields (phoneNumber, function, company)
+	if req.PhoneNumber != nil || req.Function != nil || req.Company != nil {
+		profile := user.Profile
+		if req.PhoneNumber != nil {
+			profile.PhoneNumber = *req.PhoneNumber
+		}
+		if req.Function != nil {
+			profile.Function = *req.Function
+		}
+		if req.Company != nil {
+			profile.Company = *req.Company
+		}
+		if updateErr := uh.userService.UpdateUserProfileInDatabase(c, tenantID.(string), user.ID, profile); updateErr != nil {
+			logger.Err(updateErr).Msg("Failed to update profile with signup fields")
+		}
+	}
+
 	if err := sendWelcomeEmail(c, baseAuthClient, welcomeURL, req.Email); err != nil {
 		logger.Err(err).Msg("Failed to send welcome email")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
