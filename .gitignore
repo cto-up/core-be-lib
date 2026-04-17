@@ -1,3 +1,4 @@
 .env.local
 __debug_bin*
 GEMINI.md
+vendor

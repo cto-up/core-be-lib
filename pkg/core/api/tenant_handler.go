@@ -53,7 +53,7 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 		return
 	}
 
-	tenant, err := exh.store.GetTenantBySubdomain(c, subdomain)
+	tenant, err := exh.multiTenantService.GetTenantBySubdomainCached(c, subdomain)
 	if err != nil {
 		logger.Err(err).Str("subdomain", subdomain).Msg("Error getting tenant by subdomain")
 		if err.Error() == pgx.ErrNoRows.Error() {
@@ -293,6 +293,7 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	exh.multiTenantService.InvalidateTenant(req.TenantId)
 	c.Status(http.StatusNoContent)
 }
 
@@ -333,6 +334,7 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	exh.multiTenantService.InvalidateTenant(tenant.TenantID)
 	_, err = exh.store.DeleteTenant(c, id)
 	if err != nil {
 		logger.Err(err).Msg("Failed to delete tenant in database")

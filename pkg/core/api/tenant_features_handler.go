@@ -55,6 +55,7 @@ func (s *TenantHandler) UpdateTenantFeatures(ctx *gin.Context, id uuid.UUID) {
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	s.multiTenantService.InvalidateTenantByID(ctx, id)
 	ctx.Status(http.StatusNoContent)
 }
 
@@ -115,5 +116,6 @@ func (s *TenantHandler) UpdateTenantFeatureLicenses(ctx *gin.Context, id uuid.UU
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	s.multiTenantService.InvalidateTenant(tenant.TenantID)
 	ctx.Status(http.StatusNoContent)
 }

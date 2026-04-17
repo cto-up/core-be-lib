@@ -57,5 +57,6 @@ func (s *TenantHandler) UpdateTenantProfile(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	s.multiTenantService.InvalidateTenant(tenantID.(string))
 	ctx.Status(http.StatusNoContent)
 }

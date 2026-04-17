@@ -5,7 +5,9 @@ import (
 	"sync"
 
 	"ctoup.com/coreapp/pkg/core/db"
+	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/shared/util"
+	"github.com/google/uuid"
 )
 
 type TenantMap struct {
@@ -88,6 +90,55 @@ func (uh *MultitenantService) IsReseller(ctx context.Context, tenantID string) (
 		return false, err
 	}
 	return tenant.IsReseller, nil
+}
+
+// GetTenantByTenantIDCached returns the tenant record for the given tenant_id.
+// Results are cached with a TTL (see DefaultTenantCacheTTL) and deduplicated
+// across concurrent callers. Use InvalidateTenant / InvalidateTenantByID on
+// write paths to keep the cache consistent.
+func (uh *MultitenantService) GetTenantByTenantIDCached(ctx context.Context, tenantID string) (repository.CoreTenant, error) {
+	return getTenantCache().get(ctx, uh.store, tenantID)
+}
+
+// GetTenantBySubdomainCached returns the tenant record for the given subdomain.
+// On warm paths the subdomain→tenant_id mapping (TenantMap) and the tenant
+// record cache are both hit — no DB query. On cold paths it does a single
+// GetTenantBySubdomain query and populates both caches.
+func (uh *MultitenantService) GetTenantBySubdomainCached(ctx context.Context, subdomain string) (repository.CoreTenant, error) {
+	tenantMap := GetTenantMap()
+	tenantMap.RLock()
+	tenantID, hasMapping := tenantMap.data[subdomain]
+	tenantMap.RUnlock()
+
+	if hasMapping {
+		return getTenantCache().get(ctx, uh.store, tenantID)
+	}
+
+	tenant, err := uh.store.GetTenantBySubdomain(ctx, subdomain)
+	if err != nil {
+		return repository.CoreTenant{}, err
+	}
+	tenantMap.Lock()
+	tenantMap.data[tenant.Subdomain] = tenant.TenantID
+	tenantMap.Unlock()
+	getTenantCache().put(tenant)
+	return tenant, nil
+}
+
+// InvalidateTenant removes the cached tenant record for tenant_id.
+func (uh *MultitenantService) InvalidateTenant(tenantID string) {
+	getTenantCache().invalidate(tenantID)
+}
+
+// InvalidateTenantByID looks up the tenant_id for the given internal ID and
+// removes the cached entry. Best-effort: on lookup failure the TTL will heal
+// the cache eventually.
+func (uh *MultitenantService) InvalidateTenantByID(ctx context.Context, id uuid.UUID) {
+	tenant, err := uh.store.GetTenantByID(ctx, id)
+	if err != nil {
+		return
+	}
+	getTenantCache().invalidate(tenant.TenantID)
 }
 
 // IsActingReseller checks if a tenant is managed by a reseller.
