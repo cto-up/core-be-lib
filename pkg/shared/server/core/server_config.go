@@ -38,6 +38,25 @@ type ServerConfig struct {
 	TenantMiddleware gin.HandlerFunc
 	AuthMiddleware   *service.AuthMiddleware
 	APIOptions       core.GinServerOptions
+
+	// authSlot is the indirection through which the auth middleware actually
+	// runs. APIOptions.Middlewares holds the bound method value authSlot.handle,
+	// so gin captures a stable reference at route-registration time; later
+	// calls to WrapAuthMiddleware mutate authSlot.inner and are seen by every
+	// registered route (core + module). See WrapAuthMiddleware.
+	authSlot *authMiddlewareSlot
+}
+
+// authMiddlewareSlot is a mutable container for the coreapp auth middleware.
+// It lets callers layer additional auth behavior AFTER the middleware slice
+// has been installed into the router, without relying on slice position or
+// function-pointer identity.
+type authMiddlewareSlot struct {
+	inner gin.HandlerFunc
+}
+
+func (s *authMiddlewareSlot) handle(c *gin.Context) {
+	s.inner(c)
 }
 
 var (
@@ -106,14 +125,18 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 
 	tenantMiddleware := service.NewTenantMiddleware(nil, multiTenantService)
 
+	// Auth dispatches through authSlot so WrapAuthMiddleware can layer
+	// behavior on top without depending on slice position.
+	//
 	// 1. Request ID middleware
 	// 2. Tenant middleware (extract tenant ID)
-	// 3. Auth middleware (verify token)
+	// 3. Auth middleware (verify token, via authSlot)
+	authSlot := &authMiddlewareSlot{inner: authMiddleware.MiddlewareFunc()}
 
 	middlewares = []core.MiddlewareFunc{
 		core.MiddlewareFunc(service.RequestIDMiddleware()),
 		core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
-		core.MiddlewareFunc(authMiddleware.MiddlewareFunc()),
+		core.MiddlewareFunc(authSlot.handle),
 	}
 
 	apiOptions := core.GinServerOptions{
@@ -135,5 +158,6 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 		TenantMiddleware: tenantMiddleware.MiddlewareFunc(),
 		AuthMiddleware:   authMiddleware,
 		APIOptions:       apiOptions,
+		authSlot:         authSlot,
 	}
 }
