@@ -689,6 +689,11 @@ func (uh *UserSuperAdminHandler) HardDeleteUserFromSuperAdmin(c *gin.Context, te
 			c.Status(http.StatusNoContent)
 			return
 		}
+		if helpers.AbortIfReferenced(c, err,
+			"USER_IN_USE",
+			"user is referenced by other records and cannot be deleted") {
+			return
+		}
 		logger.Err(err).Msg("Failed to hard delete user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

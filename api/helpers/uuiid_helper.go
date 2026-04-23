@@ -4,24 +4,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 )
-
-func ErrorResponse(err error) gin.H {
-	log.Err(err).Msg("Error occurred")
-	return gin.H{
-		"message": err.Error(),
-	}
-}
-
-func ErrorStringResponse(errMsg string) gin.H {
-	return gin.H{
-		"message": errMsg,
-	}
-}
 
 // ValidateUUID implements validator.CustomTypeFunc
 func CustomTypeUUID(field reflect.Value) interface{} {

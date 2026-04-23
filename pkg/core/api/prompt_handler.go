@@ -120,6 +120,11 @@ func (exh *PromptHandler) DeletePrompt(c *gin.Context, id uuid.UUID) {
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
+		if helpers.AbortIfReferenced(c, err,
+			"PROMPT_IN_USE",
+			"prompt is referenced by other records and cannot be deleted") {
+			return
+		}
 		logger.Err(err).Msg("Error deleting prompt")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

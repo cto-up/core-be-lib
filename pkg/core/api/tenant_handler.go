@@ -337,6 +337,11 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 	exh.multiTenantService.InvalidateTenant(tenant.TenantID)
 	_, err = exh.store.DeleteTenant(c, id)
 	if err != nil {
+		if helpers.AbortIfReferenced(c, err,
+			"TENANT_IN_USE",
+			"tenant is referenced by other records and cannot be deleted") {
+			return
+		}
 		logger.Err(err).Msg("Failed to delete tenant in database")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

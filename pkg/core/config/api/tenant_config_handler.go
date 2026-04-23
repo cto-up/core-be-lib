@@ -102,6 +102,11 @@ func (exh *TenantConfigHandler) DeleteTenantConfig(c *gin.Context, id uuid.UUID)
 		TenantID: tenantID.(string),
 	})
 	if err != nil {
+		if helpers.AbortIfReferenced(c, err,
+			"TENANT_CONFIG_IN_USE",
+			"tenant config is referenced by other records and cannot be deleted") {
+			return
+		}
 		logger.Err(err).Msg("Error deleting tenant config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

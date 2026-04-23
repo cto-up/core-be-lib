@@ -383,6 +383,11 @@ func (h *ClientApplicationHandler) DeleteClientApplication(c *gin.Context, id uu
 	// Delete application
 	err := h.clientAppService.DeleteClientApplication(c, id, "")
 	if err != nil {
+		if helpers.AbortIfReferenced(c, err,
+			"CLIENT_APPLICATION_IN_USE",
+			"client application is referenced by other records and cannot be deleted") {
+			return
+		}
 		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to delete client application")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

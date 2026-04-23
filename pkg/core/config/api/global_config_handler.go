@@ -77,6 +77,11 @@ func (exh *GlobalConfigHandler) DeleteGlobalConfig(c *gin.Context, id uuid.UUID)
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	_, err := exh.store.DeleteGlobalConfig(c, id)
 	if err != nil {
+		if helpers.AbortIfReferenced(c, err,
+			"GLOBAL_CONFIG_IN_USE",
+			"global config is referenced by other records and cannot be deleted") {
+			return
+		}
 		logger.Err(err).Msg("Error deleting global config")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return

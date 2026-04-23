@@ -228,6 +228,11 @@ func (uh *UserAdminHandler) DeleteUser(c *gin.Context, userid string) {
 		err = uh.userService.RemoveUserFromTenant(c, baseAuthClient, tenantID.(string), userid)
 	}
 	if err != nil {
+		if helpers.AbortIfReferenced(c, err,
+			"USER_IN_USE",
+			"user is referenced by other records and cannot be deleted") {
+			return
+		}
 		logger.Err(err).Msg("Failed to delete user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
