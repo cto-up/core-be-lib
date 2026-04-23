@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -25,6 +26,26 @@ func hasCustomerAdminRole(roles []core.Role) bool {
 		}
 	}
 	return false
+}
+
+// ADMIN and SUPER_ADMIN are global-only roles — granting them as a tenant
+// membership would let them pass /admin-api and /superadmin-api gates for
+// every tenant the user ever touches, breaking tenant isolation. Global
+// grants must go through global_roles (metadata_public), not tenant_memberships.
+func validateTenantScopedRole(role core.Role) error {
+	if role == core.ADMIN || role == core.SUPERADMIN {
+		return fmt.Errorf("role %s is global-only and cannot be assigned as a tenant membership", role)
+	}
+	return nil
+}
+
+func validateTenantScopedRoles(roles []core.Role) error {
+	for _, r := range roles {
+		if err := validateTenantScopedRole(r); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type StrategyType string
@@ -79,6 +100,10 @@ func (uh *SharedUserService) InitUserInDatabase(ctx context.Context, tenantId st
 func (uh *SharedUserService) CreateUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
 	user := repository.CoreUser{}
 
+	if err := validateTenantScopedRoles(req.Roles); err != nil {
+		return user, err
+	}
+
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	tx, err := uh.store.ConnPool.Begin(c)
@@ -124,6 +149,10 @@ func (uh *SharedUserService) CreateUser(c context.Context, authClient auth.AuthC
 }
 
 func (uh *SharedUserService) UpdateUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string, req core.UpdateUserJSONRequestBody) error {
+	if err := validateTenantScopedRoles(req.Roles); err != nil {
+		return err
+	}
+
 	tx, err := uh.store.ConnPool.Begin(c)
 	if err != nil {
 		return err
@@ -288,6 +317,10 @@ func (uh *SharedUserService) ListUsers(c *gin.Context, tenantId string, pagingSq
 }
 
 func (uh *SharedUserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
+	if err := validateTenantScopedRole(role); err != nil {
+		return err
+	}
+
 	logger := util.GetLoggerFromCtx(c)
 	strategy := uh.getStrategy(tenantId)
 	tx, err := uh.store.ConnPool.Begin(c)
@@ -357,6 +390,10 @@ func (uh *SharedUserService) UpdateUserStatus(c *gin.Context, authClient auth.Au
 
 // AddUserToTenant adds an existing user to a tenant (creates membership)
 func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.AuthClient, tenantID, userID string, roles []core.Role, invitedBy string) error {
+	if err := validateTenantScopedRoles(roles); err != nil {
+		return err
+	}
+
 	logger := util.GetLoggerFromCtx(c)
 	// Check if user exists
 	_, err := authClient.GetUser(c, userID)

@@ -172,8 +172,13 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 				// Only promote roles into top-level claims for the current tenant —
 				// writing role flags from a foreign membership would grant that role
 				// cross-tenant when IsAdmin / IsCustomerAdmin read the claims map.
+				// ADMIN and SUPER_ADMIN are global-only and must not be inferable from
+				// tenant memberships even if legacy data contains them.
 				if tid == tenantID {
 					for _, r := range membership.Roles {
+						if r == string(core.ADMIN) || r == string(core.SUPERADMIN) {
+							continue
+						}
 						claims[r] = true
 					}
 					user.TenantMemberships = append(user.TenantMemberships, membership)
