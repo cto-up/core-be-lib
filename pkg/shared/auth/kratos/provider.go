@@ -106,6 +106,7 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 
 	// if customClaims containts SUPER_ADMIN
 	isSuperAdmin := false
+	isAdmin := false
 
 	// Extract global roles from metadata_public
 	if globalRolesArr, ok := token.Claims["global_roles"].([]interface{}); ok {
@@ -116,7 +117,9 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 				if roleStr == string(core.SUPERADMIN) {
 					isSuperAdmin = true
 				}
-
+				if roleStr == string(core.ADMIN) {
+					isAdmin = true
+				}
 			}
 		}
 	}
@@ -131,7 +134,7 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 	}
 
 	// Skip tenant validation for root domain or SUPER_ADMIN
-	if isSuperAdmin {
+	if isSuperAdmin || isAdmin {
 		return user, nil
 	}
 
@@ -155,55 +158,48 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 	if membershipsInterface, ok := token.Claims[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
 		for _, m := range membershipsInterface {
 			if membershipMap, ok := m.(map[string]interface{}); ok {
-				membership := auth.TenantMembership{}
-				if tid, ok := membershipMap["tenant_id"].(string); ok {
-					membership.TenantID = tid
 
-					if roles, ok := membershipMap["roles"].([]interface{}); ok {
-						for _, item := range roles {
-							if s, ok := item.(string); ok {
-								membership.Roles = append(membership.Roles, s)
-								if s == string(core.CUSTOMERADMIN) {
-									claims[string(core.CUSTOMERADMIN)] = true
-								} else if s == string(core.ADMIN) {
-									claims[string(core.ADMIN)] = true
-								}
-							}
-						}
+				tid, _ := membershipMap["tenant_id"].(string)
+				rolesInterface, _ := membershipMap["roles"].([]interface{})
+
+				membership := auth.TenantMembership{TenantID: tid}
+				for _, item := range rolesInterface {
+					if s, ok := item.(string); ok {
+						membership.Roles = append(membership.Roles, s)
 					}
 				}
 
-				// Only validate for the current tenant
-				if membership.TenantID == tenantID {
+				// Only promote roles into top-level claims for the current tenant —
+				// writing role flags from a foreign membership would grant that role
+				// cross-tenant when IsAdmin / IsCustomerAdmin read the claims map.
+				if tid == tenantID {
+					for _, r := range membership.Roles {
+						claims[r] = true
+					}
 					user.TenantMemberships = append(user.TenantMemberships, membership)
 					return user, nil
-				} else {
-					hasCustAdmin := false
-					if rolesInterface, ok := membershipMap["roles"].([]interface{}); ok {
-						for _, r := range rolesInterface {
-							if roleStr, ok := r.(string); ok {
-								claims[roleStr] = true
-								if roleStr == string(core.CUSTOMERADMIN) {
-									hasCustAdmin = true
-								}
-							}
-						}
-					}
+				}
 
-					// Always derive TENANT_IS_RESELLER from DB so it stays accurate when:
-					//   - a tenant's reseller_id is assigned/removed
-					//   - a tenant is deleted by the reseller
-					// Only CUSTOMER_ADMIN users of a reseller-managed tenant get this flag.
-					if hasCustAdmin {
-						if managed, err := k.multitenantService.IsActingReseller(ctx, tenantID); err == nil && managed {
-							user.IsActingReseller = true
-							claims[auth.ACTING_RESELLER] = true
-						}
-						resellerMembership := auth.TenantMembership{
+				hasCustAdmin := false
+				for _, r := range membership.Roles {
+					if r == string(core.CUSTOMERADMIN) {
+						hasCustAdmin = true
+						break
+					}
+				}
+
+				// Always derive TENANT_IS_RESELLER from DB so it stays accurate when:
+				//   - a tenant's reseller_id is assigned/removed
+				//   - a tenant is deleted by the reseller
+				// Only CUSTOMER_ADMIN users of a reseller-managed tenant get this flag.
+				if hasCustAdmin {
+					if managed, err := k.multitenantService.IsActingReseller(ctx, tenantID); err == nil && managed {
+						user.IsActingReseller = true
+						claims[auth.ACTING_RESELLER] = true
+						user.TenantMemberships = append(user.TenantMemberships, auth.TenantMembership{
 							TenantID: tenantID,
 							Roles:    []string{auth.ACTING_RESELLER},
-						}
-						user.TenantMemberships = append(user.TenantMemberships, resellerMembership)
+						})
 						return user, nil
 					}
 				}
