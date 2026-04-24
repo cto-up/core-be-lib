@@ -3,6 +3,9 @@ package http
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 
 	"ctoup.com/coreapp/pkg/shared/server/core"
 
@@ -14,16 +17,42 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// parseAllowedDomain reads DOMAIN from env — a single root domain, e.g.
+// "ctoup.com". The apex host and any subdomain of it are allowed for CORS.
+// Leading "*." or "." is tolerated.
+func parseAllowedDomain() string {
+	d := strings.TrimSpace(strings.ToLower(os.Getenv("DOMAIN")))
+	d = strings.TrimPrefix(d, "*")
+	d = strings.TrimPrefix(d, ".")
+	return d
+}
+
+func isOriginAllowed(origin, domain string) bool {
+	if domain == "" {
+		return false
+	}
+	u, err := url.Parse(strings.ToLower(origin))
+	if err != nil || u.Hostname() == "" {
+		return false
+	}
+	host := u.Hostname()
+	return host == domain || strings.HasSuffix(host, "."+domain)
+}
+
 func RunRESTServer(ctx context.Context, connPool *pgxpool.Pool, address string, dbConnection string) {
+
+	allowedDomain := parseAllowedDomain()
+	if allowedDomain == "" {
+		log.Warn().Msg("No DOMAIN configured; cross-origin browser requests will be blocked")
+	}
 
 	cors := func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		if origin != "" {
+		if origin != "" && isOriginAllowed(origin, allowedDomain) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-		} else {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			c.Writer.Header().Add("Vary", "Origin")
 		}
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Session-Token, X-CSRF-Token, Cookie, X-Requested-With, X-App-Source")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, OPTIONS, PATCH")
 		if c.Request.Method == "OPTIONS" {

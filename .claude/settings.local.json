@@ -13,7 +13,9 @@
       "Bash(cat /Users/jcantonio/go/github.com/cto-up/apps/skeells/frontend/frontoffice/app/[lang]/coach/dashboard/page.client.tsx)",
       "Bash(ls -la /Users/jcantonio/go/github.com/cto-up/apps/skeells/frontend/frontoffice/app/superadmin-api/[...path]/)",
       "Bash(go mod *)",
-      "Bash(go test *)"
+      "Bash(go test *)",
+      "Bash(gofmt *)",
+      "Bash(go get *)"
     ]
   }
 }
