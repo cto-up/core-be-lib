@@ -174,9 +174,11 @@ func (exh *TenantHandler) AddTenant(c *gin.Context) {
 		})
 	if err != nil {
 		logger.Err(err).Msg("Failed to create tenant")
-		err := tenantManager.DeleteTenant(c, newTenant.ID)
-		if err != nil {
-			logger.Err(err).Msg("Failed to rollback tenant creation in auth provider")
+		if rbErr := tenantManager.DeleteTenant(c, newTenant.ID); rbErr != nil {
+			logger.Err(rbErr).Msg("Failed to rollback tenant creation in auth provider")
+		}
+		if helpers.AbortIfDuplicate(c, err) {
+			return
 		}
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
