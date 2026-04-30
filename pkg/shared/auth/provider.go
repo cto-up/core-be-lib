@@ -18,8 +18,39 @@ const (
 	AUTH_TENANT_MEMBERSHIPS = "tenant_memberships"
 	AUTH_IS_RESELLER        = "is_reseller"
 	AUTH_IS_ACTING_RESELLER = "is_acting_reseller"
+	AUTH_ACCESS_SCOPE       = "auth_access_scope"
+	AUTH_TENANT             = "auth_tenant" // populated once per request by tenant_middleware
 	REQUEST_URL_PATH        = "request_url_path"
 )
+
+// AccessScope captures whether per-request data reads/writes must be filtered
+// by user_id in addition to tenant_id. IsolateByUser is true iff the tenant has
+// AllowSignUp = true and the caller is not an admin/customer-admin/super-admin.
+//
+// Resolved by the central auth middleware (see service/auth_middleware.go) and
+// stashed on the gin.Context under AUTH_ACCESS_SCOPE. Modules that need to
+// implement per-user isolation should read it via GetAccessScope.
+type AccessScope struct {
+	TenantID      string
+	UserID        string
+	IsolateByUser bool
+}
+
+// GetAccessScope reads the AccessScope set by the auth middleware. Returns
+// (zero, false) when the request is unauthenticated or pre-dates the
+// middleware change (e.g. some API-token paths). Callers should treat a
+// missing scope as "no isolation" — the conservative tenant-only default.
+func GetAccessScope(c *gin.Context) (AccessScope, bool) {
+	v, exists := c.Get(AUTH_ACCESS_SCOPE)
+	if !exists {
+		return AccessScope{}, false
+	}
+	scope, ok := v.(AccessScope)
+	if !ok {
+		return AccessScope{}, false
+	}
+	return scope, true
+}
 
 // TenantMembership represents a user's membership in a tenant with roles
 type TenantMembership struct {
@@ -37,6 +68,7 @@ type AuthenticatedUser struct {
 	TenantMemberships []TenantMembership     `json:"tenant_memberships,omitempty"` // List of tenant memberships with roles
 	IsReseller        bool                   `json:"is_reseller"`                  // Is the current tenant a reseller
 	IsActingReseller  bool                   `json:"is_acting_reseller"`           // Is the current tenant managed by a reseller
+	TenantAllowSignUp bool                   `json:"tenant_allow_sign_up"`         // Tenant.AllowSignUp — drives AccessScope
 }
 
 func (au *AuthenticatedUser) GetClaimsArray() []string {
@@ -61,6 +93,7 @@ type MultitenantService interface {
 	GetTenantIDWithSubdomain(ctx context.Context, subdomain string) (string, error)
 	IsReseller(ctx context.Context, tenantID string) (bool, error)
 	IsActingReseller(ctx context.Context, tenantID string) (bool, error)
+	GetTenantAllowSignUp(ctx context.Context, tenantID string) (bool, error)
 }
 
 // UserToCreate represents parameters for creating a new user

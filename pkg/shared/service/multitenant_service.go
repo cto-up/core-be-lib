@@ -6,9 +6,39 @@ import (
 
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/util"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// GetTenantFromContext returns the CoreTenant cached on the gin.Context by
+// TenantMiddleware. Returns (zero, false) when the request did not pass
+// through the middleware or the tenant is unset (root domain, public route).
+func GetTenantFromContext(c *gin.Context) (repository.CoreTenant, bool) {
+	v, exists := c.Get(auth.AUTH_TENANT)
+	if !exists {
+		return repository.CoreTenant{}, false
+	}
+	t, ok := v.(repository.CoreTenant)
+	if !ok {
+		return repository.CoreTenant{}, false
+	}
+	return t, true
+}
+
+// loadTenantPreferContext is the canonical fast-path tenant lookup for the
+// MultitenantService helpers. When the caller's context is a *gin.Context
+// populated by TenantMiddleware, it returns the already-loaded tenant for
+// free; otherwise it falls back to the singleflight-deduped in-process cache.
+func (uh *MultitenantService) loadTenantPreferContext(ctx context.Context, tenantID string) (repository.CoreTenant, error) {
+	if ginCtx, ok := ctx.(*gin.Context); ok {
+		if tenant, ok := GetTenantFromContext(ginCtx); ok && tenant.TenantID == tenantID {
+			return tenant, nil
+		}
+	}
+	return getTenantCache().get(ctx, uh.store, tenantID)
+}
 
 type TenantMap struct {
 	sync.RWMutex
@@ -41,7 +71,9 @@ func (uh *MultitenantService) GetStore() *db.Store {
 	return uh.store
 }
 
-// Map subdomain to tenant ID
+// Map subdomain to tenant ID. On a cold subdomain miss the loaded tenant is
+// also written into the tenant cache so a subsequent GetTenantByTenantIDCached
+// in the same request does not re-query the DB.
 func (uh *MultitenantService) GetTenantIDWithSubdomain(ctx context.Context, subdomain string) (string, error) {
 	if util.IsAdminSubdomain(subdomain) || subdomain == "auth" {
 		return "", nil
@@ -64,8 +96,24 @@ func (uh *MultitenantService) GetTenantIDWithSubdomain(ctx context.Context, subd
 		tenantMap.Lock()
 		tenantMap.data[tenant.Subdomain] = tenantID
 		tenantMap.Unlock()
+		// Warm the tenant-record cache too — the caller almost always wants the
+		// full tenant next (tenant_middleware, auth flow), and skipping this
+		// would cost a redundant DB round-trip.
+		getTenantCache().put(tenant)
 	}
 	return tenantID, nil
+}
+
+// GetTenantAllowSignUp returns the tenant's AllowSignUp flag.
+func (uh *MultitenantService) GetTenantAllowSignUp(ctx context.Context, tenantID string) (bool, error) {
+	if tenantID == "" {
+		return false, nil
+	}
+	tenant, err := uh.loadTenantPreferContext(ctx, tenantID)
+	if err != nil {
+		return false, err
+	}
+	return tenant.AllowSignUp, nil
 }
 
 // IsTenantDisabled returns true when the tenant's is_disabled flag is set.
@@ -73,7 +121,7 @@ func (uh *MultitenantService) IsTenantDisabled(ctx context.Context, tenantID str
 	if tenantID == "" {
 		return false, nil
 	}
-	tenant, err := uh.store.GetTenantByTenantID(ctx, tenantID)
+	tenant, err := uh.loadTenantPreferContext(ctx, tenantID)
 	if err != nil {
 		return false, err
 	}
@@ -85,7 +133,7 @@ func (uh *MultitenantService) IsReseller(ctx context.Context, tenantID string) (
 	if tenantID == "" {
 		return false, nil
 	}
-	tenant, err := uh.store.GetTenantByTenantID(ctx, tenantID)
+	tenant, err := uh.loadTenantPreferContext(ctx, tenantID)
 	if err != nil {
 		return false, err
 	}
@@ -147,14 +195,16 @@ func (uh *MultitenantService) IsActingReseller(ctx context.Context, tenantID str
 	if tenantID == "" {
 		return false, nil
 	}
-	tenant, err := uh.store.GetTenantByTenantID(ctx, tenantID)
+	tenant, err := uh.loadTenantPreferContext(ctx, tenantID)
 	if err != nil {
 		return false, err
 	}
 	if !tenant.ResellerID.Valid || tenant.ResellerID.String == "" {
 		return false, nil
 	}
-	resellerTenant, err := uh.store.GetTenantByTenantID(ctx, tenant.ResellerID.String)
+	// The reseller's tenant is a different row — fall through to the cached
+	// lookup (it won't be on the gin context).
+	resellerTenant, err := uh.GetTenantByTenantIDCached(ctx, tenant.ResellerID.String)
 	if err != nil {
 		return false, err
 	}

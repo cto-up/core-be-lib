@@ -120,6 +120,16 @@ func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *auth.Authen
 	if len(user.TenantMemberships) > 0 {
 		c.Set(auth.AUTH_TENANT_MEMBERSHIPS, user.TenantMemberships)
 	}
+
+	// Resolve and stash AccessScope for downstream modules. AUTH_CLAIMS must be
+	// set above before the role-check helpers run, since they read claims off
+	// the gin context.
+	isAdmin := auth.IsAdmin(c) || auth.IsCustomerAdmin(c) || auth.IsSuperAdmin(c)
+	c.Set(auth.AUTH_ACCESS_SCOPE, auth.AccessScope{
+		TenantID:      user.TenantID,
+		UserID:        user.UserID,
+		IsolateByUser: user.TenantAllowSignUp && !isAdmin,
+	})
 }
 
 // checkPermissions validates role-based access control

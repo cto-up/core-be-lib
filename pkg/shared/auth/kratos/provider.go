@@ -155,6 +155,12 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 		claims[auth.TENANT_IS_RESELLER] = isReseller
 	}
 
+	// Populate TenantAllowSignUp — drives AccessScope (per-user data isolation)
+	// in modules like scholar. Cached lookup on warm paths.
+	if allowSignUp, err := k.multitenantService.GetTenantAllowSignUp(ctx, tenantID); err == nil {
+		user.TenantAllowSignUp = allowSignUp
+	}
+
 	if membershipsInterface, ok := token.Claims[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
 		for _, m := range membershipsInterface {
 			if membershipMap, ok := m.(map[string]interface{}); ok {
