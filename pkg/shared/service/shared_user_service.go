@@ -140,9 +140,16 @@ func (uh *SharedUserService) CreateUser(c context.Context, authClient auth.AuthC
 		return user, err
 	}
 
-	// Call the optional callback if it's set
+	// Call the optional callbacks if set. UserCreatedCallback fires for every
+	// new user. UserAddedToTenantCallback also fires here because CreateUser
+	// implicitly creates a membership; downstream listeners that need to seed
+	// per-tenant state can hook just that callback and cover both creation
+	// and AddUserToTenant flows uniformly.
 	if uh.onUserCreated != nil {
 		uh.onUserCreated(c, tenantId, user)
+	}
+	if uh.onUserAddedToTenant != nil {
+		uh.onUserAddedToTenant(c, tenantId, user)
 	}
 
 	return user, err
@@ -434,6 +441,19 @@ func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.
 	if err != nil {
 		logger.Err(err).Str("user_id", userID).Str("tenant_id", tenantID).Msg("Failed to add user to tenant in database")
 		return err
+	}
+
+	// Fire UserAddedToTenantCallback so module-level listeners (initial
+	// credit grants, default preferences, etc.) get a chance to seed
+	// per-tenant state. We need a fresh CoreUser to hand the listener; the
+	// global lookup is cheap and consistent with the post-CreateUser path.
+	if uh.onUserAddedToTenant != nil {
+		user, lookupErr := uh.store.GetSharedUserByID(c, userID)
+		if lookupErr != nil {
+			logger.Err(lookupErr).Str("user_id", userID).Msg("AddUserToTenant: failed to fetch user for callback")
+		} else {
+			uh.onUserAddedToTenant(c, tenantID, user)
+		}
 	}
 
 	return nil

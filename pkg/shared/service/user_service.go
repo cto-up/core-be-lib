@@ -45,13 +45,16 @@ type UserService interface {
 	SetUserCreatedCallback(callback UserCreatedCallback)
 	SetUserSignedUpCallback(callback UserSignedUpCallback)
 	GetUserSignedUpCallback() UserSignedUpCallback
+	SetUserAddedToTenantCallback(callback UserAddedToTenantCallback)
+	GetUserAddedToTenantCallback() UserAddedToTenantCallback
 	GetStore() *db.Store
 }
 
 type BaseUserService struct {
-	store          *db.Store
-	onUserCreated  UserCreatedCallback
-	onUserSignedUp UserSignedUpCallback
+	store               *db.Store
+	onUserCreated       UserCreatedCallback
+	onUserSignedUp      UserSignedUpCallback
+	onUserAddedToTenant UserAddedToTenantCallback
 }
 
 func NewBaseUserService(store *db.Store) *BaseUserService {
@@ -125,6 +128,18 @@ func (uh *BaseUserService) SetUserSignedUpCallback(callback UserSignedUpCallback
 // GetUserSignedUpCallback returns the registered signed-up callback (may be nil).
 func (uh *BaseUserService) GetUserSignedUpCallback() UserSignedUpCallback {
 	return uh.onUserSignedUp
+}
+
+// SetUserAddedToTenantCallback sets the callback invoked when a user gains a
+// new (user_id, tenant_id) membership — covers both fresh signups and
+// existing-user-joins-new-tenant flows. See UserAddedToTenantCallback docs.
+func (uh *BaseUserService) SetUserAddedToTenantCallback(callback UserAddedToTenantCallback) {
+	uh.onUserAddedToTenant = callback
+}
+
+// GetUserAddedToTenantCallback returns the registered membership callback (may be nil).
+func (uh *BaseUserService) GetUserAddedToTenantCallback() UserAddedToTenantCallback {
+	return uh.onUserAddedToTenant
 }
 
 func (uh *BaseUserService) GetStore() *db.Store {

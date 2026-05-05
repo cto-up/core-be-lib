@@ -23,6 +23,26 @@ type UserCreatedCallback func(ctx context.Context, tenantID string, user reposit
 // Unlike UserCreatedCallback, it only fires for self-service signups, not admin-created users.
 type UserSignedUpCallback func(ctx context.Context, tenantID string, user repository.CoreUser)
 
+// UserAddedToTenantCallback fires whenever a (user_id, tenant_id) membership
+// row is created. Unlike UserCreatedCallback (which only fires when a user is
+// freshly created), this also covers the existing-global-user-joining-a-new-
+// tenant path — the case where Signup finds a matching email globally and
+// calls AddUserToTenant instead of CreateUser. Modules that need to seed
+// per-tenant state on first contact (initial credit grants, default
+// preferences, audit entries) should hook this callback in addition to or
+// instead of UserCreatedCallback.
+//
+// Fires from:
+//   - SharedUserService.CreateUser, after the create transaction commits
+//     (admin-invited and self-service signups go through here)
+//   - SharedUserService.AddUserToTenant, after the membership row is inserted
+//     (existing user added to a new tenant)
+//
+// Listeners must be idempotent: a brand-new self-service signup will fire
+// both UserCreatedCallback and UserAddedToTenantCallback, and a sufficiently
+// determined admin can call AddUserToTenant after CreateUser too.
+type UserAddedToTenantCallback func(ctx context.Context, tenantID string, user repository.CoreUser)
+
 // UserEventInitFunc is a function that initializes the user event callback in a UserService
 type UserEventInitFunc func(userService UserService)
 
