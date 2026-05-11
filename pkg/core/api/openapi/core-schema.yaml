@@ -47,6 +47,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Role"
+        silent:
+          type: boolean
+          description: When true, suppress invitation and welcome emails (both the synchronous Kratos welcome and any asynchronous onboarding follow-up).
     Role:
       type: string
       enum: [USER, ADMIN, CUSTOMER_ADMIN, SUPER_ADMIN]

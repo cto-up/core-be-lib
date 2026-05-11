@@ -85,23 +85,28 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 		return
 	}
 
+	silent := req.Silent != nil && *req.Silent
+	MarkSilent(c, silent)
+
 	user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), req, nil)
 	if err != nil {
 		logger.Err(err).Msg("Failed to add user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	url, err := getWelcomeEmailURL(c)
-	if err != nil {
-		logger.Err(err).Msg("Failed to get welcome email URL")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-	err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
-	if err != nil {
-		logger.Err(err).Msg("Failed to send welcome email")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
+	if !silent {
+		url, err := getWelcomeEmailURL(c)
+		if err != nil {
+			logger.Err(err).Msg("Failed to get welcome email URL")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
+		err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
+		if err != nil {
+			logger.Err(err).Msg("Failed to send welcome email")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
 	}
 	c.JSON(http.StatusCreated, user)
 }
@@ -900,18 +905,22 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 			lastname := record[headerMap["lastname"]]
 			firstname := record[headerMap["firstname"]]
 			email := record[headerMap["email"]]
-			isCustomerAdminStr := strings.ToLower(record[headerMap["is_customer_admin"]])
+			isCustomerAdmin := parseBoolFlag(record[headerMap["is_customer_admin"]])
 
-			// Parse is_customer_admin value
-			isCustomerAdmin := false
-			if isCustomerAdminStr == "y" || isCustomerAdminStr == "yes" || isCustomerAdminStr == "Y" || isCustomerAdminStr == "YES" || isCustomerAdminStr == "Yes" {
-				isCustomerAdmin = true
+			silent := false
+			if idx, ok := headerMap["silent"]; ok && idx < len(record) {
+				silent = parseBoolFlag(record[idx])
 			}
 
 			var req core.AddUserJSONRequestBody
 			req.Email = email
 			req.Name = firstname + " " + lastname
 			req.Roles = []core.Role{}
+			if silent {
+				silentTrue := true
+				req.Silent = &silentTrue
+			}
+			MarkSilent(c, silent)
 
 			// check if user has rights to assign roles
 			if !auth.HasAdminPrivileges(c) {
@@ -949,25 +958,27 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 				}
 			}
 
-			url, err := getWelcomeEmailURL(c)
-			if err != nil {
-				errors = append(errors, ImportError{
-					Line:  lineNum,
-					Email: email,
-					Error: fmt.Sprintf("error getting welcome email url: %v", err),
-				})
-				failed++
-				continue
-			}
-			err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
-			if err != nil {
-				errors = append(errors, ImportError{
-					Line:  lineNum,
-					Email: email,
-					Error: fmt.Sprintf("error sending welcome email: %v", err),
-				})
-				failed++
-				continue
+			if !silent {
+				url, err := getWelcomeEmailURL(c)
+				if err != nil {
+					errors = append(errors, ImportError{
+						Line:  lineNum,
+						Email: email,
+						Error: fmt.Sprintf("error getting welcome email url: %v", err),
+					})
+					failed++
+					continue
+				}
+				err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
+				if err != nil {
+					errors = append(errors, ImportError{
+						Line:  lineNum,
+						Email: email,
+						Error: fmt.Sprintf("error sending welcome email: %v", err),
+					})
+					failed++
+					continue
+				}
 			}
 
 			success++

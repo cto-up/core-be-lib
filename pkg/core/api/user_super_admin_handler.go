@@ -76,23 +76,28 @@ func (uh *UserSuperAdminHandler) AddUserFromSuperAdmin(c *gin.Context, tenantId 
 		return
 	}
 
+	silent := req.Silent != nil && *req.Silent
+	MarkSilent(c, silent)
+
 	user, err := uh.userService.CreateUser(c, baseAuthClient, tenant.TenantID, req, nil)
 	if err != nil {
 		logger.Err(err).Msg("Failed to add user")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	url, err := getWelcomeEmailURL(c, tenant.Subdomain)
-	if err != nil {
-		logger.Err(err).Msg("Failed to get reset password URL")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-	err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
-	if err != nil {
-		logger.Err(err).Msg("Failed to send welcome email")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
+	if !silent {
+		url, err := getWelcomeEmailURL(c, tenant.Subdomain)
+		if err != nil {
+			logger.Err(err).Msg("Failed to get reset password URL")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
+		err = sendWelcomeEmail(c, baseAuthClient, url, req.Email)
+		if err != nil {
+			logger.Err(err).Msg("Failed to send welcome email")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return
+		}
 	}
 	c.JSON(http.StatusCreated, user)
 }

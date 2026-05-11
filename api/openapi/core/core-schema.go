@@ -408,6 +408,9 @@ type NewUser struct {
 	Email string `json:"email"`
 	Name  string `json:"name"`
 	Roles []Role `json:"roles"`
+
+	// Silent When true, suppress invitation and welcome emails (both the synchronous Kratos welcome and any asynchronous onboarding follow-up).
+	Silent *bool `json:"silent,omitempty"`
 }
 
 // Prompt defines model for Prompt.
