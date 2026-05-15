@@ -21,14 +21,13 @@ func (g *GlobalUserStrategy) Strategy() StrategyType {
 }
 
 func (g *GlobalUserStrategy) CreateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, userRecord *auth.UserRecord, req core.NewUser, password *string) (repository.CoreUser, error) {
-	claims := map[string]interface{}{}
-	for _, role := range req.Roles {
-		claims[string(role)] = true
-	}
 	user := repository.CoreUser{}
+	// Use the provider-specific format (Kratos: metadata_public.global_roles)
+	// so the session loader actually picks these roles up. Top-level boolean
+	// keys are ignored by KratosAuthClient.SetCustomUserClaims.
 	if len(req.Roles) > 0 {
-		err := authClient.SetCustomUserClaims(c, userRecord.UID, claims)
-		if err != nil {
+		claims := authClient.BuildGlobalRoleClaims(convertToRoles(req.Roles))
+		if err := authClient.SetCustomUserClaims(c, userRecord.UID, claims); err != nil {
 			return user, err
 		}
 	}
@@ -46,13 +45,6 @@ func (g *GlobalUserStrategy) CreateUser(c context.Context, authClient auth.AuthC
 }
 
 func (g *GlobalUserStrategy) UpdateUser(c context.Context, authClient auth.AuthClient, qtx *repository.Queries, req core.UpdateUserJSONRequestBody) error {
-
-	claims := map[string]interface{}{}
-
-	for _, role := range req.Roles {
-		claims[string(role)] = true
-	}
-
 	params := (&auth.UserToUpdate{}).
 		Email(req.Email).
 		EmailVerified(false).
@@ -60,12 +52,18 @@ func (g *GlobalUserStrategy) UpdateUser(c context.Context, authClient auth.AuthC
 		PhotoURL("/images/avatar-1.jpeg").
 		Disabled(false)
 
-	_, err := authClient.UpdateUser(c, req.Id, params)
-	if err != nil {
+	if _, err := authClient.UpdateUser(c, req.Id, params); err != nil {
 		return err
 	}
 
-	_, err = qtx.UpdateSharedUser(c,
+	// Mirror the requested role set into Kratos via the provider-specific
+	// global_roles claim (top-level booleans are silently dropped by Kratos).
+	claims := authClient.BuildGlobalRoleClaims(convertToRoles(req.Roles))
+	if err := authClient.SetCustomUserClaims(c, req.Id, claims); err != nil {
+		return err
+	}
+
+	_, err := qtx.UpdateSharedUser(c,
 		repository.UpdateSharedUserParams{
 			ID:    req.Id,
 			Name:  req.Name,
@@ -110,64 +108,56 @@ func (g *GlobalUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSq
 	return users, nil
 }
 
+// AssignRole grants a global role. core_users.roles is the source of truth: we
+// read it, merge the new role in, write it back, then mirror the full set into
+// Kratos via global_roles. The previous AssignRoleWithRowsAffected path filtered
+// by tenant_id and silently no-op'd for global users (tenant_id NULL/empty),
+// which let core_users.roles and Kratos drift.
 func (g *GlobalUserStrategy) AssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
-	err := auth.HasRightsForRole(c, role)
-	if err != nil {
+	if err := auth.HasRightsForRole(c, role); err != nil {
 		return err
 	}
 
-	_, err = qtx.AssignRoleWithRowsAffected(c, repository.AssignRoleWithRowsAffectedParams{
-		UserID:   userID,
-		RoleName: string(role),
-		TenantID: tenantId,
-	})
+	current, err := qtx.GetSharedUserByID(c, userID)
 	if err != nil {
 		return err
 	}
-
-	// Lookup the user associated with the specified uid.
-	user, err := authClient.GetUser(c, userID)
-	if err != nil {
+	merged := mergeRoleStrings(current.Roles, []string{string(role)})
+	if _, err := qtx.UpdateSharedUserGlobalRoles(c, repository.UpdateSharedUserGlobalRolesParams{
+		ID:    userID,
+		Roles: merged,
+	}); err != nil {
 		return err
 	}
 
-	var claims map[string]interface{}
-	if user.CustomClaims == nil {
-		claims = map[string]interface{}{}
-	} else {
-		claims = user.CustomClaims
-	}
-
-	claims[string(role)] = true
-	err = authClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
-	if err != nil {
-		return err
-	}
-	return nil
+	claims := authClient.BuildGlobalRoleClaims(merged)
+	return authClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
 }
 
+// UnAssignRole removes a global role. Same source-of-truth flow as AssignRole
+// — operate on core_users.roles, then push the pruned set to Kratos.
 func (g *GlobalUserStrategy) UnAssignRole(qtx *repository.Queries, c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
-	err := auth.HasRightsForRole(c, role)
-	if err != nil {
+	if err := auth.HasRightsForRole(c, role); err != nil {
 		return err
 	}
 
-	_, err = qtx.UnassignRoleWithRowsAffected(c, repository.UnassignRoleWithRowsAffectedParams{
-		UserID:   userID,
-		RoleName: string(role),
-		TenantID: tenantId,
-	})
+	current, err := qtx.GetSharedUserByID(c, userID)
 	if err != nil {
 		return err
 	}
-
-	// Lookup the user associated with the specified uid.
-	user, err := authClient.GetUser(c, userID)
-	if err != nil {
+	pruned := make([]string, 0, len(current.Roles))
+	for _, r := range current.Roles {
+		if r != string(role) {
+			pruned = append(pruned, r)
+		}
+	}
+	if _, err := qtx.UpdateSharedUserGlobalRoles(c, repository.UpdateSharedUserGlobalRolesParams{
+		ID:    userID,
+		Roles: pruned,
+	}); err != nil {
 		return err
 	}
 
-	claims := user.CustomClaims
-	claims[string(role)] = false
+	claims := authClient.BuildGlobalRoleClaims(pruned)
 	return authClient.SetCustomUserClaims(c.Request.Context(), userID, claims)
 }

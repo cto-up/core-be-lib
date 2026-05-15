@@ -100,8 +100,12 @@ func (uh *SharedUserService) InitUserInDatabase(ctx context.Context, tenantId st
 func (uh *SharedUserService) CreateUser(c context.Context, authClient auth.AuthClient, tenantId string, req core.NewUser, password *string) (repository.CoreUser, error) {
 	user := repository.CoreUser{}
 
-	if err := validateTenantScopedRoles(req.Roles); err != nil {
-		return user, err
+	// ADMIN/SUPER_ADMIN are valid as global roles but never as tenant
+	// memberships — only enforce the guard when a tenant is in context.
+	if tenantId != "" {
+		if err := validateTenantScopedRoles(req.Roles); err != nil {
+			return user, err
+		}
 	}
 
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
@@ -126,6 +130,19 @@ func (uh *SharedUserService) CreateUser(c context.Context, authClient auth.AuthC
 
 	userRecord, err := authClient.CreateUser(c, params)
 	if err != nil {
+		// When promoting a user to a global role (no tenant in context) and
+		// the email is already registered, fall back to attaching the
+		// requested global roles to the existing identity instead of erroring.
+		if tenantId == "" && auth.IsEmailAlreadyExists(err) {
+			user, err = uh.attachGlobalRolesToExistingUser(c, authClient, qtx, req)
+			if err != nil {
+				return user, err
+			}
+			if err = tx.Commit(c); err != nil {
+				return user, err
+			}
+			return user, nil
+		}
 		return user, err
 	}
 
@@ -155,9 +172,77 @@ func (uh *SharedUserService) CreateUser(c context.Context, authClient auth.AuthC
 	return user, err
 }
 
+// attachGlobalRolesToExistingUser handles the global "add user" case where the
+// email is already registered in the auth provider: instead of failing, merge
+// the requested global roles onto the existing identity and DB record.
+func (uh *SharedUserService) attachGlobalRolesToExistingUser(
+	c context.Context, authClient auth.AuthClient, qtx *repository.Queries, req core.NewUser,
+) (repository.CoreUser, error) {
+	user := repository.CoreUser{}
+	authUser, err := authClient.GetUserByEmail(c, req.Email)
+	if err != nil {
+		return user, err
+	}
+
+	user, err = qtx.GetSharedUserByID(c, authUser.UID)
+	if err != nil {
+		// No DB row yet (auth-provider-only user) — create one carrying the
+		// requested global roles.
+		user, err = qtx.CreateSharedUser(c, repository.CreateSharedUserParams{
+			ID:    authUser.UID,
+			Email: req.Email,
+			Profile: subentity.UserProfile{
+				Name: req.Name,
+			},
+			Roles: convertToRoles(req.Roles),
+		})
+		if err != nil {
+			return user, err
+		}
+	} else {
+		merged := mergeRoleStrings(user.Roles, convertToRoles(req.Roles))
+		if _, err = qtx.UpdateSharedUserGlobalRoles(c, repository.UpdateSharedUserGlobalRolesParams{
+			ID:    authUser.UID,
+			Roles: merged,
+		}); err != nil {
+			return user, err
+		}
+		user.Roles = merged
+	}
+
+	// Persist the merged global roles to the auth provider so middleware can
+	// read them out of the session. Use BuildGlobalRoleClaims so the format
+	// is provider-correct (Kratos: metadata_public.global_roles).
+	claims := authClient.BuildGlobalRoleClaims(user.Roles)
+	if err = authClient.SetCustomUserClaims(c, authUser.UID, claims); err != nil {
+		return user, err
+	}
+	return user, nil
+}
+
+func mergeRoleStrings(existing, additions []string) []string {
+	seen := make(map[string]struct{}, len(existing)+len(additions))
+	out := make([]string, 0, len(existing)+len(additions))
+	for _, r := range existing {
+		if _, ok := seen[r]; !ok {
+			seen[r] = struct{}{}
+			out = append(out, r)
+		}
+	}
+	for _, r := range additions {
+		if _, ok := seen[r]; !ok {
+			seen[r] = struct{}{}
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 func (uh *SharedUserService) UpdateUser(c *gin.Context, authClient auth.AuthClient, tenantId string, userId string, req core.UpdateUserJSONRequestBody) error {
-	if err := validateTenantScopedRoles(req.Roles); err != nil {
-		return err
+	if tenantId != "" {
+		if err := validateTenantScopedRoles(req.Roles); err != nil {
+			return err
+		}
 	}
 
 	tx, err := uh.store.ConnPool.Begin(c)
@@ -324,8 +409,10 @@ func (uh *SharedUserService) ListUsers(c *gin.Context, tenantId string, pagingSq
 }
 
 func (uh *SharedUserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
-	if err := validateTenantScopedRole(role); err != nil {
-		return err
+	if tenantId != "" {
+		if err := validateTenantScopedRole(role); err != nil {
+			return err
+		}
 	}
 
 	logger := util.GetLoggerFromCtx(c)

@@ -171,7 +171,9 @@ func HasAnyTenantRole(c *gin.Context, requiredRoles ...string) bool {
 }
 
 // HasMinimumTenantRole checks if the user has at least the specified role level
-// Role hierarchy: ADMIN > CUSTOMER_ADMIN > USER
+// in the current tenant. Note: only CUSTOMER_ADMIN/USER ever appear in tenant
+// roles (ADMIN/SUPER_ADMIN are global), so passing those higher ranks here will
+// always return false — use IsAdmin / IsSuperAdmin for global checks instead.
 func HasMinimumTenantRole(c *gin.Context, minimumRole string) bool {
 	roles, err := GetUserTenantRoles(c)
 	if err != nil {
@@ -188,10 +190,14 @@ func HasMinimumTenantRole(c *gin.Context, minimumRole string) bool {
 	return false
 }
 
-// GetRoleLevel returns the hierarchical level of a role
-// Higher number = more permissions
+// GetRoleLevel returns the privilege ranking of a role. Higher = more permissions.
+// The ranking is scope-agnostic: SUPER_ADMIN and ADMIN are global roles, CUSTOMER_ADMIN
+// and USER are tenant-scoped, but they're all comparable for "is this role at least
+// as privileged as X" checks (e.g. the reseller cap on assignable roles).
 func GetRoleLevel(role string) int {
 	switch role {
+	case string(core.SUPERADMIN):
+		return 4
 	case string(core.ADMIN):
 		return 3
 	case string(core.CUSTOMERADMIN):
@@ -203,25 +209,7 @@ func GetRoleLevel(role string) int {
 	}
 }
 
-// IsTenantOwner checks if the user is an owner of the current tenant
-func IsTenantAdmin(c *gin.Context) bool {
-	rolesInterface, exists := c.Get(CONTEXT_KEY_TENANT_ROLES)
-	if !exists {
-		return false
-	}
-	roles, ok := rolesInterface.([]string)
-	if !ok {
-		return false
-	}
-	for _, role := range roles {
-		if role == string(core.ADMIN) {
-			return true
-		}
-	}
-	return false
-}
-
-// IsTenantAdmin checks if the user is an admin of the current tenant
+// IsTenantCustomerAdmin checks if the user is a CUSTOMER_ADMIN of the current tenant
 func IsTenantCustomerAdmin(c *gin.Context) bool {
 	rolesInterface, exists := c.Get(CONTEXT_KEY_TENANT_ROLES)
 	if !exists {
@@ -239,20 +227,3 @@ func IsTenantCustomerAdmin(c *gin.Context) bool {
 	return false
 }
 
-// IsTenantAdminOrOwner checks if the user is an admin or owner of the current tenant
-func IsTenantAdminOrCustomerAdmin(c *gin.Context) bool {
-	rolesInterface, exists := c.Get(CONTEXT_KEY_TENANT_ROLES)
-	if !exists {
-		return false
-	}
-	roles, ok := rolesInterface.([]string)
-	if !ok {
-		return false
-	}
-	for _, role := range roles {
-		if role == string(core.ADMIN) || role == string(core.CUSTOMERADMIN) {
-			return true
-		}
-	}
-	return false
-}
