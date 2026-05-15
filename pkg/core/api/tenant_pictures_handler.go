@@ -47,9 +47,9 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
-	if !auth.IsAdmin(c) && !auth.IsSuperAdmin(c) && !auth.IsCustomerAdmin(c) {
-		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can upload tenant pictures")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN or SUPER_ADMIN can upload tenant pictures"})
+	if !auth.HasAdminPrivileges(c) {
+		logger.Error().Msg("Only CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN or acting reseller can upload tenant pictures")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only CUSTOMER_ADMIN, ADMIN, SUPER_ADMIN or acting reseller can upload tenant pictures"})
 		return
 	}
 
