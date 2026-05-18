@@ -133,6 +133,16 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 		TenantMemberships: []auth.TenantMembership{},
 	}
 
+	// Populate IsReseller from the current tenant before any early-return so
+	// SUPER_ADMIN/ADMIN acting inside a reseller subdomain also carry the claim
+	// (needed by handlers like AddTenant to auto-bind reseller_id).
+	if tenantID != "" {
+		if isReseller, err := k.multitenantService.IsReseller(ctx, tenantID); err == nil {
+			user.IsReseller = isReseller
+			claims[auth.TENANT_IS_RESELLER] = isReseller
+		}
+	}
+
 	// Skip tenant validation for root domain or SUPER_ADMIN
 	if isSuperAdmin || isAdmin {
 		return user, nil
@@ -146,13 +156,6 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 
 	if tenantID == "" {
 		return user, fmt.Errorf("Only SUPER_ADMIN can access root domain")
-	}
-
-	// Populate IsReseller
-	isReseller, err := k.multitenantService.IsReseller(ctx, tenantID)
-	if err == nil {
-		user.IsReseller = isReseller
-		claims[auth.TENANT_IS_RESELLER] = isReseller
 	}
 
 	// Populate TenantAllowSignUp — drives AccessScope (per-user data isolation)
