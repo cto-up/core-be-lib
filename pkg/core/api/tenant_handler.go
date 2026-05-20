@@ -418,7 +418,7 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 		query.ResellerID = pgtype.Text{String: *params.ResellerId, Valid: true}
 	}
 
-	// If user is TENANT_IS_RESELLER of a reseller, force reseller_id filter
+	// If user is TENANT_IS_RESELLER of a reseller, force reseller_id filter.
 	claims, exists := c.Get(auth.AUTH_CLAIMS)
 	if exists {
 		claimsMap := claims.(map[string]interface{})
@@ -429,6 +429,12 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 				query.ResellerID = pgtype.Text{String: authTenantID, Valid: true}
 			}
 		}
+	}
+
+	// SUPER_ADMIN / ADMIN may opt out of all reseller scoping via ?global=true
+	// (e.g. the tenant switcher needs the full list even on a reseller subdomain).
+	if params.Global != nil && *params.Global && (auth.IsSuperAdmin(c) || auth.IsAdmin(c)) {
+		query.ResellerID = pgtype.Text{Valid: false}
 	}
 
 	tenants, err := exh.store.ListTenants(c, query)

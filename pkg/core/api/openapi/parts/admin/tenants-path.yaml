@@ -42,6 +42,15 @@ get:
       required: false
       schema:
         type: string
+    - name: global
+      in: query
+      description: |
+        When true, bypass the automatic reseller scoping that filters results
+        to the current reseller subdomain. Honored only for SUPER_ADMIN / ADMIN;
+        ignored otherwise.
+      required: false
+      schema:
+        type: boolean
   responses:
     "200":
       description: tenant response

@@ -604,6 +604,11 @@ type ListTenantsParams struct {
 
 	// ResellerId filter by reseller id
 	ResellerId *string `form:"reseller_id,omitempty" json:"reseller_id,omitempty"`
+
+	// Global When true, bypass the automatic reseller scoping that filters results
+	// to the current reseller subdomain. Honored only for SUPER_ADMIN / ADMIN;
+	// ignored otherwise.
+	Global *bool `form:"global,omitempty" json:"global,omitempty"`
 }
 
 // ListTenantsParamsOrder defines parameters for ListTenants.
@@ -3374,6 +3379,14 @@ func (siw *ServerInterfaceWrapper) ListTenants(c *gin.Context) {
 	err = runtime.BindQueryParameter("form", true, false, "reseller_id", c.Request.URL.Query(), &params.ResellerId)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter reseller_id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "global" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "global", c.Request.URL.Query(), &params.Global)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter global: %w", err), http.StatusBadRequest)
 		return
 	}
 
