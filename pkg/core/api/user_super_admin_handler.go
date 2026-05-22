@@ -2,9 +2,7 @@ package core
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"strings"
 
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
@@ -643,28 +641,14 @@ func (uh *UserSuperAdminHandler) HardDeleteUserFromSuperAdmin(c *gin.Context, te
 
 	// Block if the user has active memberships in other tenants.
 	// Inactive memberships are fine — they will cascade-delete.
-	activeMemberships, err := uh.store.Queries.ListUserTenantMemberships(c, repository.ListUserTenantMembershipsParams{
-		UserID: userid,
-		Status: "active",
-	})
-	if err != nil {
-		logger.Err(err).Msg("Failed to list active tenant memberships")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-	var otherActiveTenants []string
-	for _, m := range activeMemberships {
-		if m.TenantID != tenant.TenantID {
-			otherActiveTenants = append(otherActiveTenants, m.TenantName)
+	if err := access.CheckUserNotActiveInOtherTenants(c, uh.store, userid, tenant.TenantID); err != nil {
+		var blocked *access.ErrUserActiveInOtherTenants
+		if errors.As(err, &blocked) {
+			c.JSON(http.StatusConflict, helpers.ErrorStringResponse(blocked.Error()))
+			return
 		}
-	}
-	if len(otherActiveTenants) > 0 {
-		msg := fmt.Sprintf(
-			"user has active memberships in %d other tenant(s): %s — deactivate those first",
-			len(otherActiveTenants),
-			strings.Join(otherActiveTenants, ", "),
-		)
-		c.JSON(http.StatusConflict, helpers.ErrorStringResponse(msg))
+		logger.Err(err).Msg("Failed to check active tenant memberships")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
