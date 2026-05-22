@@ -57,8 +57,7 @@ func NewUserHandler(store *db.Store, authProvider auth.AuthProvider) *UserHandle
 }
 
 func getProfilePictureFilePath(userId any) string {
-	newFilePath := `/core/users/` + userId.(string) + "/profile-picture.jpg"
-	return newFilePath
+	return fileservice.ProfilePictureFilePath(userId.(string))
 }
 
 /**
