@@ -669,6 +669,64 @@ func (q *Queries) ListPendingInvitations(ctx context.Context, userID string) ([]
 	return items, nil
 }
 
+const listSharedUsers = `-- name: ListSharedUsers :many
+SELECT
+    id,
+    email,
+    profile,
+    roles,
+    created_at
+FROM core_users
+WHERE
+    email ILIKE $3::text || '%'
+    OR $3 IS NULL
+ORDER BY email ASC
+LIMIT $1
+OFFSET $2
+`
+
+type ListSharedUsersParams struct {
+	Limit        int32       `json:"limit"`
+	Offset       int32       `json:"offset"`
+	SearchPrefix pgtype.Text `json:"search_prefix"`
+}
+
+type ListSharedUsersRow struct {
+	ID        string                `json:"id"`
+	Email     pgtype.Text           `json:"email"`
+	Profile   subentity.UserProfile `json:"profile"`
+	Roles     []string              `json:"roles"`
+	CreatedAt time.Time             `json:"created_at"`
+}
+
+// List every user system-wide (admin domain, scope=all). Global roles only —
+// tenant roles live in core_user_tenant_memberships.
+func (q *Queries) ListSharedUsers(ctx context.Context, arg ListSharedUsersParams) ([]ListSharedUsersRow, error) {
+	rows, err := q.db.Query(ctx, listSharedUsers, arg.Limit, arg.Offset, arg.SearchPrefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSharedUsersRow{}
+	for rows.Next() {
+		var i ListSharedUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Profile,
+			&i.Roles,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSharedUsersByRoles = `-- name: ListSharedUsersByRoles :many
 SELECT 
     id, 

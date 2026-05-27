@@ -408,6 +408,29 @@ func (uh *SharedUserService) ListUsers(c *gin.Context, tenantId string, pagingSq
 	return strategy.ListUsers(c, uh.store, pagingSql, like)
 }
 
+func (uh *SharedUserService) ListAllUsers(c *gin.Context, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error) {
+	rows, err := uh.store.ListSharedUsers(c, repository.ListSharedUsersParams{
+		Limit:        pagingSql.PageSize,
+		Offset:       pagingSql.Offset,
+		SearchPrefix: like,
+	})
+	if err != nil {
+		return []core.User{}, err
+	}
+
+	users := make([]core.User, len(rows))
+	for i, row := range rows {
+		users[i] = core.User{
+			Id:        row.ID,
+			Name:      row.Profile.Name,
+			Email:     row.Email.String,
+			Roles:     convertToRoleDTOs(row.Roles),
+			CreatedAt: &row.CreatedAt,
+		}
+	}
+	return users, nil
+}
+
 func (uh *SharedUserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
 	if tenantId != "" {
 		if err := validateTenantScopedRole(role); err != nil {

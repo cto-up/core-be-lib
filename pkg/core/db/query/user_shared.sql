@@ -289,6 +289,24 @@ LIMIT $1
 OFFSET $2;
 
 
+-- name: ListSharedUsers :many
+-- List every user system-wide (admin domain, scope=all). Global roles only —
+-- tenant roles live in core_user_tenant_memberships.
+SELECT
+    id,
+    email,
+    profile,
+    roles,
+    created_at
+FROM core_users
+WHERE
+    email ILIKE sqlc.narg('search_prefix')::text || '%'
+    OR sqlc.narg('search_prefix') IS NULL
+ORDER BY email ASC
+LIMIT $1
+OFFSET $2;
+
+
 -- name: UpdateUserTenantMembershipStatus :one
 UPDATE core_user_tenant_memberships
 SET status = $3, updated_at = NOW()

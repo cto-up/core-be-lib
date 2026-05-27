@@ -42,6 +42,16 @@ get:
       required: false
       schema:
         type: string
+    - name: scope
+      in: query
+      description: |
+        On the admin (tenantless) domain, controls which users are returned.
+        "global" (default) lists only holders of a global role (SUPER_ADMIN/ADMIN);
+        "all" lists every user system-wide and requires SUPER_ADMIN.
+      required: false
+      schema:
+        type: string
+        enum: [global, all]
   responses:
     "200":
       description: user response

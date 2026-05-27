@@ -387,7 +387,21 @@ func (u *UserAdminHandler) ListUsers(c *gin.Context, params core.ListUsersParams
 		like.Valid = true
 	}
 
-	users, err := u.userService.ListUsers(c, tenantID.(string), pagingSql, like)
+	var users []core.User
+	var err error
+	if params.Scope != nil && *params.Scope == core.All {
+		// Listing every user system-wide exposes cross-tenant PII — restrict to
+		// super admins (used by the admin domain to find a user to promote to a
+		// global role).
+		if !auth.IsSuperAdmin(c) {
+			logger.Error().Msg("Only super admins may list all users")
+			c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("only super admins may list all users")))
+			return
+		}
+		users, err = u.userService.ListAllUsers(c, pagingSql, like)
+	} else {
+		users, err = u.userService.ListUsers(c, tenantID.(string), pagingSql, like)
+	}
 	if err != nil {
 		logger.Err(err).Msg("Failed to list users")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))

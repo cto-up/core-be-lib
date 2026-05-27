@@ -30,6 +30,10 @@ type UserService interface {
 	GetUserByTenantIDByID(c *gin.Context, tenantID string, id string) (core.User, error)
 	GetUserByEmail(c *gin.Context, tenantId string, email string) (core.User, error)
 	ListUsers(c *gin.Context, tenantId string, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error)
+	// ListAllUsers lists every user system-wide, ignoring tenant scope. Intended
+	// for the admin (tenantless) domain so a super admin can find any user to
+	// promote to a global role. Returns global roles only.
+	ListAllUsers(c *gin.Context, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error)
 
 	GetUserByEmailGlobal(c context.Context, email string) (*core.User, error)
 

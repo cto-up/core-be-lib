@@ -65,6 +65,12 @@ const (
 	ListUsersParamsOrderDesc ListUsersParamsOrder = "desc"
 )
 
+// Defines values for ListUsersParamsScope.
+const (
+	All    ListUsersParamsScope = "all"
+	Global ListUsersParamsScope = "global"
+)
+
 // Defines values for UpdateUserStatusJSONBodyName.
 const (
 	UpdateUserStatusJSONBodyNameDISABLED      UpdateUserStatusJSONBodyName = "DISABLED"
@@ -304,10 +310,18 @@ type ListUsersParams struct {
 
 	// Detail basic or full (default to full)
 	Detail *string `form:"detail,omitempty" json:"detail,omitempty"`
+
+	// Scope On the admin (tenantless) domain, controls which users are returned.
+	// "global" (default) lists only holders of a global role (SUPER_ADMIN/ADMIN);
+	// "all" lists every user system-wide and requires SUPER_ADMIN.
+	Scope *ListUsersParamsScope `form:"scope,omitempty" json:"scope,omitempty"`
 }
 
 // ListUsersParamsOrder defines parameters for ListUsers.
 type ListUsersParamsOrder string
+
+// ListUsersParamsScope defines parameters for ListUsers.
+type ListUsersParamsScope string
 
 // CheckUserExistsParams defines parameters for CheckUserExists.
 type CheckUserExistsParams struct {
@@ -1981,6 +1995,14 @@ func (siw *ServerInterfaceWrapper) ListUsers(c *gin.Context) {
 	err = runtime.BindQueryParameter("form", true, false, "detail", c.Request.URL.Query(), &params.Detail)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter detail: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "scope" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "scope", c.Request.URL.Query(), &params.Scope)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter scope: %w", err), http.StatusBadRequest)
 		return
 	}
 
