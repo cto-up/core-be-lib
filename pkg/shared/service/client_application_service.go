@@ -231,12 +231,20 @@ func (s *ClientApplicationService) GenerateSecureToken() (string, string, []byte
 
 // CreateAPIToken creates a new API token for a client application
 func (s *ClientApplicationService) CreateAPIToken(ctx *gin.Context, clientApplicationID uuid.UUID,
-	name, description string, expiresInDays int, createdBy string, scopes []string) (string, repository.CoreApiToken, error) {
+	tenantID string, name, description string, expiresInDays int, createdBy string, scopes []string) (string, repository.CoreApiToken, error) {
 
 	logger := util.GetLoggerFromCtx(ctx)
-	// Validate client application exists and is active
+
+	var tenantIDParam *string
+	if tenantID != "" {
+		tenantIDParam = &tenantID
+	}
+
+	// Validate the client application exists, is active, and belongs to the
+	// caller's scope (tenant-specific if tenantID is set, global otherwise).
 	app, err := s.store.GetClientApplicationByID(ctx, repository.GetClientApplicationByIDParams{
-		ID: clientApplicationID,
+		ID:       clientApplicationID,
+		TenantID: util.ToNullableText(tenantIDParam),
 	})
 
 	if err != nil {
@@ -381,11 +389,19 @@ func (s *ClientApplicationService) ListAPITokens(ctx context.Context, clientAppl
 }
 
 // RevokeAPIToken revokes an API token
-func (s *ClientApplicationService) RevokeAPIToken(ctx *gin.Context, id uuid.UUID, reason, revokedBy string) (repository.CoreApiToken, error) {
+func (s *ClientApplicationService) RevokeAPIToken(ctx *gin.Context, id uuid.UUID, tenantID, reason, revokedBy string) (repository.CoreApiToken, error) {
 	logger := util.GetLoggerFromCtx(ctx)
-	// Check if token exists and is not already revoked
+
+	var tenantIDParam *string
+	if tenantID != "" {
+		tenantIDParam = &tenantID
+	}
+
+	// Check the token exists, is not already revoked, and is in the caller's
+	// scope (tenant-specific if tenantID is set, global otherwise).
 	token, err := s.store.GetAPITokenByID(ctx, repository.GetAPITokenByIDParams{
-		ID: id,
+		ID:       id,
+		TenantID: util.ToNullableText(tenantIDParam),
 	})
 
 	if err != nil {

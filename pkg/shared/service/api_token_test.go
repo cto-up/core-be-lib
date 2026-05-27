@@ -2,6 +2,7 @@ package service
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -17,11 +18,10 @@ func setupTestAPITokenService(t *testing.T) (*ClientApplicationService, *commont
 	store := testutils.NewTestStore(t)
 	mockAuth := &commontestutils.MockAuthenticator{}
 	service := NewClientApplicationService(store)
-	ctx := &gin.Context{}
-	// Set any required context values
-	ctx.Request = &http.Request{
-		Header: make(http.Header),
-	}
+	// Build a real test context so ClientIP()/GetHeader() (used in the token
+	// audit path) have an engine and a request to read from.
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 	return service, mockAuth, ctx
 }
 
@@ -39,6 +39,7 @@ func TestCreateAPIToken(t *testing.T) {
 		token, apiToken, err := service.CreateAPIToken(
 			ctx,
 			app.ID,
+			app.TenantID.String,
 			name,
 			description,
 			expiryDays,
@@ -69,11 +70,30 @@ func TestCreateAPIToken(t *testing.T) {
 		_, _, err := service.CreateAPIToken(
 			ctx,
 			invalidID,
+			"",
 			name,
 			"description",
 			30,
 			"creator",
 			nil,
+		)
+
+		require.Error(t, err)
+	})
+
+	t.Run("wrong tenant cannot create token for another tenant's application", func(t *testing.T) {
+		app := createTestClientApplication(t, service)
+		otherTenant := commontestutils.RandomString(10)
+
+		_, _, err := service.CreateAPIToken(
+			ctx,
+			app.ID,
+			otherTenant,
+			commontestutils.RandomString(10),
+			"description",
+			30,
+			"creator",
+			[]string{"read"},
 		)
 
 		require.Error(t, err)
@@ -89,6 +109,7 @@ func TestGetAPIToken(t *testing.T) {
 		token, apiToken, err := service.CreateAPIToken(
 			ctx,
 			app.ID,
+			app.TenantID.String,
 			"test token",
 			"description",
 			30,
@@ -111,6 +132,25 @@ func TestGetAPIToken(t *testing.T) {
 		_, err := service.GetAPITokenByID(ctx, invalidID, "tenant123")
 		require.Error(t, err)
 	})
+
+	t.Run("wrong tenant cannot read token", func(t *testing.T) {
+		app := createTestClientApplication(t, service)
+		_, apiToken, err := service.CreateAPIToken(
+			ctx,
+			app.ID,
+			app.TenantID.String,
+			"test token",
+			"description",
+			30,
+			"creator",
+			[]string{"read"},
+		)
+		require.NoError(t, err)
+
+		// A different tenant must not be able to resolve the token.
+		_, err = service.GetAPITokenByID(ctx, apiToken.ID, commontestutils.RandomString(10))
+		require.Error(t, err)
+	})
 }
 
 func TestRevokeAPIToken(t *testing.T) {
@@ -122,6 +162,7 @@ func TestRevokeAPIToken(t *testing.T) {
 		_, apiToken, err := service.CreateAPIToken(
 			ctx,
 			app.ID,
+			app.TenantID.String,
 			"test token",
 			"description",
 			30,
@@ -133,7 +174,7 @@ func TestRevokeAPIToken(t *testing.T) {
 		// Revoke the token
 		reason := "Security concern"
 		revokedBy := "admin"
-		revoked, err := service.RevokeAPIToken(ctx, apiToken.ID, reason, revokedBy)
+		revoked, err := service.RevokeAPIToken(ctx, apiToken.ID, app.TenantID.String, reason, revokedBy)
 		require.NoError(t, err)
 		require.True(t, revoked.Revoked)
 		require.Equal(t, reason, revoked.RevokedReason.String)
@@ -143,7 +184,7 @@ func TestRevokeAPIToken(t *testing.T) {
 
 	t.Run("revoke non-existent token", func(t *testing.T) {
 		invalidID := uuid.New()
-		_, err := service.RevokeAPIToken(ctx, invalidID, "reason", "admin")
+		_, err := service.RevokeAPIToken(ctx, invalidID, "", "reason", "admin")
 		require.Error(t, err)
 	})
 }
@@ -160,6 +201,7 @@ func TestListAPITokens(t *testing.T) {
 			_, _, err := service.CreateAPIToken(
 				ctx,
 				app.ID,
+				app.TenantID.String,
 				commontestutils.RandomString(10),
 				"test token",
 				30,
@@ -170,7 +212,7 @@ func TestListAPITokens(t *testing.T) {
 		}
 
 		// List tokens with pagination
-		tokens, err := service.ListAPITokens(ctx, &app.ID, "", 2, 0, "created_at", "desc", false, false)
+		tokens, err := service.ListAPITokens(ctx, &app.ID, app.TenantID.String, 2, 0, "created_at", "desc", false, false)
 		require.NoError(t, err)
 		require.Len(t, tokens, 2)
 
@@ -185,6 +227,7 @@ func TestListAPITokens(t *testing.T) {
 		_, _, err := service.CreateAPIToken(
 			ctx,
 			app.ID,
+			app.TenantID.String,
 			"active token",
 			"description",
 			30,
@@ -196,6 +239,7 @@ func TestListAPITokens(t *testing.T) {
 		_, revokedToken, err := service.CreateAPIToken(
 			ctx,
 			app.ID,
+			app.TenantID.String,
 			"revoked token",
 			"description",
 			30,
@@ -205,18 +249,18 @@ func TestListAPITokens(t *testing.T) {
 		require.NoError(t, err)
 
 		// Revoke one token
-		_, err = service.RevokeAPIToken(ctx, revokedToken.ID, "test", "admin")
+		_, err = service.RevokeAPIToken(ctx, revokedToken.ID, app.TenantID.String, "test", "admin")
 		require.NoError(t, err)
 
 		// List only active tokens
-		tokens, err := service.ListAPITokens(ctx, &app.ID, "", 10, 0, "created_at", "desc", false, false)
+		tokens, err := service.ListAPITokens(ctx, &app.ID, app.TenantID.String, 10, 0, "created_at", "desc", false, false)
 		require.NoError(t, err)
 		for _, token := range tokens {
 			require.False(t, token.Revoked)
 		}
 
 		// List including revoked tokens
-		tokens, err = service.ListAPITokens(ctx, &app.ID, "", 10, 0, "created_at", "desc", true, false)
+		tokens, err = service.ListAPITokens(ctx, &app.ID, app.TenantID.String, 10, 0, "created_at", "desc", true, false)
 		require.NoError(t, err)
 		found := false
 		for _, token := range tokens {
@@ -226,6 +270,26 @@ func TestListAPITokens(t *testing.T) {
 			}
 		}
 		require.True(t, found)
+	})
+
+	t.Run("wrong tenant sees no tokens", func(t *testing.T) {
+		app := createTestClientApplication(t, service)
+		_, _, err := service.CreateAPIToken(
+			ctx,
+			app.ID,
+			app.TenantID.String,
+			commontestutils.RandomString(10),
+			"test token",
+			30,
+			"creator",
+			[]string{"read"},
+		)
+		require.NoError(t, err)
+
+		// A different tenant must not see this application's tokens.
+		tokens, err := service.ListAPITokens(ctx, &app.ID, commontestutils.RandomString(10), 10, 0, "created_at", "desc", true, true)
+		require.NoError(t, err)
+		require.Empty(t, tokens)
 	})
 }
 
@@ -238,6 +302,7 @@ func TestDeleteAPIToken(t *testing.T) {
 		_, apiToken, err := service.CreateAPIToken(
 			ctx,
 			app.ID,
+			app.TenantID.String,
 			"test token",
 			"description",
 			30,

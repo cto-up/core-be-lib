@@ -11,8 +11,11 @@ RETURNING *;
 SELECT t.*, c.tenant_id 
 FROM core_api_tokens t
 JOIN core_client_applications c ON t.client_application_id = c.id
-WHERE t.id = $1 
-  AND (c.tenant_id = sqlc.narg('tenant_id')::varchar OR c.tenant_id IS NULL)
+WHERE t.id = $1
+  AND (
+    (sqlc.narg('tenant_id')::varchar IS NULL AND (c.tenant_id IS NULL OR c.tenant_id = ''))
+    OR c.tenant_id = sqlc.narg('tenant_id')::varchar
+  )
   AND t.revoked = false
 LIMIT 1;
 
@@ -29,7 +32,10 @@ LIMIT 1;
 SELECT t.*, c.name as application_name 
 FROM core_api_tokens t
 JOIN core_client_applications c ON t.client_application_id = c.id
-WHERE (c.tenant_id = sqlc.narg('tenant_id')::varchar OR c.tenant_id IS NULL)
+WHERE (
+    (sqlc.narg('tenant_id')::varchar IS NULL AND (c.tenant_id IS NULL OR c.tenant_id = ''))
+    OR c.tenant_id = sqlc.narg('tenant_id')::varchar
+  )
   AND (t.client_application_id = sqlc.narg('client_application_id')::uuid OR sqlc.narg('client_application_id') IS NULL)
   AND (
     sqlc.narg('include_revoked')::boolean OR t.revoked = false

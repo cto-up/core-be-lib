@@ -8,13 +8,19 @@ RETURNING *;
 
 -- name: GetClientApplicationByID :one
 SELECT * FROM core_client_applications
-WHERE id = $1 AND (tenant_id = sqlc.narg('tenant_id')::varchar OR tenant_id IS NULL)
+WHERE id = $1 AND (
+    (sqlc.narg('tenant_id')::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = sqlc.narg('tenant_id')::varchar
+  )
 LIMIT 1;
 
 -- name: ListClientApplications :many
-SELECT * 
+SELECT *
 FROM core_client_applications
-WHERE (tenant_id = sqlc.narg('tenant_id')::varchar OR tenant_id IS NULL)
+WHERE (
+    (sqlc.narg('tenant_id')::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = sqlc.narg('tenant_id')::varchar
+  )
   AND (sqlc.narg('include_inactive')::boolean OR active = true)
   AND (UPPER(name) LIKE UPPER(sqlc.narg('like')) OR sqlc.narg('like') IS NULL)
 ORDER BY
@@ -27,22 +33,31 @@ OFFSET $2;
 
 -- name: UpdateClientApplication :one
 UPDATE core_client_applications
-SET 
+SET
   name = $2,
   description = $3,
   active = $4
-WHERE id = $1 AND (tenant_id = sqlc.narg('tenant_id')::varchar OR tenant_id IS NULL)
+WHERE id = $1 AND (
+    (sqlc.narg('tenant_id')::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = sqlc.narg('tenant_id')::varchar
+  )
 RETURNING *;
 
 -- name: DeactivateClientApplication :one
-UPDATE core_client_applications 
+UPDATE core_client_applications
 SET active = false
-WHERE id = $1 AND (tenant_id = sqlc.narg('tenant_id')::varchar OR tenant_id IS NULL)
+WHERE id = $1 AND (
+    (sqlc.narg('tenant_id')::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = sqlc.narg('tenant_id')::varchar
+  )
 RETURNING id;
 
 -- name: DeleteClientApplication :one
 DELETE FROM core_client_applications
-WHERE id = $1 AND (tenant_id = sqlc.narg('tenant_id')::varchar OR tenant_id IS NULL)
+WHERE id = $1 AND (
+    (sqlc.narg('tenant_id')::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = sqlc.narg('tenant_id')::varchar
+  )
 RETURNING id;
 
 -- name: UpdateClientApplicationLastUsed :exec

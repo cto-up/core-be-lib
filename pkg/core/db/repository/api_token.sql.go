@@ -221,8 +221,11 @@ const getAPITokenByID = `-- name: GetAPITokenByID :one
 SELECT t.id, t.client_application_id, t.name, t.description, t.token_hash, t.token_prefix, t.expires_at, t.revoked, t.revoked_at, t.revoked_reason, t.revoked_by, t.created_by, t.scopes, t.created_at, t.updated_at, t.last_used_at, t.last_used_ip, c.tenant_id 
 FROM core_api_tokens t
 JOIN core_client_applications c ON t.client_application_id = c.id
-WHERE t.id = $1 
-  AND (c.tenant_id = $2::varchar OR c.tenant_id IS NULL)
+WHERE t.id = $1
+  AND (
+    ($2::varchar IS NULL AND (c.tenant_id IS NULL OR c.tenant_id = ''))
+    OR c.tenant_id = $2::varchar
+  )
   AND t.revoked = false
 LIMIT 1
 `
@@ -283,7 +286,10 @@ const listAPITokens = `-- name: ListAPITokens :many
 SELECT t.id, t.client_application_id, t.name, t.description, t.token_hash, t.token_prefix, t.expires_at, t.revoked, t.revoked_at, t.revoked_reason, t.revoked_by, t.created_by, t.scopes, t.created_at, t.updated_at, t.last_used_at, t.last_used_ip, c.name as application_name 
 FROM core_api_tokens t
 JOIN core_client_applications c ON t.client_application_id = c.id
-WHERE (c.tenant_id = $3::varchar OR c.tenant_id IS NULL)
+WHERE (
+    ($3::varchar IS NULL AND (c.tenant_id IS NULL OR c.tenant_id = ''))
+    OR c.tenant_id = $3::varchar
+  )
   AND (t.client_application_id = $4::uuid OR $4 IS NULL)
   AND (
     $5::boolean OR t.revoked = false

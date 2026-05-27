@@ -16,7 +16,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ClientApplicationHandler handles client application endpoints
+// ClientApplicationHandler handles client application endpoints.
+//
+// Tenant scoping: every method derives its scope from the request via
+// c.GetString(auth.AUTH_TENANT_ID_KEY) — a tenant ID for tenant-specific
+// resources, "" for global (SUPER_ADMIN) ones. Scoping is strict: tenants never
+// see globals and vice versa. See docs/CLIENT_APPLICATIONS_TENANT_SCOPING.md.
 type ClientApplicationHandler struct {
 	store            *db.Store
 	clientAppService *access.ClientApplicationService
@@ -229,10 +234,10 @@ func (h *ClientApplicationHandler) ListClientApplications(c *gin.Context, params
 		searchQuery = *params.Q
 	}
 
-	// List applications without tenant restriction for super admin
+	// Scope to the caller's tenant (empty for global/super admin at root).
 	apps, err := h.clientAppService.ListClientApplications(
 		c,
-		"", // Empty tenant ID for super admin to list all apps
+		c.GetString(auth.AUTH_TENANT_ID_KEY),
 		pagingSql.PageSize,
 		pagingSql.Offset,
 		pagingSql.SortBy,
@@ -274,12 +279,12 @@ func (h *ClientApplicationHandler) CreateClientApplication(c *gin.Context) {
 		return
 	}
 
-	// Create application (no tenant ID for super admin apps)
+	// Scope to the caller's tenant (empty for global/super admin at root).
 	description := req.Description
 
 	app, err := h.clientAppService.CreateClientApplication(
 		c,
-		"", // Empty tenant ID for super admin apps
+		c.GetString(auth.AUTH_TENANT_ID_KEY),
 		req.Name,
 		description,
 		userID.(string),
@@ -306,7 +311,7 @@ func (h *ClientApplicationHandler) GetClientApplicationById(c *gin.Context, id u
 	}
 
 	// Get application
-	app, err := h.clientAppService.GetClientApplicationByID(c, id, "")
+	app, err := h.clientAppService.GetClientApplicationByID(c, id, c.GetString(auth.AUTH_TENANT_ID_KEY))
 	if err != nil {
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
@@ -338,8 +343,11 @@ func (h *ClientApplicationHandler) UpdateClientApplication(c *gin.Context, id uu
 		return
 	}
 
+	// Scope to the caller's tenant (empty for global/super admin at root).
+	tenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+
 	// Get current application
-	app, err := h.clientAppService.GetClientApplicationByID(c, id, "")
+	app, err := h.clientAppService.GetClientApplicationByID(c, id, tenantID)
 	if err != nil {
 		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to get client application for update")
 		if err.Error() == pgx.ErrNoRows.Error() {
@@ -356,7 +364,7 @@ func (h *ClientApplicationHandler) UpdateClientApplication(c *gin.Context, id uu
 	updatedApp, err := h.clientAppService.UpdateClientApplication(
 		c,
 		id,
-		"", // Empty tenant ID for super admin
+		tenantID,
 		req.Name,
 		description,
 		app.Active, // Keep current active status
@@ -380,8 +388,8 @@ func (h *ClientApplicationHandler) DeleteClientApplication(c *gin.Context, id uu
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-	// Delete application
-	err := h.clientAppService.DeleteClientApplication(c, id, "")
+	// Delete application (scoped to the caller's tenant; empty for global)
+	err := h.clientAppService.DeleteClientApplication(c, id, c.GetString(auth.AUTH_TENANT_ID_KEY))
 	if err != nil {
 		if helpers.AbortIfReferenced(c, err,
 			"CLIENT_APPLICATION_IN_USE",
@@ -407,8 +415,8 @@ func (h *ClientApplicationHandler) DeactivateClientApplication(c *gin.Context, i
 		return
 	}
 
-	// Deactivate application
-	err := h.clientAppService.DeactivateClientApplication(c, id, "")
+	// Deactivate application (scoped to the caller's tenant; empty for global)
+	err := h.clientAppService.DeactivateClientApplication(c, id, c.GetString(auth.AUTH_TENANT_ID_KEY))
 	if err != nil {
 		logger.Err(err).Str("userID", userID.(string)).Str("appID", id.String()).Msg("Failed to deactivate client application")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -454,11 +462,11 @@ func (h *ClientApplicationHandler) ListAPITokens(c *gin.Context, id uuid.UUID, p
 		includeExpired = *params.IncludeExpired
 	}
 
-	// List tokens
+	// List tokens (scoped to the caller's tenant; empty for global)
 	tokens, err := h.clientAppService.ListAPITokens(
 		c,
 		&id,
-		"", // Empty tenant ID for super admin
+		c.GetString(auth.AUTH_TENANT_ID_KEY),
 		pagingSql.PageSize,
 		pagingSql.Offset,
 		pagingSql.SortBy,
@@ -520,10 +528,12 @@ func (h *ClientApplicationHandler) CreateAPIToken(c *gin.Context, id uuid.UUID) 
 		scopes = *req.Scopes
 	}
 
-	// Create API token
+	// Create API token (scoped to the caller's tenant; empty for global). The
+	// service rejects the request if the client application is out of scope.
 	token, apiToken, err := h.clientAppService.CreateAPIToken(
 		c,
 		id,
+		c.GetString(auth.AUTH_TENANT_ID_KEY),
 		req.Name,
 		description,
 		expiryDays,
@@ -552,8 +562,8 @@ func (h *ClientApplicationHandler) GetAPITokenById(c *gin.Context, id uuid.UUID,
 		return
 	}
 
-	// Get token
-	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, "")
+	// Get token (scoped to the caller's tenant; empty for global)
+	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, c.GetString(auth.AUTH_TENANT_ID_KEY))
 	if err != nil {
 		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", id.String()).Msg("Failed to get API token")
 
@@ -584,8 +594,8 @@ func (h *ClientApplicationHandler) DeleteAPIToken(c *gin.Context, id uuid.UUID, 
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-	// Verify token exists and belongs to the client application
-	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, "")
+	// Verify token exists and belongs to the client application (scoped to tenant)
+	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, c.GetString(auth.AUTH_TENANT_ID_KEY))
 	if err != nil {
 		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to get API token for deletion")
 		if err.Error() == pgx.ErrNoRows.Error() {
@@ -624,8 +634,8 @@ func (h *ClientApplicationHandler) RevokeAPIToken(c *gin.Context, id uuid.UUID, 
 		return
 	}
 
-	// Verify token exists and belongs to the client application
-	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, "")
+	// Verify token exists and belongs to the client application (scoped to tenant)
+	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, c.GetString(auth.AUTH_TENANT_ID_KEY))
 	if err != nil {
 		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", id.String()).Msg("Failed to get API token for revocation")
 
@@ -653,8 +663,8 @@ func (h *ClientApplicationHandler) RevokeAPIToken(c *gin.Context, id uuid.UUID, 
 	// Set revocation reason
 	reason := req.Reason
 
-	// Revoke token
-	revokedToken, err := h.clientAppService.RevokeAPIToken(c, tokenId, reason, userID.(string))
+	// Revoke token (scoped to the caller's tenant; empty for global)
+	revokedToken, err := h.clientAppService.RevokeAPIToken(c, tokenId, c.GetString(auth.AUTH_TENANT_ID_KEY), reason, userID.(string))
 	if err != nil {
 		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to revoke API token")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
@@ -709,8 +719,8 @@ func (h *ClientApplicationHandler) GetAPITokenAuditLogs(c *gin.Context, id uuid.
 		return
 	}
 
-	// Verify token exists and belongs to the client application
-	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, "")
+	// Verify token exists and belongs to the client application (scoped to tenant)
+	token, err := h.clientAppService.GetAPITokenByID(c, tokenId, c.GetString(auth.AUTH_TENANT_ID_KEY))
 	if err != nil {
 		logger.Err(err).Str("userID", userID.(string)).Str("tokenID", tokenId.String()).Msg("Failed to get API token for audit logs")
 		if err.Error() == pgx.ErrNoRows.Error() {

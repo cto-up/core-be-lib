@@ -51,9 +51,12 @@ func (q *Queries) CreateClientApplication(ctx context.Context, arg CreateClientA
 }
 
 const deactivateClientApplication = `-- name: DeactivateClientApplication :one
-UPDATE core_client_applications 
+UPDATE core_client_applications
 SET active = false
-WHERE id = $1 AND (tenant_id = $2::varchar OR tenant_id IS NULL)
+WHERE id = $1 AND (
+    ($2::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = $2::varchar
+  )
 RETURNING id
 `
 
@@ -71,7 +74,10 @@ func (q *Queries) DeactivateClientApplication(ctx context.Context, arg Deactivat
 
 const deleteClientApplication = `-- name: DeleteClientApplication :one
 DELETE FROM core_client_applications
-WHERE id = $1 AND (tenant_id = $2::varchar OR tenant_id IS NULL)
+WHERE id = $1 AND (
+    ($2::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = $2::varchar
+  )
 RETURNING id
 `
 
@@ -89,7 +95,10 @@ func (q *Queries) DeleteClientApplication(ctx context.Context, arg DeleteClientA
 
 const getClientApplicationByID = `-- name: GetClientApplicationByID :one
 SELECT id, name, description, tenant_id, active, created_by, created_at, updated_at, last_used_at FROM core_client_applications
-WHERE id = $1 AND (tenant_id = $2::varchar OR tenant_id IS NULL)
+WHERE id = $1 AND (
+    ($2::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = $2::varchar
+  )
 LIMIT 1
 `
 
@@ -116,9 +125,12 @@ func (q *Queries) GetClientApplicationByID(ctx context.Context, arg GetClientApp
 }
 
 const listClientApplications = `-- name: ListClientApplications :many
-SELECT id, name, description, tenant_id, active, created_by, created_at, updated_at, last_used_at 
+SELECT id, name, description, tenant_id, active, created_by, created_at, updated_at, last_used_at
 FROM core_client_applications
-WHERE (tenant_id = $3::varchar OR tenant_id IS NULL)
+WHERE (
+    ($3::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = $3::varchar
+  )
   AND ($4::boolean OR active = true)
   AND (UPPER(name) LIKE UPPER($5) OR $5 IS NULL)
 ORDER BY
@@ -180,11 +192,14 @@ func (q *Queries) ListClientApplications(ctx context.Context, arg ListClientAppl
 
 const updateClientApplication = `-- name: UpdateClientApplication :one
 UPDATE core_client_applications
-SET 
+SET
   name = $2,
   description = $3,
   active = $4
-WHERE id = $1 AND (tenant_id = $5::varchar OR tenant_id IS NULL)
+WHERE id = $1 AND (
+    ($5::varchar IS NULL AND (tenant_id IS NULL OR tenant_id = ''))
+    OR tenant_id = $5::varchar
+  )
 RETURNING id, name, description, tenant_id, active, created_by, created_at, updated_at, last_used_at
 `
 

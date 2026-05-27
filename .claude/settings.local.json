@@ -19,7 +19,9 @@
       "Bash(go version *)",
       "Bash(go list *)",
       "Bash(go env *)",
-      "Bash(grep 'otel/sdk ' __TRACKED_VAR__/go.opentelemetry.io/otel/sdk/log@v0.15.0/go.mod)"
+      "Bash(grep 'otel/sdk ' __TRACKED_VAR__/go.opentelemetry.io/otel/sdk/log@v0.15.0/go.mod)",
+      "Bash(docker info *)",
+      "Bash(xargs cat)"
     ]
   }
 }
