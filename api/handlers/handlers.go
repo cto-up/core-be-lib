@@ -12,7 +12,6 @@ import (
 
 type Handlers struct {
 	*config.GlobalConfigHandler
-	*core.PromptHandler
 	*config.TenantConfigHandler
 	*health.HealthHandler
 	*core.TenantHandler
@@ -30,7 +29,6 @@ func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool auth.AuthProvider
 	handlers := Handlers{
 		GlobalConfigHandler:      config.NewGlobalConfigHandler(store, authClientPool),
 		TenantConfigHandler:      config.NewTenantConfigHandler(store, authClientPool),
-		PromptHandler:            core.NewPromptHandler(store, authClientPool),
 		HealthHandler:            health.NewHealthHandler(store),
 		TenantHandler:            core.NewTenantHandler(store, authClientPool, multiTenantService),
 		UserHandler:              core.NewUserHandler(store, authClientPool),

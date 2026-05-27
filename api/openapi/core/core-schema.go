@@ -51,20 +51,6 @@ const (
 	Aal2 MFAStatusAal = "aal2"
 )
 
-// Defines values for NewPromptFormat.
-const (
-	NewPromptFormatJson     NewPromptFormat = "json"
-	NewPromptFormatMarkdown NewPromptFormat = "markdown"
-	NewPromptFormatText     NewPromptFormat = "text"
-)
-
-// Defines values for PromptFormat.
-const (
-	PromptFormatJson     PromptFormat = "json"
-	PromptFormatMarkdown PromptFormat = "markdown"
-	PromptFormatText     PromptFormat = "text"
-)
-
 // Defines values for Role.
 const (
 	ADMIN         Role = "ADMIN"
@@ -346,26 +332,6 @@ type NewConfig struct {
 	Value *string `json:"value,omitempty"`
 }
 
-// NewPrompt defines model for NewPrompt.
-type NewPrompt struct {
-	Content string `json:"content"`
-
-	// Format Output format of the prompt execution
-	Format NewPromptFormat `json:"format"`
-
-	// FormatInstructions Instructions for the LLM on how to format the output
-	FormatInstructions string   `json:"formatInstructions"`
-	Name               string   `json:"name"`
-	Parameters         []string `json:"parameters"`
-
-	// SampleParameters Example parameter values for the prompt
-	SampleParameters *map[string]string `json:"sampleParameters,omitempty"`
-	Tags             []string           `json:"tags"`
-}
-
-// NewPromptFormat Output format of the prompt execution
-type NewPromptFormat string
-
 // NewSignUp defines model for NewSignUp.
 type NewSignUp struct {
 	Company     *string `json:"company,omitempty"`
@@ -411,32 +377,6 @@ type NewUser struct {
 
 	// Silent When true, suppress invitation and welcome emails (both the synchronous Kratos welcome and any asynchronous onboarding follow-up).
 	Silent *bool `json:"silent,omitempty"`
-}
-
-// Prompt defines model for Prompt.
-type Prompt struct {
-	Content string `json:"content"`
-
-	// Format Output format of the prompt execution
-	Format PromptFormat `json:"format"`
-
-	// FormatInstructions Instructions for the LLM on how to format the output
-	FormatInstructions string             `json:"formatInstructions"`
-	Id                 openapi_types.UUID `json:"id"`
-	Name               string             `json:"name"`
-	Parameters         []string           `json:"parameters"`
-
-	// SampleParameters Example parameter values for the prompt
-	SampleParameters *map[string]string `json:"sampleParameters,omitempty"`
-	Tags             []string           `json:"tags"`
-}
-
-// PromptFormat Output format of the prompt execution
-type PromptFormat string
-
-// PromptResponse defines model for PromptResponse.
-type PromptResponse struct {
-	Result string `json:"result"`
 }
 
 // PublicTenantSchema defines model for PublicTenantSchema.

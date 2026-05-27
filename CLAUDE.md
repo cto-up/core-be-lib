@@ -24,7 +24,6 @@ make sqlc                # Generate type-safe Go code from SQL queries
 
 # Build
 go build -o app ./cmd/full         # Build REST server
-go build -o prompt ./cmd/prompt    # Build LLM prompt CLI
 
 # Tests
 go test ./...                              # Run all tests
@@ -58,7 +57,6 @@ make release VERSION=v1.0.0 NOTES="Description"
 - `pkg/shared/auth/` — Ory Kratos auth provider, role helpers (`auth.IsAdmin(c)`, `auth.IsSuperAdmin(c)`, `auth.IsCustomerAdmin(c)`)
 - `pkg/shared/service/` — middleware (auth, tenant, request ID), multi-tenant service, user service
 - `pkg/shared/server/core/` — `ServerConfig` singleton for Gin router setup
-- `pkg/shared/llmmodels/` — LLM model configs (OpenAI, Anthropic, Gemini, Ollama)
 - `pkg/shared/fileservice/` — pluggable file storage (local, GCS, S3, Azure)
 - `pkg/core/db/testutils/` — Testcontainers helpers, mock authenticator, random data generators
 - `api/handlers/` — handler factory wiring all dependencies

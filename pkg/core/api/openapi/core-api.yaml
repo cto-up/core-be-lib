@@ -167,15 +167,6 @@ paths:
   /admin-api/v1/client-applications/{id}/tokens/{tokenId}/audit:
     $ref: "./parts/tokens/client-applications-id-tokens-id-audit-path.yaml"
 
-  # prompts
-  /api/v1/prompts:
-    $ref: "./parts/prompts/prompts-path.yaml"
-  /api/v1/prompts/{id}:
-    $ref: "./parts/prompts/prompts-id-path.yaml"
-  /api/v1/prompts/format:
-    $ref: "./parts/prompts/prompts-format-path.yaml"
-  /api/v1/prompts/execute:
-    $ref: "./parts/prompts/prompts-execute-path.yaml"
   ## translations
   /api/v1/translations:
     $ref: "./parts/translations/translations-path.yaml"

@@ -29,10 +29,8 @@ pkg/shared/
 ├── auth/                # Auth provider interface + role helpers
 ├── service/             # Middleware (auth, tenant, requestID), user/tenant services
 ├── server/core/         # ServerConfig singleton (Gin + middleware wiring)
-├── llmmodels/           # LLM model configs (OpenAI, Anthropic, Gemini, Ollama)
 ├── fileservice/         # Pluggable file storage (local, GCS, S3, Azure)
 ├── emailservice/
-├── pgvector/
 └── seedservice/
 
 api/

@@ -59,9 +59,3 @@ func TestSomething(t *testing.T) {
 ```
 
 Docker must be running. Container is cleaned up automatically via `t.Cleanup()`.
-
-## pgvector (RAG)
-
-- Vector columns use `pgvector` extension (included in the `docker/docker-compose-postgresql.yml` image)
-- Use `pgvector-go` types for embedding fields
-- Vector support managed in `pkg/shared/pgvector/`

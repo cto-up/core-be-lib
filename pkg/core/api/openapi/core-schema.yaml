@@ -311,12 +311,6 @@ components:
         additionalData:
           type: object
           nullable: true
-    Prompt:
-      $ref: "./parts/prompts/prompt-schema.yaml"
-    PromptResponse:
-      $ref: "./parts/prompts/prompt-response-schema.yaml"
-    NewPrompt:
-      $ref: "./parts/prompts/prompt-new-schema.yaml"
     NewConfig:
       $ref: "./parts/configs/config-new-schema.yaml"
     Config:

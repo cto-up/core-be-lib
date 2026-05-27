@@ -1,6 +1,0 @@
-type: object
-required:
-  - result
-properties:
-  result:
-    type: string

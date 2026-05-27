@@ -1,13 +1,12 @@
 # Core Application: Modular Monolith Framework
 
-A production-ready **Go** framework designed for building scalable, multi-tenant modular monoliths. This repository provides a contract-first development workflow, integrating advanced identity management, RAG-ready vector storage, and a pluggable LLM architecture.
+A production-ready **Go** framework designed for building scalable, multi-tenant modular monoliths. This repository provides a contract-first development workflow with advanced identity management and type-safe persistence.
 
 ## Key Capabilities
 
 - **Contract-First API**: Automated code generation for Go (server) and TypeScript (Axios client) via OpenAPI.
 - **Ory Kratos** (supporting MFA and native multi-tenancy).
 - **Enterprise Multi-tenancy**: Subdomain-based isolation with built-in **Reseller support** (`IsActingReseller`) for hierarchical account management.
-- **AI/LLM Native**: Unified interface for OpenAI, Anthropic, Gemini, and Ollama, paired with **pgvector** for RAG patterns.
 - **Type-Safe Persistence**: SQLC-driven database layer for high-performance, compile-time safe PostgreSQL operations.
 
 ---
@@ -16,7 +15,7 @@ A production-ready **Go** framework designed for building scalable, multi-tenant
 
 ### 1. Environment Setup
 
-The application requires a specific logging structure and a running PostgreSQL instance with vector support.
+The application requires a specific logging structure and a running PostgreSQL instance.
 
 ```bash
 # Setup log directory
@@ -81,7 +80,7 @@ make sqlc
 | Feature           | Implementation                                        |
 | ----------------- | ----------------------------------------------------- |
 | **Web Framework** | Gin (Go)                                              |
-| **Database**      | PostgreSQL + pgvector , Goose for migration           |
+| **Database**      | PostgreSQL, Goose for migration                       |
 | **Observability** | OpenTelemetry + zerolog                               |
 | **Auth Patterns** | RBAC (Admin, SuperAdmin, Customer), MFA, Social Login |
 | **Testing**       | Testcontainers for isolated integration tests         |
