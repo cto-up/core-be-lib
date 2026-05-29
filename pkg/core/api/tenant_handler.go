@@ -260,11 +260,22 @@ func (exh *TenantHandler) UpdateTenant(c *gin.Context, id uuid.UUID) {
 		IsReseller:      existing.IsReseller,
 		ContractEndDate: existing.ContractEndDate,
 		IsDisabled:      existing.IsDisabled,
+		ResellerID:      existing.ResellerID,
 	}
 
 	// Only SUPER_ADMIN can change is_reseller
 	if auth.IsSuperAdmin(c) && req.IsReseller != nil {
 		updateParams.IsReseller = *req.IsReseller
+	}
+
+	// Only SUPER_ADMIN can assign or clear the managing reseller. The selector is
+	// clearable, so an empty/nil value detaches the tenant from its reseller.
+	if auth.IsSuperAdmin(c) {
+		if req.ResellerId != nil && *req.ResellerId != "" && *req.ResellerId != existing.TenantID {
+			updateParams.ResellerID = pgtype.Text{String: *req.ResellerId, Valid: true}
+		} else {
+			updateParams.ResellerID = pgtype.Text{}
+		}
 	}
 
 	// SUPER_ADMIN, ADMIN, or a reseller managing this specific tenant can update

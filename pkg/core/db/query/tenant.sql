@@ -45,7 +45,8 @@ SET
     "allow_sign_up" = $5,
     "is_reseller" = $6,
     "contract_end_date" = $7,
-    "is_disabled" = $8
+    "is_disabled" = $8,
+    "reseller_id" = $9
 WHERE id = $1
 RETURNING id;
 

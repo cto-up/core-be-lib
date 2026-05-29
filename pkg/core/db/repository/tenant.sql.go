@@ -365,7 +365,8 @@ SET
     "allow_sign_up" = $5,
     "is_reseller" = $6,
     "contract_end_date" = $7,
-    "is_disabled" = $8
+    "is_disabled" = $8,
+    "reseller_id" = $9
 WHERE id = $1
 RETURNING id
 `
@@ -379,6 +380,7 @@ type UpdateTenantParams struct {
 	IsReseller          bool               `json:"is_reseller"`
 	ContractEndDate     pgtype.Timestamptz `json:"contract_end_date"`
 	IsDisabled          bool               `json:"is_disabled"`
+	ResellerID          pgtype.Text        `json:"reseller_id"`
 }
 
 func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (uuid.UUID, error) {
@@ -391,6 +393,7 @@ func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) (uui
 		arg.IsReseller,
 		arg.ContractEndDate,
 		arg.IsDisabled,
+		arg.ResellerID,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
