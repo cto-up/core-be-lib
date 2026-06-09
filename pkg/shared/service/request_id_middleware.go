@@ -46,8 +46,10 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		// Calculate the time taken
 		duration := time.Since(start)
 
-		// Log the details
-		requestLogger.Info().
+		// Re-read the context logger so the summary line picks up any fields
+		// added downstream (e.g. tenant_id/user_id from LoggerEnrichmentMiddleware).
+		summaryLogger := util.GetLoggerFromCtx(c.Request.Context())
+		summaryLogger.Info().
 			Str("method", c.Request.Method).
 			Str("url", c.Request.URL.String()).
 			Int("status", c.Writer.Status()).

@@ -131,12 +131,14 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	// 1. Request ID middleware
 	// 2. Tenant middleware (extract tenant ID)
 	// 3. Auth middleware (verify token, via authSlot)
+	// 4. Logger enrichment (stamp tenant_id/user_id onto the request logger)
 	authSlot := &authMiddlewareSlot{inner: authMiddleware.MiddlewareFunc()}
 
 	middlewares = []core.MiddlewareFunc{
 		core.MiddlewareFunc(service.RequestIDMiddleware()),
 		core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
 		core.MiddlewareFunc(authSlot.handle),
+		core.MiddlewareFunc(service.LoggerEnrichmentMiddleware()),
 	}
 
 	apiOptions := core.GinServerOptions{
