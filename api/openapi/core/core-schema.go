@@ -539,6 +539,9 @@ type Tenant struct {
 type TenantFeatureLicenses map[string]struct {
 	// Code License code for the feature
 	Code string `json:"code"`
+
+	// EndDate Optional license expiry date. When reached, the feature is automatically disabled. Omit or null for no expiry.
+	EndDate *time.Time `json:"end_date"`
 }
 
 // TenantFeatures Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
