@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
@@ -65,20 +64,26 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 		return
 	}
 
-	// Expose effective features so an expired per-feature license is reflected
-	// immediately, without waiting for the background job that persists it.
-	features := subentity.EffectiveFeatures(tenant.Features, tenant.FeatureLicenses, time.Now())
+	// Expose per-feature license end dates (without license codes) so the
+	// frontend can guard access against per-feature expiry in real time.
+	publicLicenses := make(subentity.TenantFeatureLicenses, len(tenant.FeatureLicenses))
+	for name, license := range tenant.FeatureLicenses {
+		if license.EndDate != nil {
+			publicLicenses[name] = subentity.FeatureLicense{EndDate: license.EndDate}
+		}
+	}
 
 	// write the tenant id to the response
 	c.JSON(http.StatusOK, repository.CoreTenant{
-		Subdomain:   tenant.Subdomain,
-		Name:        tenant.Name,
-		TenantID:    tenant.TenantID,
-		Features:    features,
-		Profile:     tenant.Profile,
-		AllowSignUp: tenant.AllowSignUp,
-		IsReseller:  tenant.IsReseller,
-		ResellerID:  tenant.ResellerID,
+		Subdomain:       tenant.Subdomain,
+		Name:            tenant.Name,
+		TenantID:        tenant.TenantID,
+		Features:        tenant.Features,
+		FeatureLicenses: publicLicenses,
+		Profile:         tenant.Profile,
+		AllowSignUp:     tenant.AllowSignUp,
+		IsReseller:      tenant.IsReseller,
+		ResellerID:      tenant.ResellerID,
 	})
 }
 

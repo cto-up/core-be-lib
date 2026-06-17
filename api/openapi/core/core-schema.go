@@ -390,6 +390,15 @@ type PublicTenantSchema struct {
 	// ContractEndDate Optional contract expiry date. When reached, the tenant is automatically disabled.
 	ContractEndDate *time.Time `json:"contract_end_date"`
 
+	// FeatureLicenses License info per feature for a tenant. Key is the feature name. Only features enabled in TenantFeatures should have an entry.
+	FeatureLicenses *map[string]struct {
+		// Code License code for the feature
+		Code string `json:"code"`
+
+		// EndDate Optional license expiry date. When reached, the feature is automatically disabled. Omit or null for no expiry.
+		EndDate *time.Time `json:"end_date"`
+	} `json:"feature_licenses,omitempty"`
+
 	// Features Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
 	Features map[string]bool    `json:"features"`
 	Id       openapi_types.UUID `json:"id"`

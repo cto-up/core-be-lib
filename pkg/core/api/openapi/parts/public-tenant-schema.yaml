@@ -9,3 +9,5 @@ allOf:
         $ref: "./tenant-profile-schema.yaml"
       features:
         $ref: "./tenant-features-schema.yaml"
+      feature_licenses:
+        $ref: "./tenant-feature-licenses-schema.yaml"
