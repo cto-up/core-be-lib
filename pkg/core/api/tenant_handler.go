@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
@@ -64,12 +65,16 @@ func (exh *TenantHandler) GetPublicTenant(c *gin.Context) {
 		return
 	}
 
+	// Expose effective features so an expired per-feature license is reflected
+	// immediately, without waiting for the background job that persists it.
+	features := subentity.EffectiveFeatures(tenant.Features, tenant.FeatureLicenses, time.Now())
+
 	// write the tenant id to the response
 	c.JSON(http.StatusOK, repository.CoreTenant{
 		Subdomain:   tenant.Subdomain,
 		Name:        tenant.Name,
 		TenantID:    tenant.TenantID,
-		Features:    tenant.Features,
+		Features:    features,
 		Profile:     tenant.Profile,
 		AllowSignUp: tenant.AllowSignUp,
 		IsReseller:  tenant.IsReseller,
