@@ -7,4 +7,9 @@ additionalProperties:
     code:
       type: string
       description: License code for the feature
+    end_date:
+      type: string
+      format: date-time
+      nullable: true
+      description: Optional license expiry date. When reached, the feature is automatically disabled. Omit or null for no expiry.
 description: "License info per feature for a tenant. Key is the feature name. Only features enabled in TenantFeatures should have an entry."
