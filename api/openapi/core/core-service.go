@@ -566,6 +566,9 @@ type ImportUsersFromAdminMultipartRequestBody ImportUsersFromAdminMultipartBody
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = User
 
+// UpdateUserFeatureLicensesJSONRequestBody defines body for UpdateUserFeatureLicenses for application/json ContentType.
+type UpdateUserFeatureLicensesJSONRequestBody = TenantFeatureLicenses
+
 // AddUserMembershipJSONRequestBody defines body for AddUserMembership for application/json ContentType.
 type AddUserMembershipJSONRequestBody AddUserMembershipJSONBody
 
@@ -683,6 +686,9 @@ type ServerInterface interface {
 	// (GET /api/v1/me/email-verification/status)
 	GetMyEmailVerificationStatus(c *gin.Context)
 
+	// (GET /api/v1/me/feature-licenses)
+	GetMyFeatureLicenses(c *gin.Context)
+
 	// (GET /api/v1/me/profile)
 	GetMeProfile(c *gin.Context)
 
@@ -760,6 +766,12 @@ type ServerInterface interface {
 
 	// (PUT /api/v1/users/{userid})
 	UpdateUser(c *gin.Context, userid string)
+
+	// (GET /api/v1/users/{userid}/feature-licenses)
+	GetUserFeatureLicenses(c *gin.Context, userid string)
+
+	// (PUT /api/v1/users/{userid}/feature-licenses)
+	UpdateUserFeatureLicenses(c *gin.Context, userid string)
 
 	// (POST /api/v1/users/{userid}/membership)
 	AddUserMembership(c *gin.Context, userid string)
@@ -1524,6 +1536,19 @@ func (siw *ServerInterfaceWrapper) GetMyEmailVerificationStatus(c *gin.Context) 
 	siw.Handler.GetMyEmailVerificationStatus(c)
 }
 
+// GetMyFeatureLicenses operation middleware
+func (siw *ServerInterfaceWrapper) GetMyFeatureLicenses(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMyFeatureLicenses(c)
+}
+
 // GetMeProfile operation middleware
 func (siw *ServerInterfaceWrapper) GetMeProfile(c *gin.Context) {
 
@@ -2169,6 +2194,54 @@ func (siw *ServerInterfaceWrapper) UpdateUser(c *gin.Context) {
 	}
 
 	siw.Handler.UpdateUser(c, userid)
+}
+
+// GetUserFeatureLicenses operation middleware
+func (siw *ServerInterfaceWrapper) GetUserFeatureLicenses(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetUserFeatureLicenses(c, userid)
+}
+
+// UpdateUserFeatureLicenses operation middleware
+func (siw *ServerInterfaceWrapper) UpdateUserFeatureLicenses(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateUserFeatureLicenses(c, userid)
 }
 
 // AddUserMembership operation middleware
@@ -3615,6 +3688,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/api/v1/me", wrapper.CreateMeUser)
 	router.POST(options.BaseURL+"/api/v1/me/email-verification/resend", wrapper.ResendEmailVerification)
 	router.GET(options.BaseURL+"/api/v1/me/email-verification/status", wrapper.GetMyEmailVerificationStatus)
+	router.GET(options.BaseURL+"/api/v1/me/feature-licenses", wrapper.GetMyFeatureLicenses)
 	router.GET(options.BaseURL+"/api/v1/me/profile", wrapper.GetMeProfile)
 	router.PUT(options.BaseURL+"/api/v1/me/profile", wrapper.UpdateMeProfile)
 	router.POST(options.BaseURL+"/api/v1/me/profile/picture", wrapper.UploadProfilePicture)
@@ -3641,6 +3715,8 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/api/v1/users/:userid", wrapper.DeleteUser)
 	router.GET(options.BaseURL+"/api/v1/users/:userid", wrapper.GetUserByID)
 	router.PUT(options.BaseURL+"/api/v1/users/:userid", wrapper.UpdateUser)
+	router.GET(options.BaseURL+"/api/v1/users/:userid/feature-licenses", wrapper.GetUserFeatureLicenses)
+	router.PUT(options.BaseURL+"/api/v1/users/:userid/feature-licenses", wrapper.UpdateUserFeatureLicenses)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/membership", wrapper.AddUserMembership)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/password-reset-request", wrapper.ResetPasswordRequestByAdmin)
 	router.POST(options.BaseURL+"/api/v1/users/:userid/reactivate", wrapper.ReactivateUser)

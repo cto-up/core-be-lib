@@ -36,6 +36,8 @@ paths:
     $ref: "./parts/users/users-check-path.yaml"
   /api/v1/users/{userid}:
     $ref: "./parts/users/users-id-path.yaml"
+  /api/v1/users/{userid}/feature-licenses:
+    $ref: "./parts/users/users-id-feature-licenses-path.yaml"
   /api/v1/users/{userid}/membership:
     $ref: "./parts/users/users-id-membership-path.yaml"
   /api/v1/users/{userid}/remove-from-tenant:
@@ -84,6 +86,8 @@ paths:
     $ref: "./parts/users/me/users-me-profile-path.yaml"
   /api/v1/me/profile/picture:
     $ref: "./parts/users/me/users-me-profile-picture-path.yaml"
+  /api/v1/me/feature-licenses:
+    $ref: "./parts/users/me/users-me-feature-licenses-path.yaml"
 
   # mfa
   /api/v1/mfa/status:
