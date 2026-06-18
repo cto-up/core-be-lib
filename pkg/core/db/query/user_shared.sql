@@ -432,3 +432,22 @@ LIMIT 1;
 SELECT COUNT(DISTINCT tenant_id)::int
 FROM core_user_tenant_memberships
 WHERE user_id = $1 AND status = 'active';
+
+-- name: GetUserFeatureLicenses :one
+-- Per-user feature licenses (seats). These live on the (user, tenant) membership,
+-- so the same user can have different seats in different tenants.
+SELECT feature_licenses FROM core_user_tenant_memberships
+WHERE user_id = sqlc.arg(user_id)
+    AND tenant_id = sqlc.arg(tenant_id)
+    AND status = 'active'
+LIMIT 1;
+
+-- name: UpdateUserFeatureLicenses :one
+-- Set a user's feature licenses on their active membership in the given tenant,
+-- so the write can never reach a membership outside the caller's tenant.
+UPDATE core_user_tenant_memberships
+SET feature_licenses = sqlc.arg(feature_licenses)
+WHERE user_id = sqlc.arg(user_id)
+    AND tenant_id = sqlc.arg(tenant_id)
+    AND status = 'active'
+RETURNING user_id AS id;

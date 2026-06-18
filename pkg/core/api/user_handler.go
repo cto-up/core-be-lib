@@ -130,6 +130,33 @@ func (s *UserHandler) GetMeProfile(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, profile)
 }
 
+// GetMyFeatureLicenses returns the authenticated user's per-user feature
+// licenses (seats) within their tenant. An empty object means no per-user
+// restriction — the user inherits the tenant entitlement. The frontoffice
+// combines this with the tenant's feature licenses to gate access.
+// (GET /api/v1/me/feature-licenses)
+func (s *UserHandler) GetMyFeatureLicenses(ctx *gin.Context) {
+	tenantID := ctx.GetString(auth.AUTH_TENANT_ID_KEY)
+
+	authUserID, exists := ctx.Get(auth.AUTH_USER_ID)
+	if !exists {
+		ctx.JSON(http.StatusBadRequest, "Not Authenticated")
+		return
+	}
+
+	licenses, err := s.store.GetUserFeatureLicenses(ctx, repository.GetUserFeatureLicensesParams{
+		UserID:   authUserID.(string),
+		TenantID: tenantID,
+	})
+	// No active membership / no row means no per-user restriction: default-allow
+	// by returning an empty map so the user inherits the tenant entitlement.
+	if err != nil || licenses == nil {
+		ctx.JSON(http.StatusOK, subentity.TenantFeatureLicenses{})
+		return
+	}
+	ctx.JSON(http.StatusOK, licenses)
+}
+
 func (s *UserHandler) UpdateMeProfile(ctx *gin.Context) {
 	logger := util.GetLoggerFromCtx(ctx.Request.Context())
 

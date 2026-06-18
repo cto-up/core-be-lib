@@ -139,14 +139,15 @@ type CoreUser struct {
 }
 
 type CoreUserTenantMembership struct {
-	ID        uuid.UUID          `json:"id"`
-	UserID    string             `json:"user_id"`
-	TenantID  string             `json:"tenant_id"`
-	Status    string             `json:"status"`
-	InvitedBy pgtype.Text        `json:"invited_by"`
-	InvitedAt pgtype.Timestamptz `json:"invited_at"`
-	JoinedAt  pgtype.Timestamptz `json:"joined_at"`
-	CreatedAt time.Time          `json:"created_at"`
-	UpdatedAt time.Time          `json:"updated_at"`
-	Roles     []string           `json:"roles"`
+	ID              uuid.UUID                       `json:"id"`
+	UserID          string                          `json:"user_id"`
+	TenantID        string                          `json:"tenant_id"`
+	Status          string                          `json:"status"`
+	InvitedBy       pgtype.Text                     `json:"invited_by"`
+	InvitedAt       pgtype.Timestamptz              `json:"invited_at"`
+	JoinedAt        pgtype.Timestamptz              `json:"joined_at"`
+	CreatedAt       time.Time                       `json:"created_at"`
+	UpdatedAt       time.Time                       `json:"updated_at"`
+	Roles           []string                        `json:"roles"`
+	FeatureLicenses subentity.TenantFeatureLicenses `json:"feature_licenses"`
 }

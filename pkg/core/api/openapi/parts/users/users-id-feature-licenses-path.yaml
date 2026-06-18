@@ -1,0 +1,37 @@
+get:
+  description: Returns the per-user feature licenses (seats) for a user within the caller's tenant.
+  operationId: getUserFeatureLicenses
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user to fetch
+      required: true
+      schema:
+        type: string
+  responses:
+    "200":
+      description: user feature licenses response
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/TenantFeatureLicenses"
+put:
+  description: Updates the per-user feature licenses (seats) for a user. Only features enabled for the tenant may be assigned.
+  operationId: UpdateUserFeatureLicenses
+  parameters:
+    - name: userid
+      in: path
+      description: ID of user to update
+      required: true
+      schema:
+        type: string
+  requestBody:
+    description: Feature licenses to set on the user
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/TenantFeatureLicenses"
+  responses:
+    "204":
+      description: user feature licenses updated

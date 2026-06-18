@@ -42,5 +42,10 @@ sql:
               import: ctoup.com/coreapp/pkg/shared/repository/subentity
               package: subentity
               type: UserProfile
+          - column: core_user_tenant_memberships.feature_licenses
+            go_type:
+              import: ctoup.com/coreapp/pkg/shared/repository/subentity
+              package: subentity
+              type: TenantFeatureLicenses
         rename:
           get_user_role_by_id_row: "UserRole"

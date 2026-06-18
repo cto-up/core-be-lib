@@ -1,0 +1,14 @@
+get:
+  description: |
+    Returns the current user's per-user feature licenses (seats) within their
+    tenant. An empty object means the user has no per-user restriction and
+    inherits the tenant entitlement.
+  operationId: getMyFeatureLicenses
+  parameters:
+  responses:
+    "200":
+      description: current user feature licenses response
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/TenantFeatureLicenses"
