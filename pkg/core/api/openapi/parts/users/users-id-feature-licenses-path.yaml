@@ -1,5 +1,5 @@
 get:
-  description: Returns the per-user feature licenses (seats) for a user within the caller's tenant.
+  description: Returns the per-user feature licenses (seats) for a user. On a tenant subdomain the caller's tenant is used; super admins / resellers on the root domain pass tenant_id.
   operationId: getUserFeatureLicenses
   parameters:
     - name: userid
@@ -8,6 +8,13 @@ get:
       required: true
       schema:
         type: string
+    - name: tenant_id
+      in: query
+      description: Target tenant (UUID). Required only when there is no tenant subdomain context (root/super-admin); the caller must be allowed to manage that tenant.
+      required: false
+      schema:
+        type: string
+        format: uuid
   responses:
     "200":
       description: user feature licenses response
@@ -16,7 +23,7 @@ get:
           schema:
             $ref: "../../core-schema.yaml#/components/schemas/TenantFeatureLicenses"
 put:
-  description: Updates the per-user feature licenses (seats) for a user. Only features enabled for the tenant may be assigned.
+  description: Updates the per-user feature licenses (seats) for a user. Only features enabled for the tenant may be assigned. On a tenant subdomain the caller's tenant is used; super admins / resellers on the root domain pass tenant_id.
   operationId: UpdateUserFeatureLicenses
   parameters:
     - name: userid
@@ -25,6 +32,13 @@ put:
       required: true
       schema:
         type: string
+    - name: tenant_id
+      in: query
+      description: Target tenant (UUID). Required only when there is no tenant subdomain context (root/super-admin); the caller must be allowed to manage that tenant.
+      required: false
+      schema:
+        type: string
+        format: uuid
   requestBody:
     description: Feature licenses to set on the user
     required: true

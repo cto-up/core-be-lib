@@ -335,6 +335,18 @@ type ImportUsersFromAdminMultipartBody struct {
 	File *openapi_types.File `json:"file,omitempty"`
 }
 
+// GetUserFeatureLicensesParams defines parameters for GetUserFeatureLicenses.
+type GetUserFeatureLicensesParams struct {
+	// TenantId Target tenant (UUID). Required only when there is no tenant subdomain context (root/super-admin); the caller must be allowed to manage that tenant.
+	TenantId *openapi_types.UUID `form:"tenant_id,omitempty" json:"tenant_id,omitempty"`
+}
+
+// UpdateUserFeatureLicensesParams defines parameters for UpdateUserFeatureLicenses.
+type UpdateUserFeatureLicensesParams struct {
+	// TenantId Target tenant (UUID). Required only when there is no tenant subdomain context (root/super-admin); the caller must be allowed to manage that tenant.
+	TenantId *openapi_types.UUID `form:"tenant_id,omitempty" json:"tenant_id,omitempty"`
+}
+
 // AddUserMembershipJSONBody defines parameters for AddUserMembership.
 type AddUserMembershipJSONBody struct {
 	// Roles Roles to assign to the user in this tenant
@@ -768,10 +780,10 @@ type ServerInterface interface {
 	UpdateUser(c *gin.Context, userid string)
 
 	// (GET /api/v1/users/{userid}/feature-licenses)
-	GetUserFeatureLicenses(c *gin.Context, userid string)
+	GetUserFeatureLicenses(c *gin.Context, userid string, params GetUserFeatureLicensesParams)
 
 	// (PUT /api/v1/users/{userid}/feature-licenses)
-	UpdateUserFeatureLicenses(c *gin.Context, userid string)
+	UpdateUserFeatureLicenses(c *gin.Context, userid string, params UpdateUserFeatureLicensesParams)
 
 	// (POST /api/v1/users/{userid}/membership)
 	AddUserMembership(c *gin.Context, userid string)
@@ -2210,6 +2222,17 @@ func (siw *ServerInterfaceWrapper) GetUserFeatureLicenses(c *gin.Context) {
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetUserFeatureLicensesParams
+
+	// ------------- Optional query parameter "tenant_id" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "tenant_id", c.Request.URL.Query(), &params.TenantId)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenant_id: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -2217,7 +2240,7 @@ func (siw *ServerInterfaceWrapper) GetUserFeatureLicenses(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetUserFeatureLicenses(c, userid)
+	siw.Handler.GetUserFeatureLicenses(c, userid, params)
 }
 
 // UpdateUserFeatureLicenses operation middleware
@@ -2234,6 +2257,17 @@ func (siw *ServerInterfaceWrapper) UpdateUserFeatureLicenses(c *gin.Context) {
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateUserFeatureLicensesParams
+
+	// ------------- Optional query parameter "tenant_id" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "tenant_id", c.Request.URL.Query(), &params.TenantId)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenant_id: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -2241,7 +2275,7 @@ func (siw *ServerInterfaceWrapper) UpdateUserFeatureLicenses(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.UpdateUserFeatureLicenses(c, userid)
+	siw.Handler.UpdateUserFeatureLicenses(c, userid, params)
 }
 
 // AddUserMembership operation middleware
