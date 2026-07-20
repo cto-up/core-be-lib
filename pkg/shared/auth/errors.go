@@ -75,6 +75,15 @@ func ConvertKratosError(err error) error {
 			if eg.Error.Reason != nil {
 				message += " reason: " + *eg.Error.Reason
 			}
+			// A 409 on identity creation means the email is already taken.
+			// Map it to a stable code with a user-friendly message instead of
+			// leaking Kratos' internal "identity conflicts" wording.
+			if eg.Error.Code != nil && *eg.Error.Code == 409 {
+				return &AuthError{
+					Code:    ErrorCodeEmailAlreadyExists,
+					Message: "A user with this email address already exists.",
+				}
+			}
 		} else if fe, ok := model.(ory.FlowError); ok {
 			// Some flows (like settings/login) return FlowError
 			if fe.Id != "" {
@@ -88,11 +97,18 @@ func ConvertKratosError(err error) error {
 	if errorCode == "kratos-error" {
 		var raw struct {
 			Error struct {
-				ID string `json:"id"`
+				ID   string `json:"id"`
+				Code int64  `json:"code"`
 			} `json:"error"`
 			ID string `json:"id"` // Some responses have ID at top level
 		}
 		if jsonErr := json.Unmarshal(apiErr.Body(), &raw); jsonErr == nil {
+			if raw.Error.Code == 409 {
+				return &AuthError{
+					Code:    ErrorCodeEmailAlreadyExists,
+					Message: "A user with this email address already exists.",
+				}
+			}
 			if raw.Error.ID != "" {
 				errorCode = raw.Error.ID
 			} else if raw.ID != "" {

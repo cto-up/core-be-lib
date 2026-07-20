@@ -91,6 +91,13 @@ func (uh *UserAdminHandler) AddUser(c *gin.Context) {
 	user, err := uh.userService.CreateUser(c, baseAuthClient, tenantID.(string), req, nil)
 	if err != nil {
 		logger.Err(err).Msg("Failed to add user")
+		if auth.IsEmailAlreadyExists(err) {
+			c.JSON(http.StatusConflict, gin.H{
+				"code":    auth.ErrorCodeEmailAlreadyExists,
+				"message": "A user with this email address already exists.",
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}

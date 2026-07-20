@@ -115,11 +115,13 @@ func (h *TranslationHandler) GetTranslation(c *gin.Context, params api.GetTransl
 		Language:   string(params.Language),
 	})
 	if err != nil {
-		logger.Err(err).Msg("Error getting translation")
+		// A missing translation is a normal 404 (the client probes every
+		// field/language pair), not an error — don't pollute the logs with it.
 		if err.Error() == pgx.ErrNoRows.Error() {
 			c.JSON(http.StatusNotFound, helpers.ErrorResponse(err))
 			return
 		}
+		logger.Err(err).Msg("Error getting translation")
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
