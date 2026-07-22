@@ -33,6 +33,13 @@ func RegisterSeatGuard(g SeatGuard) {
 	seatGuard = g
 }
 
+// CheckSeatGuard runs the registered guard, if any. Exported so the membership
+// service can apply the same check at invite and accept — an invitation that
+// skipped it would be a way around the cap.
+func CheckSeatGuard(ctx context.Context, tenantID string, roles []core.Role) error {
+	return checkSeatGuard(ctx, tenantID, roles)
+}
+
 // checkSeatGuard runs the registered guard, if any.
 func checkSeatGuard(ctx context.Context, tenantID string, roles []core.Role) error {
 	seatGuardMu.RLock()

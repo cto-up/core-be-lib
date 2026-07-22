@@ -216,7 +216,10 @@ INSERT INTO core_user_tenant_memberships (
     sqlc.arg(status),
     sqlc.narg(invited_by),
     sqlc.narg(invited_at),
-    NOW()
+    -- Only an ACTIVE membership has joined. A pending invitation with a
+    -- joined_at is a lie in the data, and "when did this person actually join"
+    -- becomes unanswerable once invitations exist.
+    CASE WHEN sqlc.arg(status) = 'active' THEN NOW() ELSE NULL END
 )
 ON CONFLICT (user_id, tenant_id) 
 DO UPDATE SET
@@ -224,7 +227,9 @@ DO UPDATE SET
     roles = EXCLUDED.roles,
     invited_by = COALESCE(core_user_tenant_memberships.invited_by, EXCLUDED.invited_by),
     invited_at = COALESCE(core_user_tenant_memberships.invited_at, EXCLUDED.invited_at),
-    joined_at = NOW(),
+    -- Never clear an existing joined_at: re-inviting somebody who already joined
+    -- must not erase when they did.
+    joined_at = COALESCE(core_user_tenant_memberships.joined_at, EXCLUDED.joined_at),
     updated_at = NOW()
 RETURNING *;
 
