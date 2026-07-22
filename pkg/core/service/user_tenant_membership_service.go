@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -13,7 +14,9 @@ import (
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/emailservice"
 	sharedservice "ctoup.com/coreapp/pkg/shared/service"
+	"ctoup.com/coreapp/pkg/shared/util"
 )
 
 // UserTenantMembershipService is the self-service side of membership: invite a
@@ -78,7 +81,7 @@ func (s *UserTenantMembershipService) GetPendingInvitations(ctx context.Context,
 // is the admin user-creation path's job (it needs the auth provider, a password
 // flow and email verification), and conflating the two would make a simple
 // invite carry all of that weight.
-func (s *UserTenantMembershipService) InviteUser(ctx context.Context, email, tenantID string, roles []core.Role, inviterID string) (repository.CoreUserTenantMembership, error) {
+func (s *UserTenantMembershipService) InviteUser(ctx context.Context, email, tenantID string, roles []core.Role, inviterID, acceptURL string) (repository.CoreUserTenantMembership, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
 		return repository.CoreUserTenantMembership{}, errors.New("an email is required")
@@ -109,7 +112,7 @@ func (s *UserTenantMembershipService) InviteUser(ctx context.Context, email, ten
 		return repository.CoreUserTenantMembership{}, err
 	}
 
-	return s.store.AddSharedUserToTenant(ctx, repository.AddSharedUserToTenantParams{
+	m, err := s.store.AddSharedUserToTenant(ctx, repository.AddSharedUserToTenantParams{
 		UserID:      user.ID,
 		TenantID:    tenantID,
 		TenantRoles: rolesToStrings(roles),
@@ -117,6 +120,78 @@ func (s *UserTenantMembershipService) InviteUser(ctx context.Context, email, ten
 		InvitedBy:   pgtype.Text{String: inviterID, Valid: inviterID != ""},
 		InvitedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	})
+	if err != nil {
+		return repository.CoreUserTenantMembership{}, err
+	}
+
+	// Best-effort: the invitation EXISTS whether or not the mail goes out, and
+	// failing the request would leave the admin thinking nothing happened while
+	// a pending row sits there. Logged loudly instead — an invitation nobody was
+	// told about is the failure this whole change exists to prevent, so it must
+	// be visible.
+	s.sendInvitationEmail(ctx, email, tenantID, inviterID, acceptURL)
+	return m, nil
+}
+
+// sendInvitationEmail tells the invitee. Without this the flow is an API that
+// works and a person who never finds out.
+func (s *UserTenantMembershipService) sendInvitationEmail(ctx context.Context, email, tenantID, inviterID, acceptURL string) {
+	logger := util.GetLoggerFromCtx(ctx)
+	if acceptURL == "" {
+		logger.Warn().Str("tenant_id", tenantID).
+			Msg("membership: invitation created but no accept URL was built; no email sent")
+		return
+	}
+
+	tenantName := tenantID
+	if t, err := s.store.GetTenantByTenantID(ctx, tenantID); err == nil && t.Name != "" {
+		tenantName = t.Name
+	}
+
+	// "Alice invited you" beats "You have been invited" — a name tells the reader
+	// whether they were expecting this. Falls back to the impersonal form rather
+	// than printing an opaque user id.
+	inviterLine := "You have been "
+	if inviterID != "" {
+		if u, err := s.store.GetSharedUserByID(ctx, inviterID); err == nil {
+			if name := strings.TrimSpace(u.Email.String); u.Email.Valid && name != "" {
+				inviterLine = name + " has "
+			}
+		}
+	}
+
+	data := struct {
+		Link          string
+		TenantName    string
+		InviterLine   string
+		ExpiresInDays int
+	}{
+		Link:          acceptURL,
+		TenantName:    tenantName,
+		InviterLine:   inviterLine,
+		ExpiresInDays: int(InvitationTTL / (24 * time.Hour)),
+	}
+
+	r := emailservice.NewEmailRequest(systemEmailFrom(), []string{email},
+		"You have been invited to "+tenantName, "")
+	if err := r.ParseTemplate("email-tenant-invitation.html", data); err != nil {
+		logger.Err(err).Str("tenant_id", tenantID).Msg("membership: could not render the invitation email")
+		return
+	}
+	if err := r.SendEmail(); err != nil {
+		logger.Err(err).Str("tenant_id", tenantID).
+			Msg("membership: INVITATION CREATED BUT EMAIL NOT SENT — the invitee does not know")
+		return
+	}
+	logger.Info().Str("tenant_id", tenantID).Msg("membership: invitation email sent")
+}
+
+// systemEmailFrom mirrors the from-address resolution the rest of core uses.
+func systemEmailFrom() string {
+	if from := os.Getenv("SYSTEM_EMAIL"); from != "" {
+		return from
+	}
+	return "noreply@ctoup.com"
 }
 
 // AcceptInvitation turns a pending invitation into membership.

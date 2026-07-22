@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workspace invitation</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .header {
+        background-color: #4f46e5;
+        color: white;
+        padding: 20px;
+        text-align: center;
+        border-radius: 5px 5px 0 0;
+      }
+      .content {
+        background-color: #f9f9f9;
+        padding: 30px;
+        border-radius: 0 0 5px 5px;
+      }
+      .button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #4f46e5;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        margin-top: 20px;
+      }
+      .footer {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 12px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>You have been invited to {{.TenantName}}</h1>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>
+        {{.InviterLine}}invited you to join <strong>{{.TenantName}}</strong>.
+      </p>
+      <p>
+        Accepting adds you to the workspace. If you were not expecting this, you can simply ignore this email — nothing happens until you accept.
+      </p>
+      <p>
+        <a href="{{.Link}}" class="button">Review the invitation</a>
+      </p>
+      <p>This invitation expires in {{.ExpiresInDays}} days. If you have any questions, contact whoever invited you.</p>
+    </div>
+    <div class="footer">
+      <p>This is an automated message from CTO-UP Hub.</p>
+    </div>
+  </body>
+</html>
