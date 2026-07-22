@@ -187,7 +187,15 @@ func (h *TenantMembershipHandler) InviteUserToTenant(c *gin.Context) {
 		return
 	}
 
-	m, err := h.membershipService.InviteUser(c.Request.Context(), req.Email, tenantID, toRoles(req.Roles), inviterID)
+	// Built here, not in the service: the accept link needs the request's host
+	// and scheme to land on the right tenant subdomain, which only the HTTP layer
+	// knows. Mirrors how sendTenantAddedEmail already receives its URL.
+	acceptURL, urlErr := buildTenantURL(c, "/invitations", "")
+	if urlErr != nil {
+		logger.Warn().Err(urlErr).Msg("Could not build the invitation URL; inviting without an email link")
+	}
+
+	m, err := h.membershipService.InviteUser(c.Request.Context(), req.Email, tenantID, toRoles(req.Roles), inviterID, acceptURL)
 	if err != nil {
 		logger.Err(err).Str("tenant_id", tenantID).Msg("Failed to invite user")
 		c.JSON(membershipErrorStatus(err), helpers.ErrorResponse(err))

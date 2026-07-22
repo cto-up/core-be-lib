@@ -56,3 +56,26 @@ func TestMembershipStatusesAreDistinct(t *testing.T) {
 		seen[s] = true
 	}
 }
+
+// The from-address must fall back rather than send from an empty sender, which
+// most SMTP servers reject outright — the invitation would vanish silently.
+func TestSystemEmailFromFallsBack(t *testing.T) {
+	t.Setenv("SYSTEM_EMAIL", "")
+	if got := systemEmailFrom(); got == "" {
+		t.Fatal("an empty from-address would be rejected by most SMTP servers")
+	}
+	t.Setenv("SYSTEM_EMAIL", "invites@acme.test")
+	if got := systemEmailFrom(); got != "invites@acme.test" {
+		t.Fatalf("configured sender ignored, got %q", got)
+	}
+}
+
+// The email states an expiry in days, and it must match the TTL the service
+// actually enforces — telling someone "14 days" while expiring at 7 is worse
+// than saying nothing.
+func TestEmailExpiryMatchesTheEnforcedTTL(t *testing.T) {
+	days := int(InvitationTTL / (24 * time.Hour))
+	if days != 14 {
+		t.Fatalf("the template promises %d days; keep it and InvitationTTL in step", days)
+	}
+}
