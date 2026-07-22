@@ -7,6 +7,7 @@ import (
 	"ctoup.com/coreapp/api/handlers"
 	"ctoup.com/coreapp/api/helpers"
 	core "ctoup.com/coreapp/api/openapi/core"
+	coreapi "ctoup.com/coreapp/pkg/core/api"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/rs/zerolog/log"
@@ -153,6 +154,21 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	handlers := handlers.CreateCoreHandlers(connPool, authProvider, multiTenantService, clientAppService)
 
 	core.RegisterHandlersWithOptions(router, handlers, apiOptions)
+
+	// Self-service membership (W1.1): invite / accept / decline, plus workspace
+	// member administration. Registered here rather than generated from the spec
+	// because these paths were never in it — the handler existed fully stubbed
+	// and mounted nowhere. Same middleware chain as every other core route, so
+	// they inherit auth and tenant resolution unchanged.
+	membershipMW := make([]gin.HandlerFunc, 0, len(apiOptions.Middlewares))
+	for _, mw := range apiOptions.Middlewares {
+		membershipMW = append(membershipMW, gin.HandlerFunc(mw))
+	}
+	coreapi.RegisterTenantMembershipRoutes(
+		router,
+		coreapi.NewTenantMembershipHandler(coreStore, authProvider),
+		membershipMW...,
+	)
 
 	return &ServerConfig{
 		Router:           router,
