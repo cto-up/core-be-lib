@@ -511,6 +511,14 @@ func (uh *SharedUserService) AddUserToTenant(c context.Context, authClient auth.
 		return err
 	}
 
+	// Seat check before anything is written. This is the single choke point every
+	// path that adds a member goes through (admin add, super-admin add, and both
+	// self-service join paths), which is why the guard lives here rather than in
+	// each handler. A consumer with no guard registered is unaffected.
+	if err := checkSeatGuard(c, tenantID, roles); err != nil {
+		return err
+	}
+
 	logger := util.GetLoggerFromCtx(c)
 	// Check if user exists
 	_, err := authClient.GetUser(c, userID)
