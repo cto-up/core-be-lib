@@ -15,6 +15,7 @@ import (
 	// [DO NOT REMOVE COMMENT - Import]
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/shared/auth"
+	"ctoup.com/coreapp/pkg/shared/observability"
 	_ "ctoup.com/coreapp/pkg/shared/auth/kratos"
 	"ctoup.com/coreapp/pkg/shared/service"
 
@@ -65,6 +66,33 @@ var (
 	serverConfigOnce     sync.Once
 )
 
+// outerMiddlewares are consumer-supplied handlers placed at the very head of
+// the API middleware chain, ahead of metrics, request-id, tenant and auth.
+var outerMiddlewares []gin.HandlerFunc
+
+// RegisterOuterMiddleware injects cross-cutting middleware at the OUTERMOST
+// position of the API chain (roadmap 020, Tier 2).
+//
+// This exists so a consumer can install distributed tracing without core taking
+// a dependency on any tracing vendor's SDK — core stays vendor-neutral, and an
+// app that wants none pays nothing.
+//
+// Outermost is the correct position for a tracer specifically: the span must
+// enclose auth (a network round-trip to Kratos), tenant resolution and the
+// handler, or the trace shows a gap it cannot explain. It also means the tracer
+// sees panics before Recovery converts them into a 500.
+//
+// MUST be called before NewServerConfig. NewServerConfig is a sync.Once
+// singleton, so a later call is silently ignored — hence the panic, which turns
+// a wiring mistake into a startup failure rather than permanently missing
+// telemetry that nobody notices for a month.
+func RegisterOuterMiddleware(mw ...gin.HandlerFunc) {
+	if serverConfigInstance != nil {
+		panic("RegisterOuterMiddleware: must be called before NewServerConfig — the middleware chain is already built")
+	}
+	outerMiddlewares = append(outerMiddlewares, mw...)
+}
+
 func NewServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additionalChecks ...checks.Check) *ServerConfig {
 	serverConfigOnce.Do(func() {
 		serverConfigInstance = initializeServerConfig(connPool, cors, additionalChecks...)
@@ -90,13 +118,40 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 		v.RegisterCustomTypeFunc(helpers.CustomTypeUUID, uuid.UUID{})
 		v.RegisterValidation("uuid", helpers.ValidateUUID)
 	}
-	router := gin.Default()
+	// gin.New() rather than gin.Default() (roadmap 020, Tier 1.2).
+	//
+	// gin.Default() is Logger() + Recovery(). Its Logger computes a latency for
+	// every request and writes it to gin.DefaultWriter — os.Stdout — which in a
+	// container goes to the runtime's log driver, which nothing scrapes. The
+	// measurement was being taken correctly on every request and discarded.
+	//
+	// RequestIDMiddleware already emits a structured "Request handled" line
+	// (method, route, status, duration_ms, request_id, tenant_id, user_id) to
+	// the zerolog logger the app ships to Loki. Keeping gin's Logger as well
+	// would mean two access logs, one of which is unreachable. Recovery is kept
+	// verbatim — dropping it would turn a handler panic into a dead connection.
+	router := gin.New()
+	router.Use(gin.Recovery())
 	router.Use(cors)
+
+	// Prometheus scrape endpoint (roadmap 020, Tier 1.1). Mounted on the app's
+	// own listener, which is published to 127.0.0.1 only and is not proxied by
+	// nginx, so it is unreachable from the internet; Prometheus reaches it over
+	// the internal network. Registered before the API handlers so it is never
+	// shadowed by a catch-all route.
+	observability.MountMetricsEndpoint(router)
 
 	err := connPool.Ping(context.Background())
 	if err != nil {
 		log.Err(err).Msg("Ping DB failed")
 	}
+
+	// Connection-pool saturation (roadmap 020, Tier 1.3). Watch
+	// pgxpool_empty_acquire_count_total: when it rises, every individual query
+	// is still fast and requests are nonetheless slow, because they are waiting
+	// for a CONNECTION. Nothing else in the stack surfaces that wait — not the
+	// nginx log, not the query timings, not the request histogram.
+	observability.RegisterPgxPoolCollector(connPool)
 
 	// Convert pgxpool.Pool to *sql.DB for SqlCheck
 	db := stdlib.OpenDBFromPool(connPool)
@@ -129,18 +184,35 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	// Auth dispatches through authSlot so WrapAuthMiddleware can layer
 	// behavior on top without depending on slice position.
 	//
-	// 1. Request ID middleware
+	// 0. RED metrics (roadmap 020 Tier 1.1) — FIRST, so the histogram covers
+	//    the entire server-side cost of the request. Anything placed above it
+	//    is time the metric cannot see and nobody can later explain.
+	// 1. Request ID middleware (also emits the structured access log)
 	// 2. Tenant middleware (extract tenant ID)
-	// 3. Auth middleware (verify token, via authSlot)
+	// 3. Auth middleware (verify token, via authSlot), separately timed
 	// 4. Logger enrichment (stamp tenant_id/user_id onto the request logger)
+	//
+	// The auth step is wrapped in its own timer because it makes a NETWORK
+	// round-trip to Kratos on every authenticated request. Roadmap 018 dropped
+	// the backend session cache (T5) pending "a measurement — Kratos's share of
+	// p50 on ordinary endpoints"; http_server_auth_duration_seconds over
+	// http_server_request_duration_seconds is that measurement.
 	authSlot := &authMiddlewareSlot{inner: authMiddleware.MiddlewareFunc()}
 
-	middlewares = []core.MiddlewareFunc{
+	// Consumer-supplied outer middleware (tracing) goes ahead of everything, so
+	// its span encloses auth and the handler. Empty unless a consumer called
+	// RegisterOuterMiddleware.
+	for _, mw := range outerMiddlewares {
+		middlewares = append(middlewares, core.MiddlewareFunc(mw))
+	}
+
+	middlewares = append(middlewares,
+		core.MiddlewareFunc(observability.HTTPMetricsMiddleware()),
 		core.MiddlewareFunc(service.RequestIDMiddleware()),
 		core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
-		core.MiddlewareFunc(authSlot.handle),
+		core.MiddlewareFunc(observability.TimeAuthMiddleware(authSlot.handle)),
 		core.MiddlewareFunc(service.LoggerEnrichmentMiddleware()),
-	}
+	)
 
 	apiOptions := core.GinServerOptions{
 		BaseURL:     "",
