@@ -49,10 +49,36 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		// Re-read the context logger so the summary line picks up any fields
 		// added downstream (e.g. tenant_id/user_id from LoggerEnrichmentMiddleware).
 		summaryLogger := util.GetLoggerFromCtx(c.Request.Context())
+
+		// THIS LINE IS THE APPLICATION ACCESS LOG (roadmap 020, Tier 1.2).
+		//
+		// It goes to the request-scoped zerolog logger, which the app writes to
+		// its lumberjack file — the file promtail already ships to Loki. gin's
+		// own default logger computes the same latency and writes it to stdout,
+		// where nothing scrapes it; NewServerConfig therefore builds the engine
+		// with gin.New() rather than gin.Default() so there is exactly one
+		// access log and it lands somewhere queryable.
+		//
+		// `route` is the gin route TEMPLATE, added so a LogQL query can group by
+		// endpoint. `url` is kept alongside it because the raw path (and query)
+		// is what you actually want when reading one slow request — but it must
+		// never be promoted to a Loki LABEL, for the same cardinality reason
+		// that `route` exists.
+		//
+		// Paired with request_id (set above from nginx's X-Request-ID when
+		// present), a slow line in the nginx timing log joins directly to the
+		// application log line, the tenant and the user that produced it:
+		//   {job="zerolog"} | json | duration_ms > 1000 | tenant_id="..."
+		route := c.FullPath()
+		if route == "" {
+			route = "unmatched"
+		}
 		summaryLogger.Info().
 			Str("method", c.Request.Method).
+			Str("route", route).
 			Str("url", c.Request.URL.String()).
 			Int("status", c.Writer.Status()).
+			Float64("duration_ms", float64(duration.Microseconds())/1000.0).
 			Dur("duration", duration).
 			Msg("Request handled")
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
@@ -67,15 +68,48 @@ func (r ErrorConnector) Connect() (*pgxpool.Pool, error) {
 
 type PostgresConnector struct {
 	connectionString string
+	tracer           pgx.QueryTracer
 }
 
 func NewPostgresConnector(connectionString string) PostgresConnector {
 	return PostgresConnector{connectionString: connectionString}
 }
 
-// Connect always throws error
+// WithTracer attaches a pgx query tracer to every connection in the pool
+// (roadmap 020, Tier 2).
+//
+// This is the hook a consumer needs to emit one span per SQL statement, which
+// is what makes an N+1 query visible: in aggregate metrics such an endpoint is
+// merely "slow", in a trace waterfall the repeated statement is unmistakable.
+//
+// Optional and non-breaking — a zero-value connector has no tracer and behaves
+// exactly as before. Core deliberately does not know which tracing vendor the
+// consumer uses; it only knows the pgx interface.
+func (r PostgresConnector) WithTracer(tracer pgx.QueryTracer) PostgresConnector {
+	r.tracer = tracer
+	return r
+}
+
+// Connect opens the pool.
 func (r PostgresConnector) Connect() (*pgxpool.Pool, error) {
-	connPool, err := pgxpool.New(context.Background(), r.connectionString)
+	// Without a tracer, keep the original single-call path so nothing about the
+	// existing behaviour depends on ParseConfig's handling of the DSN.
+	if r.tracer == nil {
+		connPool, err := pgxpool.New(context.Background(), r.connectionString)
+		if err != nil {
+			log.Printf("connect error %v \n", err)
+		}
+		return connPool, err
+	}
+
+	config, err := pgxpool.ParseConfig(r.connectionString)
+	if err != nil {
+		log.Printf("parse config error %v \n", err)
+		return nil, err
+	}
+	config.ConnConfig.Tracer = r.tracer
+
+	connPool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Printf("connect error %v \n", err)
 	}
