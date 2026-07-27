@@ -480,3 +480,49 @@ func TestOrdinaryRequestsAreStillTimed(t *testing.T) {
 	assert.GreaterOrEqual(t, m.GetHistogram().GetSampleSum(), 0.02,
 		"an ordinary request must still be timed")
 }
+
+// THE REGRESSION THIS EXISTS FOR — production showed aborted and passed counts
+// EXACTLY equal (59/59, 47/47), because under oapi-codegen's sequential loop
+// AuthTimerStart's c.Next() returns before auth has run, so the "not recorded
+// yet" fallback fired on every successful request.
+func TestNoSpuriousAbortUnderOapiWrapper(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	beforeAbort := observations(t, authDuration, "aborted", "/oapi")
+	beforePass := observations(t, authDuration, "passed", "/oapi")
+
+	r := gin.New()
+	r.GET("/oapi", oapiWrapper(
+		[]gin.HandlerFunc{
+			AuthTimerStart(),
+			func(c *gin.Context) { c.Next() }, // auth, succeeding
+			AuthTimerEnd(),
+		},
+		func(c *gin.Context) { c.Status(http.StatusOK) },
+	))
+	do(r, http.MethodGet, "/oapi")
+
+	assert.Equal(t, uint64(1), observations(t, authDuration, "passed", "/oapi")-beforePass,
+		"a successful auth must be recorded exactly once as passed")
+	assert.Zero(t, observations(t, authDuration, "aborted", "/oapi")-beforeAbort,
+		"a SUCCESSFUL request must never be recorded as aborted")
+}
+
+// The guard must not silence a real rejection on a gin-native route, where
+// c.Next() does run the whole chain and c.IsAborted() is meaningful.
+func TestRealAbortStillRecordedOnGinNativeRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	before := observations(t, authDuration, "aborted", "/native")
+
+	r := gin.New()
+	r.Use(AuthTimerStart())
+	r.Use(func(c *gin.Context) { c.AbortWithStatus(http.StatusUnauthorized) })
+	r.Use(AuthTimerEnd())
+	r.GET("/native", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/native", nil))
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Equal(t, uint64(1), observations(t, authDuration, "aborted", "/native")-before,
+		"a genuine rejection must still be recorded")
+}
