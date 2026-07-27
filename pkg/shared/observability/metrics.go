@@ -303,6 +303,27 @@ func AuthTimerStart() gin.HandlerFunc {
 		if _, recorded := c.Get(authRecordedKey); recorded {
 			return // AuthTimerEnd already observed it
 		}
+
+		// c.IsAborted() IS REQUIRED, not a belt-and-braces extra.
+		//
+		// "AuthTimerEnd has not recorded yet" does NOT imply "auth rejected the
+		// request". Under oapi-codegen's sequential middleware loop this
+		// function's c.Next() returns immediately — before auth has even run —
+		// so authRecordedKey is legitimately unset at this point on EVERY
+		// request. Without this guard the fallback fired every time and
+		// outcome="aborted" came to mean "a request happened".
+		//
+		// Production made that unmistakable: aborted and passed counts were
+		// exactly equal on both instances (59/59 and 47/47).
+		//
+		// KNOWN LIMITATION: on an oapi-codegen route a genuine auth rejection is
+		// not observed at all — the generated wrapper breaks its loop on
+		// c.IsAborted() and AuthTimerEnd never runs. Under-counting rejections is
+		// far better than labelling every request as one, and outcome="passed"
+		// (the series the SLO actually uses) is unaffected either way.
+		if !c.IsAborted() {
+			return
+		}
 		if v, ok := c.Get(authStartKey); ok {
 			if start, ok := v.(time.Time); ok {
 				authDuration.WithLabelValues("aborted", routeLabel(c)).Observe(time.Since(start).Seconds())
