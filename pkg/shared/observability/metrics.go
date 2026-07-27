@@ -88,6 +88,16 @@ var (
 	// "the trigger is a measurement — Kratos's share of p50 on ordinary
 	// endpoints." Divide this histogram by request_duration_seconds and that
 	// share is on a dashboard instead of in an argument.
+	// The "route" label was added after auth_duration proved UNDIAGNOSABLE without
+	// it. Production showed auth averaging 89ms inside a request averaging 67ms —
+	// impossible, and impossible to attribute, because the only label was
+	// "outcome". There was no way to ask WHICH endpoints were slow in auth, so the
+	// investigation could only guess. A metric you cannot slice is a metric you
+	// cannot act on.
+	//
+	// Cardinality is bounded and strictly SMALLER than requestDuration's, which
+	// already carries route alongside method and status_class. Same template-only
+	// rule applies — see routeLabel below.
 	authDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
@@ -97,9 +107,22 @@ var (
 				0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5,
 			},
 		},
-		[]string{"outcome"},
+		[]string{"outcome", "route"},
 	)
 )
+
+// routeLabel returns the gin route TEMPLATE, never the raw URL.
+//
+// c.FullPath() is "" for an unmatched request; bucketing those under a literal
+// "unmatched" is what keeps a scanner probing /wp-admin/<random> from minting
+// unbounded series. Same rule as requestDuration — see the cardinality note at
+// the top of this file.
+func routeLabel(c *gin.Context) string {
+	if r := c.FullPath(); r != "" {
+		return r
+	}
+	return "unmatched"
+}
 
 func init() {
 	prometheus.MustRegister(requestDuration, requestsInFlight, authDuration)
@@ -127,34 +150,64 @@ func statusClass(code int) string {
 
 // HTTPMetricsMiddleware records RED metrics for every request it wraps.
 //
-// Install it FIRST in the middleware chain so the histogram covers the entire
-// server-side cost — auth, tenant resolution, handler and all. Anything placed
-// before it is time this metric cannot see, and time nobody can then explain.
+// ── IT MUST BE REGISTERED WITH router.Use(), NOT VIA APIOptions.Middlewares ──
+//
+// This is not a style preference; putting it in the oapi-codegen middleware list
+// silently reduces it to measuring nothing, and that shipped to production.
+//
+// oapi-codegen's gin generator does NOT run APIOptions.Middlewares through gin's
+// handler chain. Each generated wrapper calls them as plain functions:
+//
+//	for _, middleware := range siw.HandlerMiddlewares {
+//	    middleware(c)                 // plain call
+//	    if c.IsAborted() { return }
+//	}
+//	siw.Handler.ListRunsByBatch(c, batchId)   // handler runs AFTER the loop
+//
+// A middleware that measures by calling c.Next() therefore measures the wrong
+// thing: c.Next() advances GIN's chain, which at that point holds only the
+// wrapper already executing, so it returns immediately — before the handler has
+// run. The observation came back as ~76µs on every generated route while nginx
+// measured tens of milliseconds for the same requests.
+//
+// The failure is invisible in the worst way: the metric exists, has plausible
+// labels, and every panel renders. The only route reading correctly was
+// /api/v1/assets/:id/file, which asset-lib registers straight onto gin — so the
+// "costliest routes" panel showed it as 99.98% of all server time, which looked
+// like a finding about assets and was actually a finding about instrumentation.
+//
+// Registered with router.Use() the middleware sits in gin's real chain, wraps
+// the generated wrapper AND its handler, and covers hand-registered routes too.
 func HTTPMetricsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		requestsInFlight.Inc()
-		defer requestsInFlight.Dec()
+
+		// Deferred so a panicking handler is still counted. Without this the
+		// observation is skipped while the panic unwinds to gin.Recovery(), and
+		// 500s from panics — the ones most worth seeing — go unrecorded.
+		defer func() {
+			requestsInFlight.Dec()
+
+			route := c.FullPath()
+			if route == "" {
+				route = "unmatched"
+			}
+			// Prometheus scrapes its own endpoint every interval. Counting them
+			// adds a steady stream of fast requests that flatters every
+			// aggregate and measures nothing about the product.
+			if route == metricsPath {
+				return
+			}
+			requestDuration.WithLabelValues(
+				c.Request.Method,
+				route,
+				statusClass(c.Writer.Status()),
+			).Observe(time.Since(start).Seconds())
+		}()
 
 		c.Next()
 
-		// c.FullPath() must be read AFTER c.Next(): gin only resolves the route
-		// once the request has been matched against the tree.
-		//
-		// It is "" for an unmatched request (404) — bucketing those under a
-		// literal "unmatched" is what stops a 404 scan (or a scanner probing
-		// /wp-admin/<random>) from minting an unbounded number of series. That
-		// is not a hypothetical: it is the normal state of any public endpoint.
-		route := c.FullPath()
-		if route == "" {
-			route = "unmatched"
-		}
-
-		requestDuration.WithLabelValues(
-			c.Request.Method,
-			route,
-			statusClass(c.Writer.Status()),
-		).Observe(time.Since(start).Seconds())
 	}
 }
 
@@ -183,6 +236,9 @@ func HTTPMetricsMiddleware() gin.HandlerFunc {
 //
 // Both must be adjacent to auth. Anything placed between them is counted as
 // auth, which is the one way to get this wrong again.
+// metricsPath is the scrape endpoint, excluded from its own histogram.
+const metricsPath = "/metrics"
+
 const (
 	authStartKey    = "coreapp_auth_timer_start"
 	authRecordedKey = "coreapp_auth_timer_recorded"
@@ -203,7 +259,7 @@ func AuthTimerStart() gin.HandlerFunc {
 		}
 		if v, ok := c.Get(authStartKey); ok {
 			if start, ok := v.(time.Time); ok {
-				authDuration.WithLabelValues("aborted").Observe(time.Since(start).Seconds())
+				authDuration.WithLabelValues("aborted", routeLabel(c)).Observe(time.Since(start).Seconds())
 			}
 		}
 	}
@@ -218,7 +274,7 @@ func AuthTimerEnd() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if v, ok := c.Get(authStartKey); ok {
 			if start, ok := v.(time.Time); ok {
-				authDuration.WithLabelValues("passed").Observe(time.Since(start).Seconds())
+				authDuration.WithLabelValues("passed", routeLabel(c)).Observe(time.Since(start).Seconds())
 				c.Set(authRecordedKey, true)
 			}
 		}
@@ -234,7 +290,7 @@ func AuthTimerEnd() gin.HandlerFunc {
 // behind the auth middleware: a scraper has no session, and gating it would
 // mean either an exception in the auth chain or a second listener.
 func MountMetricsEndpoint(r gin.IRoutes) {
-	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	r.GET(metricsPath, gin.WrapH(promhttp.Handler()))
 }
 
 // RegisterPgxPoolCollector exports connection-pool statistics.

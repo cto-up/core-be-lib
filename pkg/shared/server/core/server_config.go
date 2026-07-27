@@ -131,6 +131,25 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	// would mean two access logs, one of which is unreachable. Recovery is kept
 	// verbatim — dropping it would turn a handler panic into a dead connection.
 	router := gin.New()
+
+	// RED metrics go on GIN'S OWN CHAIN, deliberately — not into the
+	// APIOptions.Middlewares list below with the other cross-cutting concerns.
+	//
+	// oapi-codegen invokes that list as plain sequential function calls, so a
+	// middleware timing via c.Next() there returns BEFORE the handler runs and
+	// records ~76µs for every generated route. See the long note on
+	// HTTPMetricsMiddleware. Moving this line back into `middlewares` silently
+	// reverts the app-latency layer to measuring nothing, with every panel still
+	// rendering plausible numbers.
+	//
+	// Placed OUTSIDE gin.Recovery(), which is subtle and load-bearing. Recovery
+	// converts a handler panic into a 500; if metrics sat outside-in the other
+	// order, its deferred observation would run while the panic was still
+	// unwinding — before Recovery had set the status — and every panicking
+	// request would be filed as 2xx. Outermost, it reads the 500 Recovery
+	// produced. Also before cors, so preflight cost counts as the server-side
+	// time it really is.
+	router.Use(observability.HTTPMetricsMiddleware())
 	router.Use(gin.Recovery())
 	router.Use(cors)
 
@@ -207,7 +226,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	}
 
 	middlewares = append(middlewares,
-		core.MiddlewareFunc(observability.HTTPMetricsMiddleware()),
+		// NOTE: HTTPMetricsMiddleware is NOT here — it is on router.Use() above.
 		core.MiddlewareFunc(service.RequestIDMiddleware()),
 		core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
 		// AuthTimerStart / AuthTimerEnd MUST bracket auth adjacently — anything
