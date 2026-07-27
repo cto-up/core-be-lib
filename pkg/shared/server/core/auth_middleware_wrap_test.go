@@ -41,7 +41,10 @@ func chain(t *testing.T, slot *authMiddlewareSlot, handler gin.HandlerFunc) *gin
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(gin.HandlerFunc(observability.TimeAuthMiddleware(slot.handle)))
+	// Mirrors the real chain: the timer PAIR brackets auth adjacently.
+	r.Use(observability.AuthTimerStart())
+	r.Use(gin.HandlerFunc(slot.handle))
+	r.Use(observability.AuthTimerEnd())
 	r.GET("/protected", handler)
 	return r
 }
