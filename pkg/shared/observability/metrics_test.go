@@ -395,3 +395,88 @@ func TestHTTPMetricsExcludesTheScrapeEndpoint(t *testing.T) {
 	require.NoError(t, obs.(prometheus.Metric).Write(&m))
 	assert.Zero(t, m.GetHistogram().GetSampleCount(), "/metrics must not observe itself")
 }
+
+// THE REGRESSION THIS EXISTS FOR — 5 requests summing to 299.3 seconds in
+// production, minutes after HTTPMetricsMiddleware moved to router.Use(). A
+// stream's duration is a session length, not a latency.
+func TestStreamsAreCountedNotTimed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cases := []struct {
+		name     string
+		route    string
+		setupReq func(*http.Request)
+		handler  gin.HandlerFunc
+	}{
+		{
+			// WebSocket announces itself in the REQUEST.
+			name:     "websocket upgrade",
+			route:    "/ws/chan",
+			setupReq: func(r *http.Request) { r.Header.Set("Upgrade", "websocket") },
+			handler: func(c *gin.Context) {
+				time.Sleep(40 * time.Millisecond)
+				c.Status(http.StatusOK)
+			},
+		},
+		{
+			// SSE is an ordinary GET; only the RESPONSE identifies it. Keying on
+			// the request alone misses this case entirely.
+			name:     "server-sent events",
+			route:    "/sse",
+			setupReq: func(*http.Request) {},
+			handler: func(c *gin.Context) {
+				c.Header("Content-Type", "text/event-stream")
+				time.Sleep(40 * time.Millisecond)
+				c.Status(http.StatusOK)
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := gin.New()
+			r.Use(HTTPMetricsMiddleware())
+			r.GET(tc.route, tc.handler)
+
+			req := httptest.NewRequest(http.MethodGet, tc.route, nil)
+			tc.setupReq(req)
+			r.ServeHTTP(httptest.NewRecorder(), req)
+
+			obs, err := requestDuration.GetMetricWithLabelValues(http.MethodGet, tc.route, "2xx")
+			require.NoError(t, err)
+			var m dto.Metric
+			require.NoError(t, obs.(prometheus.Metric).Write(&m))
+			assert.Zero(t, m.GetHistogram().GetSampleCount(),
+				"a stream must never enter the latency histogram")
+
+			// Counted, not silently dropped: a flood of stream churn must not
+			// look like no traffic at all.
+			assert.Equal(t, 1.0,
+				testutil.ToFloat64(streamConnections.WithLabelValues(tc.route)),
+				"the stream must still be counted")
+		})
+	}
+}
+
+// The inverse: an ordinary JSON request must still be timed. A too-broad stream
+// test would silently disable the whole metric.
+func TestOrdinaryRequestsAreStillTimed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.Use(HTTPMetricsMiddleware())
+	r.GET("/plain", func(c *gin.Context) {
+		c.Header("Content-Type", "application/json")
+		time.Sleep(30 * time.Millisecond)
+		c.Status(http.StatusOK)
+	})
+	do(r, http.MethodGet, "/plain")
+
+	obs, err := requestDuration.GetMetricWithLabelValues(http.MethodGet, "/plain", "2xx")
+	require.NoError(t, err)
+	var m dto.Metric
+	require.NoError(t, obs.(prometheus.Metric).Write(&m))
+	assert.Equal(t, uint64(1), m.GetHistogram().GetSampleCount())
+	assert.GreaterOrEqual(t, m.GetHistogram().GetSampleSum(), 0.02,
+		"an ordinary request must still be timed")
+}

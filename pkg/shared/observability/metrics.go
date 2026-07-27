@@ -25,6 +25,8 @@
 package observability
 
 import (
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -98,6 +100,17 @@ var (
 	// Cardinality is bounded and strictly SMALLER than requestDuration's, which
 	// already carries route alongside method and status_class. Same template-only
 	// rule applies — see routeLabel below.
+	// Long-lived connections, counted rather than timed. Their duration is a
+	// session length, not a latency, and belongs in no latency histogram.
+	streamConnections = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "stream_connections_total",
+			Help:      "Long-lived connections (WebSocket/SSE), excluded from the request-duration histogram.",
+		},
+		[]string{"route"},
+	)
+
 	authDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
@@ -125,7 +138,7 @@ func routeLabel(c *gin.Context) string {
 }
 
 func init() {
-	prometheus.MustRegister(requestDuration, requestsInFlight, authDuration)
+	prometheus.MustRegister(requestDuration, requestsInFlight, authDuration, streamConnections)
 }
 
 // statusClass collapses an HTTP status into a bounded label.
@@ -199,6 +212,13 @@ func HTTPMetricsMiddleware() gin.HandlerFunc {
 			if route == metricsPath {
 				return
 			}
+			// Streams are counted, never timed — see isStream. Counting them
+			// keeps them visible: silently dropping the observation would make
+			// a flood of WebSocket churn look like no traffic at all.
+			if isStream(c) {
+				streamConnections.WithLabelValues(route).Inc()
+				return
+			}
 			requestDuration.WithLabelValues(
 				c.Request.Method,
 				route,
@@ -238,6 +258,32 @@ func HTTPMetricsMiddleware() gin.HandlerFunc {
 // auth, which is the one way to get this wrong again.
 // metricsPath is the scrape endpoint, excluded from its own histogram.
 const metricsPath = "/metrics"
+
+// isStream reports whether this request is a long-lived connection rather than
+// a request/response exchange.
+//
+// THIS EXCLUSION IS NOT OPTIONAL. For a stream, "duration" is how long the
+// client stayed connected — this vhost allows proxy_read_timeout 86400 — so a
+// single WebSocket open for five minutes contributes 300 SECONDS to a latency
+// histogram. Observed immediately after HTTPMetricsMiddleware moved to
+// router.Use(): 5 requests summing to 299.3s, while the app was in fact
+// answering in microseconds.
+//
+// The same exclusion already existed one layer down, in the nginx pipeline's
+// `stream` label (infra/config.alloy). Moving this middleware outermost put the
+// app on the same footing as nginx — and therefore exposed it to the same
+// artefact. Two independent signals, because they catch different things:
+//
+//	Upgrade / 101  — WebSocket, which announces itself in the REQUEST.
+//	text/event-stream — SSE, an ordinary GET that only the RESPONSE identifies.
+//
+// Keying on the request alone misses SSE completely; there are 11 SSE handlers.
+func isStream(c *gin.Context) bool {
+	if c.Request.Header.Get("Upgrade") != "" || c.Writer.Status() == http.StatusSwitchingProtocols {
+		return true
+	}
+	return strings.Contains(c.Writer.Header().Get("Content-Type"), "text/event-stream")
+}
 
 const (
 	authStartKey    = "coreapp_auth_timer_start"
