@@ -165,7 +165,7 @@ func TestInFlightIsReleasedOnPanic(t *testing.T) {
 // if the handler's time leaks in, the assertion fails.
 func TestAuthTimerMeasuresAuthOnlyNotDownstream(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	before := observations(t, authDuration, "passed")
+	before := observations(t, authDuration, "passed", "/x")
 
 	r := gin.New()
 	r.Use(AuthTimerStart())
@@ -180,10 +180,10 @@ func TestAuthTimerMeasuresAuthOnlyNotDownstream(t *testing.T) {
 	})
 	do(r, http.MethodGet, "/x")
 
-	require.Equal(t, uint64(1), observations(t, authDuration, "passed")-before)
+	require.Equal(t, uint64(1), observations(t, authDuration, "passed", "/x")-before)
 
 	var m dto.Metric
-	obs, err := authDuration.GetMetricWithLabelValues("passed")
+	obs, err := authDuration.GetMetricWithLabelValues("passed", "/x")
 	require.NoError(t, err)
 	require.NoError(t, obs.(prometheus.Metric).Write(&m))
 	// Cumulative sum across the suite, so assert the increment is auth-shaped:
@@ -194,7 +194,7 @@ func TestAuthTimerMeasuresAuthOnlyNotDownstream(t *testing.T) {
 
 func TestAuthTimerRecordsAnAbort(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	before := observations(t, authDuration, "aborted")
+	before := observations(t, authDuration, "aborted", "/x")
 
 	r := gin.New()
 	r.Use(AuthTimerStart())
@@ -206,7 +206,7 @@ func TestAuthTimerRecordsAnAbort(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/x", nil))
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	assert.Equal(t, uint64(1), observations(t, authDuration, "aborted")-before,
+	assert.Equal(t, uint64(1), observations(t, authDuration, "aborted", "/x")-before,
 		"an aborted auth never reaches AuthTimerEnd; AuthTimerStart must record it")
 }
 
@@ -239,4 +239,159 @@ func TestRouteAndStatusLabelHelpers(t *testing.T) {
 	assert.Equal(t, "/x/:id", got)
 
 	assert.Equal(t, "5xx", StatusLabel(502))
+}
+
+// The route label must be the gin TEMPLATE, never the concrete URL. Getting this
+// wrong turns one series into one-per-id and takes Prometheus down — the single
+// hard rule in infra/OBSERVABILITY.md § 7.
+func TestAuthTimerRouteLabelIsTemplateNotRawPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	before := observations(t, authDuration, "passed", "/u/:id")
+
+	r := gin.New()
+	r.Use(AuthTimerStart())
+	r.Use(func(c *gin.Context) { c.Next() })
+	r.Use(AuthTimerEnd())
+	r.GET("/u/:id", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	// Three DIFFERENT ids must collapse into the SAME series.
+	for _, id := range []string{"a1b2", "c3d4", "e5f6"} {
+		do(r, http.MethodGet, "/u/"+id)
+	}
+
+	assert.Equal(t, uint64(3), observations(t, authDuration, "passed", "/u/:id")-before,
+		"all ids must share one series; a raw-path label would split them")
+}
+
+// An unmatched request (404) has no route template. It must collapse to a single
+// literal bucket, or a scanner probing random URLs mints unbounded series.
+func TestAuthTimerUnmatchedRouteCollapses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	before := observations(t, authDuration, "aborted", "unmatched")
+
+	r := gin.New()
+	r.Use(AuthTimerStart())
+	r.Use(func(c *gin.Context) { c.AbortWithStatus(http.StatusUnauthorized) })
+	r.Use(AuthTimerEnd())
+	r.GET("/known", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	for _, path := range []string{"/wp-admin/x", "/.env", "/phpmyadmin"} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+	}
+
+	assert.Equal(t, uint64(3), observations(t, authDuration, "aborted", "unmatched")-before,
+		"probes of random paths must share one series")
+}
+
+// THE REGRESSION THIS EXISTS FOR — the bug that made every generated route
+// report ~76µs while nginx measured tens of milliseconds for the same requests.
+//
+// oapi-codegen does NOT run APIOptions.Middlewares through gin's chain. Each
+// generated wrapper calls them as plain functions and then calls the handler:
+//
+//	for _, mw := range siw.HandlerMiddlewares { mw(c); if c.IsAborted() { return } }
+//	siw.Handler.Op(c, args...)
+//
+// oapiWrapper reproduces that convention exactly.
+func oapiWrapper(mws []gin.HandlerFunc, handler gin.HandlerFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		for _, mw := range mws {
+			mw(c)
+			if c.IsAborted() {
+				return
+			}
+		}
+		handler(c)
+	}
+}
+
+// Registered with router.Use(), the metric must capture the handler's time even
+// when the handler runs inside an oapi-codegen wrapper.
+func TestHTTPMetricsOnRouterUseCapturesHandlerInsideOapiWrapper(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.Use(HTTPMetricsMiddleware()) // gin's real chain — the correct placement
+	r.GET("/w", oapiWrapper(
+		[]gin.HandlerFunc{func(c *gin.Context) { c.Next() }}, // a list middleware
+		func(c *gin.Context) {
+			time.Sleep(60 * time.Millisecond) // the handler's real work
+			c.Status(http.StatusOK)
+		},
+	))
+	do(r, http.MethodGet, "/w")
+
+	var m dto.Metric
+	obs, err := requestDuration.GetMetricWithLabelValues(http.MethodGet, "/w", "2xx")
+	require.NoError(t, err)
+	require.NoError(t, obs.(prometheus.Metric).Write(&m))
+
+	assert.GreaterOrEqual(t, m.GetHistogram().GetSampleSum(), 0.05,
+		"handler time was not captured — HTTPMetricsMiddleware has been moved back "+
+			"into APIOptions.Middlewares, where c.Next() returns before the handler runs")
+}
+
+// The inverse, pinning WHY the placement matters: inside the oapi list the very
+// same middleware measures essentially nothing. If this ever starts recording
+// real time, oapi-codegen changed its convention and the comments should follow.
+func TestHTTPMetricsInsideOapiListMeasuresNothing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.GET("/bad", oapiWrapper(
+		[]gin.HandlerFunc{HTTPMetricsMiddleware()}, // the WRONG placement
+		func(c *gin.Context) {
+			time.Sleep(60 * time.Millisecond)
+			c.Status(http.StatusOK)
+		},
+	))
+	do(r, http.MethodGet, "/bad")
+
+	var m dto.Metric
+	obs, err := requestDuration.GetMetricWithLabelValues(http.MethodGet, "/bad", "2xx")
+	require.NoError(t, err)
+	require.NoError(t, obs.(prometheus.Metric).Write(&m))
+
+	assert.Less(t, m.GetHistogram().GetSampleSum(), 0.02,
+		"oapi-codegen now chains middlewares properly; revisit the placement note")
+}
+
+// A panicking handler must still be counted. The observation is deferred so it
+// survives the unwind to gin.Recovery(); 500s from panics are the ones most
+// worth seeing, and the pre-defer version dropped them silently.
+func TestHTTPMetricsRecordsPanickingRequests(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// Metrics OUTSIDE Recovery — the production order. Reversed, Recovery has
+	// not yet set the 500 when the deferred observation runs, and the request is
+	// misfiled as 2xx.
+	r := gin.New()
+	r.Use(HTTPMetricsMiddleware())
+	r.Use(gin.Recovery())
+	r.GET("/boom", func(c *gin.Context) { panic("kaboom") })
+
+	before := observations(t, requestDuration, http.MethodGet, "/boom", "5xx")
+	do(r, http.MethodGet, "/boom")
+
+	assert.Equal(t, uint64(1),
+		observations(t, requestDuration, http.MethodGet, "/boom", "5xx")-before,
+		"a panicking request must still be observed")
+}
+
+// The scrape endpoint must not appear in its own histogram: Prometheus polls it
+// on every interval, and those fast requests flatter every aggregate.
+func TestHTTPMetricsExcludesTheScrapeEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.Use(HTTPMetricsMiddleware())
+	MountMetricsEndpoint(r)
+	do(r, http.MethodGet, "/metrics")
+
+	obs, err := requestDuration.GetMetricWithLabelValues(http.MethodGet, "/metrics", "2xx")
+	require.NoError(t, err)
+	var m dto.Metric
+	require.NoError(t, obs.(prometheus.Metric).Write(&m))
+	assert.Zero(t, m.GetHistogram().GetSampleCount(), "/metrics must not observe itself")
 }
