@@ -39,19 +39,29 @@ var (
 	// requestDuration is the RED "Duration" and, with _count, "Rate" and
 	// "Errors" too — one histogram answers all three.
 	//
-	// Buckets are hand-chosen rather than prometheus.DefBuckets: the SLOs in
-	// roadmap 020 Tier 4 are 300 ms / 800 ms / 1 s, and DefBuckets has no
-	// boundary between 0.25 and 0.5, so a p95 near the read SLO would be
-	// interpolated across a bucket four times too wide to trust. The long tail
-	// (10s/30s/60s) exists for the AI/authoring endpoints, which legitimately
-	// run for tens of seconds and would otherwise all pile into +Inf.
+	// Buckets are hand-chosen rather than prometheus.DefBuckets, for two reasons:
+	// DefBuckets has no boundary between 0.25 and 0.5, so a p95 near the 300ms
+	// read SLO would be interpolated across a bucket four times too wide to
+	// trust; and its lowest boundary is far above where this app actually lives.
+	// See the bucket list below for what production measurement changed.
 	requestDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "request_duration_seconds",
 			Help:      "Latency of HTTP requests handled by this instance, by route template.",
+			// Buckets start at 1ms, NOT 10ms. Measured in production after the
+			// first rollout: every ordinary read completed inside the old lowest
+			// bucket (le=0.01), so histogram_quantile had nothing to interpolate
+			// between and reported the bucket's linear fractions as if they were
+			// data — p50 5.0ms, p95 9.5ms, p99 9.9ms, identical for every route.
+			// Those were artefacts of the bucket edge, not latencies.
+			//
+			// 0.3 / 0.8 / 30 are retained as exact SLO boundaries (Tier 4 reads
+			// ratios straight off these `le` values, so removing one silently
+			// empties an alert). The long tail serves the AI/authoring routes.
 			Buckets: []float64{
-				0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 0.8, 1, 2, 5, 10, 30, 60,
+				0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 0.8,
+				1, 2, 5, 10, 30, 60,
 			},
 		},
 		[]string{"method", "route", "status_class"},
