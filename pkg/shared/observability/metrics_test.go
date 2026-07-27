@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
@@ -156,25 +157,57 @@ func TestInFlightIsReleasedOnPanic(t *testing.T) {
 		"in-flight gauge leaked after a handler panic")
 }
 
-func TestTimeAuthMiddlewareLabelsOutcome(t *testing.T) {
+// THE REGRESSION THIS PAIR EXISTS FOR.
+//
+// A gin middleware continues the chain from inside itself via c.Next(). A single
+// wrapping middleware therefore measures auth PLUS everything downstream. The
+// pair must measure auth alone — proven here with a deliberately slow handler:
+// if the handler's time leaks in, the assertion fails.
+func TestAuthTimerMeasuresAuthOnlyNotDownstream(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-
-	passedBefore := observations(t, authDuration, "passed")
-	abortedBefore := observations(t, authDuration, "aborted")
+	before := observations(t, authDuration, "passed")
 
 	r := gin.New()
-	r.Use(TimeAuthMiddleware(func(c *gin.Context) { c.Next() }))
-	r.GET("/ok", func(c *gin.Context) { c.Status(http.StatusOK) })
-	do(r, http.MethodGet, "/ok")
+	r.Use(AuthTimerStart())
+	r.Use(func(c *gin.Context) { // stands in for the auth middleware
+		time.Sleep(20 * time.Millisecond)
+		c.Next()
+	})
+	r.Use(AuthTimerEnd())
+	r.GET("/x", func(c *gin.Context) {
+		time.Sleep(200 * time.Millisecond) // handler + DB work
+		c.Status(http.StatusOK)
+	})
+	do(r, http.MethodGet, "/x")
 
-	deny := gin.New()
-	deny.Use(TimeAuthMiddleware(func(c *gin.Context) { c.AbortWithStatus(http.StatusUnauthorized) }))
-	deny.GET("/no", func(c *gin.Context) { c.Status(http.StatusOK) })
-	do(deny, http.MethodGet, "/no")
+	require.Equal(t, uint64(1), observations(t, authDuration, "passed")-before)
 
-	assert.Equal(t, uint64(1), observations(t, authDuration, "passed")-passedBefore)
-	assert.Equal(t, uint64(1), observations(t, authDuration, "aborted")-abortedBefore,
-		"a rejected request short-circuits before the Kratos call and must not be averaged in with successes")
+	var m dto.Metric
+	obs, err := authDuration.GetMetricWithLabelValues("passed")
+	require.NoError(t, err)
+	require.NoError(t, obs.(prometheus.Metric).Write(&m))
+	// Cumulative sum across the suite, so assert the increment is auth-shaped:
+	// ~20ms, and nowhere near the 220ms a wrapper would have recorded.
+	assert.Less(t, m.GetHistogram().GetSampleSum(), 0.15,
+		"auth timing absorbed downstream handler time — the c.Next() bug is back")
+}
+
+func TestAuthTimerRecordsAnAbort(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	before := observations(t, authDuration, "aborted")
+
+	r := gin.New()
+	r.Use(AuthTimerStart())
+	r.Use(func(c *gin.Context) { c.AbortWithStatus(http.StatusUnauthorized) })
+	r.Use(AuthTimerEnd())
+	r.GET("/x", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	// This package's do() returns nothing; assert the status directly.
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/x", nil))
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Equal(t, uint64(1), observations(t, authDuration, "aborted")-before,
+		"an aborted auth never reaches AuthTimerEnd; AuthTimerStart must record it")
 }
 
 func TestMetricsEndpointServesPrometheusText(t *testing.T) {

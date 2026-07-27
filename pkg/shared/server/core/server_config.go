@@ -15,8 +15,8 @@ import (
 	// [DO NOT REMOVE COMMENT - Import]
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/shared/auth"
-	"ctoup.com/coreapp/pkg/shared/observability"
 	_ "ctoup.com/coreapp/pkg/shared/auth/kratos"
+	"ctoup.com/coreapp/pkg/shared/observability"
 	"ctoup.com/coreapp/pkg/shared/service"
 
 	"ctoup.com/coreapp/pkg/shared/seedservice"
@@ -192,7 +192,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	// 3. Auth middleware (verify token, via authSlot), separately timed
 	// 4. Logger enrichment (stamp tenant_id/user_id onto the request logger)
 	//
-	// The auth step is wrapped in its own timer because it makes a NETWORK
+	// The auth step is BRACKETED by a timer pair because it makes a NETWORK
 	// round-trip to Kratos on every authenticated request. Roadmap 018 dropped
 	// the backend session cache (T5) pending "a measurement — Kratos's share of
 	// p50 on ordinary endpoints"; http_server_auth_duration_seconds over
@@ -210,7 +210,13 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 		core.MiddlewareFunc(observability.HTTPMetricsMiddleware()),
 		core.MiddlewareFunc(service.RequestIDMiddleware()),
 		core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
-		core.MiddlewareFunc(observability.TimeAuthMiddleware(authSlot.handle)),
+		// AuthTimerStart / AuthTimerEnd MUST bracket auth adjacently — anything
+		// between them is counted as auth time. A single wrapping middleware
+		// cannot work here: the auth middleware calls c.Next() itself, so a
+		// wrapper measures the whole downstream chain rather than auth.
+		core.MiddlewareFunc(observability.AuthTimerStart()),
+		core.MiddlewareFunc(authSlot.handle),
+		core.MiddlewareFunc(observability.AuthTimerEnd()),
 		core.MiddlewareFunc(service.LoggerEnrichmentMiddleware()),
 	)
 

@@ -158,22 +158,71 @@ func HTTPMetricsMiddleware() gin.HandlerFunc {
 	}
 }
 
-// TimeAuthMiddleware wraps an auth middleware so its own cost is measured
-// separately from the handler's.
+// ── Auth timing: a PAIR of middlewares, not a wrapper ───────────────────────
 //
-// "outcome" is aborted/passed rather than an error string: an auth failure and
-// an auth success have very different latency profiles (a rejected request may
-// short-circuit before the Kratos call), and averaging them together hides
-// both.
-func TimeAuthMiddleware(next gin.HandlerFunc) gin.HandlerFunc {
+// WHY A PAIR. The obvious implementation is wrong, and was shipped before being
+// caught in production:
+//
+//	func TimeAuthMiddleware(next gin.HandlerFunc) gin.HandlerFunc {
+//	    return func(c *gin.Context) { t := time.Now(); next(c); observe(t) }  // WRONG
+//	}
+//
+// A gin middleware continues the chain by calling c.Next() from INSIDE itself.
+// The coreapp auth middleware does exactly that (three call sites). So `next(c)`
+// above does not return when auth finishes — it returns when the entire
+// remaining chain, handler and database work included, has finished. The metric
+// therefore measured ~the whole request and the derived "Kratos share of request
+// time" read 16% one hour and 41,331% the next. Both were noise.
+//
+// The fix is to observe the moment auth HANDS OFF, which is the moment the next
+// middleware in the chain starts running. AuthTimerStart stamps the clock;
+// AuthTimerEnd, placed immediately after auth, reads it before any downstream
+// work has happened.
+//
+//	middlewares = [..., AuthTimerStart(), authSlot.handle, AuthTimerEnd(), ...]
+//
+// Both must be adjacent to auth. Anything placed between them is counted as
+// auth, which is the one way to get this wrong again.
+const (
+	authStartKey    = "coreapp_auth_timer_start"
+	authRecordedKey = "coreapp_auth_timer_recorded"
+)
+
+// AuthTimerStart stamps the clock. Place IMMEDIATELY BEFORE the auth middleware.
+//
+// It also covers the abort path: when auth rejects a request it never calls
+// c.Next(), so AuthTimerEnd never runs. In that case nothing downstream ran
+// either, so measuring here after c.Next() returns is still auth-only time.
+func AuthTimerStart() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		start := time.Now()
-		next(c)
-		outcome := "passed"
-		if c.IsAborted() {
-			outcome = "aborted"
+		c.Set(authStartKey, time.Now())
+		c.Next()
+
+		if _, recorded := c.Get(authRecordedKey); recorded {
+			return // AuthTimerEnd already observed it
 		}
-		authDuration.WithLabelValues(outcome).Observe(time.Since(start).Seconds())
+		if v, ok := c.Get(authStartKey); ok {
+			if start, ok := v.(time.Time); ok {
+				authDuration.WithLabelValues("aborted").Observe(time.Since(start).Seconds())
+			}
+		}
+	}
+}
+
+// AuthTimerEnd observes auth's own duration. Place IMMEDIATELY AFTER the auth
+// middleware.
+//
+// It runs at the instant auth calls c.Next() — before the handler, before any
+// query — so time.Since(start) is auth's work alone.
+func AuthTimerEnd() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if v, ok := c.Get(authStartKey); ok {
+			if start, ok := v.(time.Time); ok {
+				authDuration.WithLabelValues("passed").Observe(time.Since(start).Seconds())
+				c.Set(authRecordedKey, true)
+			}
+		}
+		c.Next()
 	}
 }
 
