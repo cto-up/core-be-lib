@@ -213,13 +213,16 @@ INSERT INTO core_user_tenant_memberships (
     $1,
     sqlc.arg(tenant_id),
     sqlc.arg(tenant_roles)::TEXT[],
-    sqlc.arg(status),
+    -- Both uses of the status parameter must carry the same cast: bare, the
+    -- INSERT target column deduces varchar(20) while the CASE comparison
+    -- deduces text, and Postgres rejects the statement with 42P08.
+    sqlc.arg(status)::TEXT,
     sqlc.narg(invited_by),
     sqlc.narg(invited_at),
     -- Only an ACTIVE membership has joined. A pending invitation with a
     -- joined_at is a lie in the data, and "when did this person actually join"
     -- becomes unanswerable once invitations exist.
-    CASE WHEN sqlc.arg(status) = 'active' THEN NOW() ELSE NULL END
+    CASE WHEN sqlc.arg(status)::TEXT = 'active' THEN NOW() ELSE NULL END
 )
 ON CONFLICT (user_id, tenant_id) 
 DO UPDATE SET
