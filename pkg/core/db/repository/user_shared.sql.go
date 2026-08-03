@@ -61,13 +61,16 @@ INSERT INTO core_user_tenant_memberships (
     $1,
     $2,
     $3::TEXT[],
-    $4,
+    -- Both uses of the status parameter must carry the same cast: bare, the
+    -- INSERT target column deduces varchar(20) while the CASE comparison
+    -- deduces text, and Postgres rejects the statement with 42P08.
+    $4::TEXT,
     $5,
     $6,
     -- Only an ACTIVE membership has joined. A pending invitation with a
     -- joined_at is a lie in the data, and "when did this person actually join"
     -- becomes unanswerable once invitations exist.
-    CASE WHEN $4 = 'active' THEN NOW() ELSE NULL END
+    CASE WHEN $4::TEXT = 'active' THEN NOW() ELSE NULL END
 )
 ON CONFLICT (user_id, tenant_id) 
 DO UPDATE SET
