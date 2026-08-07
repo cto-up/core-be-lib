@@ -6,7 +6,9 @@ post:
     know which tenant the user signed in to. Until the membership exists, the
     session is real but every authenticated call is rejected. The SPA calls this
     once, right after the OIDC redirect lands back on the tenant host; the tenant
-    is read from the request Host, and the caller is identified from their Kratos
+    is resolved from the request Origin (falling back to Host) — the SPA calls
+    this on the tenant-neutral api host, so Origin is what names the tenant —
+    and the caller is identified from their Kratos
     session (this endpoint deliberately accepts a session the normal auth
     middleware would reject, since the missing membership is the point).
     Idempotent: an identity that is already a member is answered with

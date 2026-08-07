@@ -704,12 +704,16 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 // which the auth middleware rejects with a 401 on every subsequent call. To the
 // user that reads as "sign-in worked, then the app broke".
 //
-// This closes that gap from the app side. The tenant comes from the request Host
-// (the normal multi-tenancy mechanism) rather than from a Kratos web_hook
-// registration hook: a webhook fires inside Kratos, which sits on one shared
-// host and would have to infer the tenant by parsing the flow's return_to.
-// Reading it off the request the browser actually made to *this* tenant is both
-// simpler and correct by construction.
+// This closes that gap from the app side. The tenant comes from the browser's
+// own request — TenantMiddleware resolves it from the Origin header, falling
+// back to Host (util.GetHost). Origin is what carries it in practice: the SPA
+// calls this on the tenant-NEUTRAL api.<domain> ingress, whose Host names no
+// tenant, while Origin is the tenant site the user is on.
+//
+// That is preferred over a Kratos web_hook registration hook, which fires
+// inside Kratos — one shared host serving every tenant — and would have to
+// infer the tenant by parsing the flow's return_to. It would also miss an
+// existing user signing into a second tenant, since no registration occurs.
 func (uh *UserHandler) CompleteSocialSignIn(c *gin.Context) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 
