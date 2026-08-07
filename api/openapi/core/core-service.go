@@ -811,6 +811,9 @@ type ServerInterface interface {
 	// Handle password recovery
 	// (GET /public-api/v1/auth/recovery)
 	HandleRecovery(c *gin.Context, params HandleRecoveryParams)
+	// Attach a social sign-in identity to the tenant of the current host
+	// (POST /public-api/v1/auth/social/complete)
+	CompleteSocialSignIn(c *gin.Context)
 	// API Health Check
 	// (GET /public-api/v1/health)
 	GetHealthCheck(c *gin.Context)
@@ -2525,6 +2528,19 @@ func (siw *ServerInterfaceWrapper) HandleRecovery(c *gin.Context) {
 	siw.Handler.HandleRecovery(c, params)
 }
 
+// CompleteSocialSignIn operation middleware
+func (siw *ServerInterfaceWrapper) CompleteSocialSignIn(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CompleteSocialSignIn(c)
+}
+
 // GetHealthCheck operation middleware
 func (siw *ServerInterfaceWrapper) GetHealthCheck(c *gin.Context) {
 
@@ -3760,6 +3776,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/api/v1/users/:userid/status", wrapper.UpdateUserStatus)
 	router.POST(options.BaseURL+"/public-api/v1/auth/identify", wrapper.IdentifyUser)
 	router.GET(options.BaseURL+"/public-api/v1/auth/recovery", wrapper.HandleRecovery)
+	router.POST(options.BaseURL+"/public-api/v1/auth/social/complete", wrapper.CompleteSocialSignIn)
 	router.GET(options.BaseURL+"/public-api/v1/health", wrapper.GetHealthCheck)
 	router.POST(options.BaseURL+"/public-api/v1/password-reset-request", wrapper.ResetPasswordRequest)
 	router.POST(options.BaseURL+"/public-api/v1/sign-up", wrapper.Signup)
