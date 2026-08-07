@@ -692,3 +692,146 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Verification flow initiated"})
 }
+
+// CompleteSocialSignIn implements openapi.ServerInterface.
+// (POST /public-api/v1/auth/social/complete)
+//
+// Password sign-up goes through IdentifyUser, where the BACKEND creates the
+// identity and therefore controls which tenant it belongs to. Social sign-up
+// does not: Kratos mints the identity itself the moment the provider hands back
+// a verified email, and Kratos knows nothing about tenants. The result is a live
+// session whose identity carries no metadata_public.tenant_memberships entry —
+// which the auth middleware rejects with a 401 on every subsequent call. To the
+// user that reads as "sign-in worked, then the app broke".
+//
+// This closes that gap from the app side. The tenant comes from the request Host
+// (the normal multi-tenancy mechanism) rather than from a Kratos web_hook
+// registration hook: a webhook fires inside Kratos, which sits on one shared
+// host and would have to infer the tenant by parsing the flow's return_to.
+// Reading it off the request the browser actually made to *this* tenant is both
+// simpler and correct by construction.
+func (uh *UserHandler) CompleteSocialSignIn(c *gin.Context) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
+	sessionToken := socialSessionToken(c)
+	if sessionToken == "" {
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(errors.New("no session")))
+		return
+	}
+
+	authClient := uh.authProvider.GetAuthClient()
+	token, err := authClient.VerifyIDToken(c.Request.Context(), sessionToken)
+	if err != nil {
+		logger.Warn().Err(err).Msg("Social sign-in: session verification failed")
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(errors.New("invalid session")))
+		return
+	}
+
+	tenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+	if tenantID == "" {
+		// Root domain: there is no tenant to join, and only SUPER_ADMIN belongs
+		// there at all — nothing to provision either way.
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(errors.New("no tenant for this host")))
+		return
+	}
+
+	if hasTenantMembership(token.Claims, tenantID) {
+		c.JSON(http.StatusOK, core.SocialSignInResult{Provisioned: false})
+		return
+	}
+
+	tenant, err := uh.store.GetTenantByTenantID(c, tenantID)
+	if err != nil {
+		logger.Err(err).Str("tenant_id", tenantID).Msg("Social sign-in: failed to load tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	// The same gate IdentifyUser applies. A social identity is not a membership:
+	// without this, anyone with a Google account could join any tenant simply by
+	// clicking the button on its sign-in page.
+	if !tenant.AllowSignUp {
+		logger.Warn().
+			Str("tenant_id", tenantID).
+			Str("user_id", token.UID).
+			Msg("Social sign-in: tenant does not allow self-service signup")
+		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("signup not allowed")))
+		return
+	}
+
+	email, _ := token.Claims["email"].(string)
+	name, _ := token.Claims["name"].(string)
+	if name == "" {
+		name = email
+	}
+
+	// The identity exists in the auth provider but the app's own user row may
+	// not — every other creation path writes both at once, this one cannot.
+	if _, err := uh.store.GetSharedUserByID(c, token.UID); err != nil {
+		if _, createErr := uh.store.CreateSharedUser(c, repository.CreateSharedUserParams{
+			ID:      token.UID,
+			Email:   email,
+			Profile: subentity.UserProfile{Name: name},
+		}); createErr != nil {
+			logger.Err(createErr).Str("user_id", token.UID).Msg("Social sign-in: failed to create user row")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(createErr))
+			return
+		}
+	}
+
+	// Writes the membership row AND the identity's metadata_public claims, and
+	// runs the seat guard plus the per-tenant onboarding callbacks — the same
+	// choke point admin-side invites go through.
+	if err := uh.userService.AddUserToTenant(c, authClient, tenantID, token.UID, []core.Role{core.USER}, ""); err != nil {
+		logger.Err(err).
+			Str("user_id", token.UID).
+			Str("tenant_id", tenantID).
+			Msg("Social sign-in: failed to attach user to tenant")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+
+	logger.Info().
+		Str("user_id", token.UID).
+		Str("tenant_id", tenantID).
+		Msg("Social sign-in: user provisioned into tenant")
+
+	c.JSON(http.StatusOK, core.SocialSignInResult{Provisioned: true})
+}
+
+// socialSessionToken mirrors the extraction order of the Kratos auth provider,
+// so a request this endpoint accepts is one the auth middleware would also have
+// accepted had the membership existed.
+func socialSessionToken(c *gin.Context) string {
+	if token := c.GetHeader("X-Session-Token"); token != "" {
+		return token
+	}
+	if cookie, err := c.Cookie("ory_kratos_session"); err == nil && cookie != "" {
+		return cookie
+	}
+	if authHeader := c.GetHeader("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
+		return strings.TrimPrefix(authHeader, "Bearer ")
+	}
+	return ""
+}
+
+// hasTenantMembership reports whether the session's own claims already place
+// this identity in the tenant. Reading the claims rather than the database is
+// deliberate: the claims are what the auth middleware will consult on the next
+// request, so this answers "will the app work now?", not "is there a row?".
+func hasTenantMembership(claims map[string]interface{}, tenantID string) bool {
+	memberships, ok := claims[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{})
+	if !ok {
+		return false
+	}
+	for _, m := range memberships {
+		membership, ok := m.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if id, _ := membership["tenant_id"].(string); id == tenantID {
+			return true
+		}
+	}
+	return false
+}

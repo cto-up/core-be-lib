@@ -1,0 +1,48 @@
+post:
+  summary: Attach a social sign-in identity to the tenant of the current host
+  description: >
+    Completes a social (OIDC) sign-in. The identity provider creates the identity
+    inside Kratos, which serves every tenant from one host and therefore cannot
+    know which tenant the user signed in to. Until the membership exists, the
+    session is real but every authenticated call is rejected. The SPA calls this
+    once, right after the OIDC redirect lands back on the tenant host; the tenant
+    is read from the request Host, and the caller is identified from their Kratos
+    session (this endpoint deliberately accepts a session the normal auth
+    middleware would reject, since the missing membership is the point).
+    Idempotent: an identity that is already a member is answered with
+    provisioned=false. Subject to the tenant's self-service signup setting, the
+    same gate /public-api/v1/auth/identify applies.
+  operationId: completeSocialSignIn
+  tags:
+    - auth
+  responses:
+    "200":
+      description: The identity is a member of this tenant
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/SocialSignInResult"
+    "400":
+      description: The host resolves to no tenant
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "401":
+      description: No valid session
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "403":
+      description: This tenant does not allow self-service signup
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"

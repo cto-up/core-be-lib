@@ -16,6 +16,8 @@ components:
     # Users
     Identify:
       $ref: "./parts/auth/identify-schema.yaml"
+    SocialSignInResult:
+      $ref: "./parts/auth/social-complete-schema.yaml"
     NewSignUp:
       type: object
       required:

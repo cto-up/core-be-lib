@@ -523,6 +523,12 @@ type SettingsFlow struct {
 	} `json:"ui,omitempty"`
 }
 
+// SocialSignInResult defines model for SocialSignInResult.
+type SocialSignInResult struct {
+	// Provisioned True when this call created the tenant membership, false when the identity was already a member. Callers use it only for telemetry — either way the session is usable once the response is 200, though the client must re-read the session before relying on its roles.
+	Provisioned bool `json:"provisioned"`
+}
+
 // Tenant defines model for Tenant.
 type Tenant struct {
 	// AllowPasswordSignUp Auth Provider setting to Allow password sign up (can skip)
