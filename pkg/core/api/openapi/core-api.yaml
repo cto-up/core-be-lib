@@ -109,6 +109,8 @@ paths:
     $ref: "./parts/users/me/users-me-leave-preview-path.yaml"
   /api/v1/users/me/leave:
     $ref: "./parts/users/me/users-me-leave-path.yaml"
+  /api/v1/users/me/closure-preview:
+    $ref: "./parts/users/me/users-me-closure-preview-path.yaml"
   /api/v1/users/me/deletion:
     $ref: "./parts/users/me/users-me-deletion-path.yaml"
   /api/v1/users/me/export:

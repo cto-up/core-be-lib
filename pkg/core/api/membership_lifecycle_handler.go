@@ -110,6 +110,23 @@ func (h *MembershipLifecycleHandler) GetMyAccountDeletion(c *gin.Context) {
 	c.JSON(http.StatusOK, status)
 }
 
+// GetMyAccountClosurePreview implements core.ServerInterface.
+// (GET /api/v1/users/me/closure-preview)
+func (h *MembershipLifecycleHandler) GetMyAccountClosurePreview(c *gin.Context) {
+	userID := c.GetString(auth.AUTH_USER_ID)
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(errors.New("no caller")))
+		return
+	}
+	preview, err := h.service.ClosurePreview(c.Request.Context(), userID)
+	if err != nil {
+		logCtxErr(c, err).Msg("closure preview failed")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	c.JSON(http.StatusOK, preview)
+}
+
 // ScheduleMyAccountDeletion implements core.ServerInterface.
 // (POST /api/v1/users/me/deletion)
 func (h *MembershipLifecycleHandler) ScheduleMyAccountDeletion(c *gin.Context) {

@@ -1,0 +1,34 @@
+get:
+  summary: What closing the account would cost, tenant by tenant
+  description: >
+    Closing an account ends every membership at once, so the questions leaving
+    one organization asks are asked here for all of them — what is lost, and what
+    the caller wants done with the content they own in each.
+
+
+    Tenants appear in the RESPONSE because the answer is inherently per-tenant;
+    the request still names none. Any decision left unanswered falls back to the
+    module's policy at execution time, 30 days later, when there is nobody left
+    to prompt.
+  operationId: getMyAccountClosurePreview
+  tags:
+    - me
+  responses:
+    "200":
+      description: Per-tenant closure preview
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/AccountClosurePreview"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"

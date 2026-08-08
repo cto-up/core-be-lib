@@ -775,6 +775,9 @@ type ServerInterface interface {
 
 	// (POST /api/v1/users/import)
 	ImportUsersFromAdmin(c *gin.Context)
+	// What closing the account would cost, tenant by tenant
+	// (GET /api/v1/users/me/closure-preview)
+	GetMyAccountClosurePreview(c *gin.Context)
 	// Cancel a scheduled account deletion
 	// (DELETE /api/v1/users/me/deletion)
 	CancelMyAccountDeletion(c *gin.Context)
@@ -2173,6 +2176,19 @@ func (siw *ServerInterfaceWrapper) ImportUsersFromAdmin(c *gin.Context) {
 	}
 
 	siw.Handler.ImportUsersFromAdmin(c)
+}
+
+// GetMyAccountClosurePreview operation middleware
+func (siw *ServerInterfaceWrapper) GetMyAccountClosurePreview(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMyAccountClosurePreview(c)
 }
 
 // CancelMyAccountDeletion operation middleware
@@ -3928,6 +3944,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/api/v1/users/by-email/:email", wrapper.GetUserByEmail)
 	router.GET(options.BaseURL+"/api/v1/users/check", wrapper.CheckUserExists)
 	router.POST(options.BaseURL+"/api/v1/users/import", wrapper.ImportUsersFromAdmin)
+	router.GET(options.BaseURL+"/api/v1/users/me/closure-preview", wrapper.GetMyAccountClosurePreview)
 	router.DELETE(options.BaseURL+"/api/v1/users/me/deletion", wrapper.CancelMyAccountDeletion)
 	router.GET(options.BaseURL+"/api/v1/users/me/deletion", wrapper.GetMyAccountDeletion)
 	router.POST(options.BaseURL+"/api/v1/users/me/deletion", wrapper.ScheduleMyAccountDeletion)
