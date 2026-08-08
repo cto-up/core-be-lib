@@ -194,10 +194,62 @@ components:
         exportAvailable:
           type: boolean
           description: Whether GET /api/v1/users/me/export can still be called.
+    AccountClosurePreview:
+      type: object
+      description: >
+        One entry per active membership. Closing ends them all, so the caller is
+        shown every organization's cost at once rather than discovering them one
+        at a time after the fact.
+      required: [tenants]
+      properties:
+        tenants:
+          type: array
+          items:
+            $ref: "#/components/schemas/TenantClosureImpact"
+    TenantClosureImpact:
+      type: object
+      required: [tenantId, tenantName, impacts]
+      properties:
+        tenantId:
+          type: string
+          description: >
+            Named in the response, never in a request: it identifies which answer
+            belongs to which organization, not which tenant the call acts on.
+        tenantName:
+          type: string
+        subdomain:
+          type: string
+        impacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaveImpact"
+    TenantLeaveDecision:
+      type: object
+      description: A LeaveDecision bound to the organization it answers for.
+      required: [tenantId, key, action]
+      properties:
+        tenantId:
+          type: string
+        key:
+          type: string
+        action:
+          type: string
+          enum: [transfer, keep, unpublish, cancelAtPeriodEnd]
+        targetUserId:
+          type: string
     AccountDeletionRequest:
       type: object
       required: [confirmEmail]
       properties:
+        decisions:
+          type: array
+          description: >
+            What to do with the content the caller owns, per organization. Stored
+            with the schedule and applied at execution — not now, so cancelling
+            leaves nothing to undo. Anything unanswered falls back to the
+            owning module's policy.
+          items:
+            $ref: "#/components/schemas/TenantLeaveDecision"
         confirmEmail:
           type: string
           format: email

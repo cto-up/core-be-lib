@@ -17,7 +17,7 @@ INSERT INTO core_users (
 ) VALUES (
   $1, $3::text, $2, $4::VARCHAR[], $5::text
 )
-RETURNING id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason
+RETURNING id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason, deletion_decisions
 `
 
 type CreateUserByTenantParams struct {
@@ -47,6 +47,7 @@ func (q *Queries) CreateUserByTenant(ctx context.Context, arg CreateUserByTenant
 		&i.DeletionRequestedAt,
 		&i.DeletionScheduledAt,
 		&i.DeletionReason,
+		&i.DeletionDecisions,
 	)
 	return i, err
 }
@@ -71,7 +72,7 @@ func (q *Queries) DeleteUserByTenant(ctx context.Context, arg DeleteUserByTenant
 }
 
 const getUserByTenantByEmail = `-- name: GetUserByTenantByEmail :one
-SELECT id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason, deletion_decisions FROM core_users
 WHERE email = $1::text
 AND tenant_id = $2::text
 LIMIT 1
@@ -95,12 +96,13 @@ func (q *Queries) GetUserByTenantByEmail(ctx context.Context, arg GetUserByTenan
 		&i.DeletionRequestedAt,
 		&i.DeletionScheduledAt,
 		&i.DeletionReason,
+		&i.DeletionDecisions,
 	)
 	return i, err
 }
 
 const getUserByTenantByID = `-- name: GetUserByTenantByID :one
-SELECT id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason, deletion_decisions FROM core_users
 WHERE id = $1
 AND tenant_id = $2::text
 LIMIT 1
@@ -124,12 +126,13 @@ func (q *Queries) GetUserByTenantByID(ctx context.Context, arg GetUserByTenantBy
 		&i.DeletionRequestedAt,
 		&i.DeletionScheduledAt,
 		&i.DeletionReason,
+		&i.DeletionDecisions,
 	)
 	return i, err
 }
 
 const listUsersByTenant = `-- name: ListUsersByTenant :many
-SELECT id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason, deletion_decisions FROM core_users
 WHERE (UPPER(email) LIKE UPPER($3) OR $3 IS NULL)
 AND tenant_id = $4::text
 ORDER BY created_at
@@ -168,6 +171,7 @@ func (q *Queries) ListUsersByTenant(ctx context.Context, arg ListUsersByTenantPa
 			&i.DeletionRequestedAt,
 			&i.DeletionScheduledAt,
 			&i.DeletionReason,
+			&i.DeletionDecisions,
 		); err != nil {
 			return nil, err
 		}

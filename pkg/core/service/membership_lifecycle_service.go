@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -164,6 +165,37 @@ func (s *MembershipLifecycleService) DeletionStatus(ctx context.Context, userID 
 	return deletionStatusOf(user, s.countMemberships(ctx, userID)), nil
 }
 
+// ClosurePreview asks every contributor what closing would cost, in every tenant
+// the caller still belongs to.
+//
+// Leaving asks about one organization; closing ends them all, so the same
+// questions are asked once per membership rather than discovered one at a time
+// after the fact.
+func (s *MembershipLifecycleService) ClosurePreview(ctx context.Context, userID string) (core.AccountClosurePreview, error) {
+	memberships, err := s.store.ListUserTenantMemberships(ctx, repository.ListUserTenantMembershipsParams{
+		UserID: userID, Status: "active",
+	})
+	if err != nil {
+		return core.AccountClosurePreview{}, err
+	}
+
+	out := core.AccountClosurePreview{Tenants: []core.TenantClosureImpact{}}
+	for _, m := range memberships {
+		impacts := s.collectImpacts(ctx, userID, m.TenantID)
+		if len(impacts) == 0 {
+			continue
+		}
+		subdomain := m.Subdomain
+		out.Tenants = append(out.Tenants, core.TenantClosureImpact{
+			TenantId:   m.TenantID,
+			TenantName: m.TenantName,
+			Subdomain:  &subdomain,
+			Impacts:    impacts,
+		})
+	}
+	return out, nil
+}
+
 // ScheduleDeletion closes the account across every tenant — as a date, not as a
 // deletion. Nothing is destroyed here: the grace period is what makes an account
 // takeover non-destructive and a change of mind cheap.
@@ -208,6 +240,22 @@ func (s *MembershipLifecycleService) ScheduleDeletion(ctx context.Context, userI
 		DeletionReason:      reason,
 	})
 	if err != nil {
+		return core.AccountDeletion{}, err
+	}
+
+	// Recorded, not applied. Applying now would transfer somebody's courses away
+	// during a window whose whole point is that they can change their mind.
+	decisions := []core.TenantLeaveDecision{}
+	if req.Decisions != nil {
+		decisions = *req.Decisions
+	}
+	encoded, encodeErr := json.Marshal(decisions)
+	if encodeErr != nil {
+		return core.AccountDeletion{}, encodeErr
+	}
+	if err := s.store.SetUserDeletionDecisions(ctx, repository.SetUserDeletionDecisionsParams{
+		ID: userID, DeletionDecisions: encoded,
+	}); err != nil {
 		return core.AccountDeletion{}, err
 	}
 
@@ -335,6 +383,13 @@ func (s *MembershipLifecycleService) ExecuteDueDeletions(ctx context.Context, li
 func (s *MembershipLifecycleService) executeDeletion(ctx context.Context, userID string) error {
 	logger := util.GetLoggerFromCtx(ctx)
 
+	// What the person asked for, replayed per tenant before anything is erased.
+	// Nothing here is required: a closure answered with silence — or one made
+	// before this existed — falls through to each module's own policy.
+	if err := s.applyStoredDecisions(ctx, userID); err != nil {
+		return err
+	}
+
 	// Modules first: they anonymize or delete rows that reference the user id,
 	// and core_users must still exist while they do it.
 	for _, c := range sharedservice.UserDataContributors() {
@@ -361,6 +416,47 @@ func (s *MembershipLifecycleService) executeDeletion(ctx context.Context, userID
 	}
 
 	logger.Info().Str("user_id", userID).Msg("deletion: account deleted")
+	return nil
+}
+
+// applyStoredDecisions replays the answers given at closing time, grouped by the
+// tenant each one was about.
+func (s *MembershipLifecycleService) applyStoredDecisions(ctx context.Context, userID string) error {
+	logger := util.GetLoggerFromCtx(ctx)
+
+	user, err := s.store.GetSharedUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if len(user.DeletionDecisions) == 0 {
+		return nil
+	}
+
+	var stored []core.TenantLeaveDecision
+	if err := json.Unmarshal(user.DeletionDecisions, &stored); err != nil {
+		// Unreadable answers must not stop the deletion the person asked for;
+		// the policy fallback still runs.
+		logger.Err(err).Str("user_id", userID).Msg("deletion: stored decisions unreadable, falling back to policy")
+		return nil
+	}
+
+	byTenant := map[string][]core.LeaveDecision{}
+	for _, d := range stored {
+		byTenant[d.TenantId] = append(byTenant[d.TenantId], core.LeaveDecision{
+			Key: d.Key, Action: core.LeaveDecisionAction(d.Action), TargetUserId: d.TargetUserId,
+		})
+	}
+
+	for tenantID, decisions := range byTenant {
+		for _, c := range sharedservice.UserDataContributors() {
+			if err := c.ApplyLeaveDecisions(ctx, userID, tenantID, decisions); err != nil {
+				// One tenant's answer failing must not strand the others, nor
+				// block the deletion — the policy backstop covers what is left.
+				logger.Err(err).Str("contributor", c.Name()).Str("tenant_id", tenantID).
+					Msg("deletion: stored decision failed, falling back to policy for this tenant")
+			}
+		}
+	}
 	return nil
 }
 

@@ -534,3 +534,23 @@ LIMIT $2;
 UPDATE core_user_tenant_memberships
 SET dormant_purged_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2;
+
+-- name: FindTenantSuccessor :one
+-- Who inherits what a departing member owned, when nobody chose (ADR 040 §6).
+-- An administrator of the same tenant, longest-standing first, and never the
+-- person leaving. Returns no row when the tenant has no other administrator —
+-- the caller must then fall back rather than orphan the content.
+SELECT utm.user_id
+FROM core_user_tenant_memberships utm
+WHERE utm.tenant_id = $1
+  AND utm.user_id <> $2
+  AND utm.status = 'active'
+  AND utm.roles && ARRAY['CUSTOMER_ADMIN', 'ADMIN']::text[]
+ORDER BY utm.joined_at ASC NULLS LAST
+LIMIT 1;
+
+-- name: SetUserDeletionDecisions :exec
+-- Stored with the schedule, applied 30 days later. Kept as the wire shape rather
+-- than normalised: they are an answer given at a moment in time, replayed once,
+-- and nothing else ever queries them.
+UPDATE core_users SET deletion_decisions = $2 WHERE id = $1;

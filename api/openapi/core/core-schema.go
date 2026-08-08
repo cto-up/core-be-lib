@@ -92,6 +92,14 @@ const (
 	USER          Role = "USER"
 )
 
+// Defines values for TenantLeaveDecisionAction.
+const (
+	CancelAtPeriodEnd TenantLeaveDecisionAction = "cancelAtPeriodEnd"
+	Keep              TenantLeaveDecisionAction = "keep"
+	Transfer          TenantLeaveDecisionAction = "transfer"
+	Unpublish         TenantLeaveDecisionAction = "unpublish"
+)
+
 // Defines values for TenantMembershipStatus.
 const (
 	TenantMembershipStatusActive   TenantMembershipStatus = "active"
@@ -180,6 +188,11 @@ type APITokenRevoke struct {
 	Reason string `json:"reason"`
 }
 
+// AccountClosurePreview One entry per active membership. Closing ends them all, so the caller is shown every organization's cost at once rather than discovering them one at a time after the fact.
+type AccountClosurePreview struct {
+	Tenants []TenantClosureImpact `json:"tenants"`
+}
+
 // AccountDeletion defines model for AccountDeletion.
 type AccountDeletion struct {
 	// ExportAvailable Whether GET /api/v1/users/me/export can still be called.
@@ -203,7 +216,10 @@ type AccountDeletionStatus string
 type AccountDeletionRequest struct {
 	// ConfirmEmail Must equal the caller's own email. Verified server-side — the typed confirmation is a real check, not a client-side speed bump.
 	ConfirmEmail openapi_types.Email `json:"confirmEmail"`
-	Reason       *string             `json:"reason,omitempty"`
+
+	// Decisions What to do with the content the caller owns, per organization. Stored with the schedule and applied at execution — not now, so cancelling leaves nothing to undo. Anything unanswered falls back to the owning module's policy.
+	Decisions *[]TenantLeaveDecision `json:"decisions,omitempty"`
+	Reason    *string                `json:"reason,omitempty"`
 }
 
 // BasicEntity defines model for BasicEntity.
@@ -687,6 +703,16 @@ type Tenant struct {
 	TenantId   string  `json:"tenant_id"`
 }
 
+// TenantClosureImpact defines model for TenantClosureImpact.
+type TenantClosureImpact struct {
+	Impacts   []LeaveImpact `json:"impacts"`
+	Subdomain *string       `json:"subdomain,omitempty"`
+
+	// TenantId Named in the response, never in a request: it identifies which answer belongs to which organization, not which tenant the call acts on.
+	TenantId   string `json:"tenantId"`
+	TenantName string `json:"tenantName"`
+}
+
 // TenantFeatureLicenses License info per feature for a tenant. Key is the feature name. Only features enabled in TenantFeatures should have an entry.
 type TenantFeatureLicenses map[string]struct {
 	// Code License code for the feature
@@ -698,6 +724,17 @@ type TenantFeatureLicenses map[string]struct {
 
 // TenantFeatures Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
 type TenantFeatures map[string]bool
+
+// TenantLeaveDecision A LeaveDecision bound to the organization it answers for.
+type TenantLeaveDecision struct {
+	Action       TenantLeaveDecisionAction `json:"action"`
+	Key          string                    `json:"key"`
+	TargetUserId *string                   `json:"targetUserId,omitempty"`
+	TenantId     string                    `json:"tenantId"`
+}
+
+// TenantLeaveDecisionAction defines model for TenantLeaveDecision.Action.
+type TenantLeaveDecisionAction string
 
 // TenantMembership One row of core_user_tenant_memberships joined to its tenant. Field names are snake_case because this payload predates its spec — it is the sqlc row, serialized as-is, and a live SPA already reads it. Renaming is a separate, breaking decision.
 type TenantMembership struct {
