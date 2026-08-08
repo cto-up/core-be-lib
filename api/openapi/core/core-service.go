@@ -575,6 +575,12 @@ type AddUserJSONRequestBody = NewUser
 // ImportUsersFromAdminMultipartRequestBody defines body for ImportUsersFromAdmin for multipart/form-data ContentType.
 type ImportUsersFromAdminMultipartRequestBody ImportUsersFromAdminMultipartBody
 
+// ScheduleMyAccountDeletionJSONRequestBody defines body for ScheduleMyAccountDeletion for application/json ContentType.
+type ScheduleMyAccountDeletionJSONRequestBody = AccountDeletionRequest
+
+// LeaveTenantJSONRequestBody defines body for LeaveTenant for application/json ContentType.
+type LeaveTenantJSONRequestBody = LeaveTenantRequest
+
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = User
 
@@ -769,6 +775,30 @@ type ServerInterface interface {
 
 	// (POST /api/v1/users/import)
 	ImportUsersFromAdmin(c *gin.Context)
+	// Cancel a scheduled account deletion
+	// (DELETE /api/v1/users/me/deletion)
+	CancelMyAccountDeletion(c *gin.Context)
+	// Whether the caller's account is scheduled for deletion
+	// (GET /api/v1/users/me/deletion)
+	GetMyAccountDeletion(c *gin.Context)
+	// Schedule deletion of the caller's account
+	// (POST /api/v1/users/me/deletion)
+	ScheduleMyAccountDeletion(c *gin.Context)
+	// Export the caller's own data
+	// (GET /api/v1/users/me/export)
+	ExportMyData(c *gin.Context)
+	// Leave the current tenant (self-service)
+	// (POST /api/v1/users/me/leave)
+	LeaveTenant(c *gin.Context)
+	// What leaving this tenant would cost the caller
+	// (GET /api/v1/users/me/leave-preview)
+	GetMyLeaveTenantPreview(c *gin.Context)
+	// The tenants the caller belongs to
+	// (GET /api/v1/users/me/tenants)
+	ListMyTenants(c *gin.Context)
+	// Invitations awaiting the caller's answer
+	// (GET /api/v1/users/me/tenants/pending)
+	ListMyPendingInvitations(c *gin.Context)
 
 	// (DELETE /api/v1/users/{userid})
 	DeleteUser(c *gin.Context, userid string)
@@ -817,6 +847,12 @@ type ServerInterface interface {
 	// API Health Check
 	// (GET /public-api/v1/health)
 	GetHealthCheck(c *gin.Context)
+	// Accept the invitation to the tenant of the current host
+	// (POST /public-api/v1/invitations/accept)
+	AcceptInvitation(c *gin.Context)
+	// Decline the invitation to the tenant of the current host
+	// (POST /public-api/v1/invitations/reject)
+	RejectInvitation(c *gin.Context)
 
 	// (POST /public-api/v1/password-reset-request)
 	ResetPasswordRequest(c *gin.Context)
@@ -2139,6 +2175,110 @@ func (siw *ServerInterfaceWrapper) ImportUsersFromAdmin(c *gin.Context) {
 	siw.Handler.ImportUsersFromAdmin(c)
 }
 
+// CancelMyAccountDeletion operation middleware
+func (siw *ServerInterfaceWrapper) CancelMyAccountDeletion(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CancelMyAccountDeletion(c)
+}
+
+// GetMyAccountDeletion operation middleware
+func (siw *ServerInterfaceWrapper) GetMyAccountDeletion(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMyAccountDeletion(c)
+}
+
+// ScheduleMyAccountDeletion operation middleware
+func (siw *ServerInterfaceWrapper) ScheduleMyAccountDeletion(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ScheduleMyAccountDeletion(c)
+}
+
+// ExportMyData operation middleware
+func (siw *ServerInterfaceWrapper) ExportMyData(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ExportMyData(c)
+}
+
+// LeaveTenant operation middleware
+func (siw *ServerInterfaceWrapper) LeaveTenant(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.LeaveTenant(c)
+}
+
+// GetMyLeaveTenantPreview operation middleware
+func (siw *ServerInterfaceWrapper) GetMyLeaveTenantPreview(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMyLeaveTenantPreview(c)
+}
+
+// ListMyTenants operation middleware
+func (siw *ServerInterfaceWrapper) ListMyTenants(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListMyTenants(c)
+}
+
+// ListMyPendingInvitations operation middleware
+func (siw *ServerInterfaceWrapper) ListMyPendingInvitations(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListMyPendingInvitations(c)
+}
+
 // DeleteUser operation middleware
 func (siw *ServerInterfaceWrapper) DeleteUser(c *gin.Context) {
 
@@ -2552,6 +2692,32 @@ func (siw *ServerInterfaceWrapper) GetHealthCheck(c *gin.Context) {
 	}
 
 	siw.Handler.GetHealthCheck(c)
+}
+
+// AcceptInvitation operation middleware
+func (siw *ServerInterfaceWrapper) AcceptInvitation(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AcceptInvitation(c)
+}
+
+// RejectInvitation operation middleware
+func (siw *ServerInterfaceWrapper) RejectInvitation(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.RejectInvitation(c)
 }
 
 // ResetPasswordRequest operation middleware
@@ -3762,6 +3928,14 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/api/v1/users/by-email/:email", wrapper.GetUserByEmail)
 	router.GET(options.BaseURL+"/api/v1/users/check", wrapper.CheckUserExists)
 	router.POST(options.BaseURL+"/api/v1/users/import", wrapper.ImportUsersFromAdmin)
+	router.DELETE(options.BaseURL+"/api/v1/users/me/deletion", wrapper.CancelMyAccountDeletion)
+	router.GET(options.BaseURL+"/api/v1/users/me/deletion", wrapper.GetMyAccountDeletion)
+	router.POST(options.BaseURL+"/api/v1/users/me/deletion", wrapper.ScheduleMyAccountDeletion)
+	router.GET(options.BaseURL+"/api/v1/users/me/export", wrapper.ExportMyData)
+	router.POST(options.BaseURL+"/api/v1/users/me/leave", wrapper.LeaveTenant)
+	router.GET(options.BaseURL+"/api/v1/users/me/leave-preview", wrapper.GetMyLeaveTenantPreview)
+	router.GET(options.BaseURL+"/api/v1/users/me/tenants", wrapper.ListMyTenants)
+	router.GET(options.BaseURL+"/api/v1/users/me/tenants/pending", wrapper.ListMyPendingInvitations)
 	router.DELETE(options.BaseURL+"/api/v1/users/:userid", wrapper.DeleteUser)
 	router.GET(options.BaseURL+"/api/v1/users/:userid", wrapper.GetUserByID)
 	router.PUT(options.BaseURL+"/api/v1/users/:userid", wrapper.UpdateUser)
@@ -3778,6 +3952,8 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/public-api/v1/auth/recovery", wrapper.HandleRecovery)
 	router.POST(options.BaseURL+"/public-api/v1/auth/social/complete", wrapper.CompleteSocialSignIn)
 	router.GET(options.BaseURL+"/public-api/v1/health", wrapper.GetHealthCheck)
+	router.POST(options.BaseURL+"/public-api/v1/invitations/accept", wrapper.AcceptInvitation)
+	router.POST(options.BaseURL+"/public-api/v1/invitations/reject", wrapper.RejectInvitation)
 	router.POST(options.BaseURL+"/public-api/v1/password-reset-request", wrapper.ResetPasswordRequest)
 	router.POST(options.BaseURL+"/public-api/v1/sign-up", wrapper.Signup)
 	router.GET(options.BaseURL+"/public-api/v1/tenant", wrapper.GetPublicTenant)

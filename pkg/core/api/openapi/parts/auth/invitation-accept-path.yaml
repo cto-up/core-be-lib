@@ -1,0 +1,55 @@
+post:
+  summary: Accept the invitation to the tenant of the current host
+  description: >
+    Turns a pending membership into an active one and writes the tenant into the
+    identity's `metadata_public.tenant_memberships` — without that claim the
+    membership row exists and every request is still rejected.
+
+
+    Deliberately outside the auth middleware, for the reason
+    /public-api/v1/auth/social/complete is: authorization is evaluated against
+    the host's tenant, and an invitee has no membership claim for the tenant
+    inviting them, so the middleware would 401 them before any handler runs. The
+    endpoint verifies the Kratos session itself and resolves the tenant from
+    Origin (falling back to Host) — the invitation email links to the tenant's
+    own host, so Origin names it.
+
+
+    The seat guard is re-checked here, not only at invite time: seats can be
+    taken by someone else in between, and this is the moment one is consumed.
+  operationId: acceptInvitation
+  tags:
+    - auth
+  responses:
+    "204":
+      description: Invitation accepted; the caller is now an active member
+    "401":
+      description: No valid session
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "403":
+      description: The tenant has no seat left for this member
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "404":
+      description: No pending invitation for this caller and tenant
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "410":
+      description: The invitation expired
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"

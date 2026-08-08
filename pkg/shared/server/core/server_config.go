@@ -252,6 +252,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 
 	core.RegisterHandlersWithOptions(router, handlers, apiOptions)
 
+
 	// Self-service membership (W1.1): invite / accept / decline, plus workspace
 	// member administration. Registered here rather than generated from the spec
 	// because these paths were never in it — the handler existed fully stubbed

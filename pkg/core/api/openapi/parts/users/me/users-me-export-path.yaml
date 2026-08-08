@@ -1,0 +1,40 @@
+get:
+  summary: Export the caller's own data
+  description: >
+    One JSON document: what core owns (identity, profile, memberships) plus one
+    section per module that registered a data contributor at boot. Core assembles
+    it and knows nothing about what the sections contain — an LMS fills in
+    enrollments, progress and certificates because the LMS registered a
+    contributor, not because core has heard of them.
+
+
+    Offered inside the close-account dialog rather than buried in a settings
+    page: it covers the portability obligation and it is what a good share of
+    the people who click delete actually wanted.
+
+
+    A module that registers nothing contributes no section. That is silent, and
+    unlike the seat guard it is not benign — an unregistered module means
+    personal data this document does not show and the erase path will not reach.
+  operationId: exportMyData
+  tags:
+    - me
+  responses:
+    "200":
+      description: Export document
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/UserDataExport"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
