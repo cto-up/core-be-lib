@@ -24,6 +24,12 @@ const (
 	APITokenAuditLogActionUSED    APITokenAuditLogAction = "USED"
 )
 
+// Defines values for AccountDeletionStatus.
+const (
+	None      AccountDeletionStatus = "none"
+	Scheduled AccountDeletionStatus = "scheduled"
+)
+
 // Defines values for CheckDetailsStatus.
 const (
 	CheckDetailsStatusFail CheckDetailsStatus = "fail"
@@ -45,6 +51,33 @@ const (
 	Warn HealthResponseStatus = "warn"
 )
 
+// Defines values for LeaveDecisionAction.
+const (
+	LeaveDecisionActionCancelAtPeriodEnd LeaveDecisionAction = "cancelAtPeriodEnd"
+	LeaveDecisionActionKeep              LeaveDecisionAction = "keep"
+	LeaveDecisionActionTransfer          LeaveDecisionAction = "transfer"
+	LeaveDecisionActionUnpublish         LeaveDecisionAction = "unpublish"
+)
+
+// Defines values for LeaveImpactActions.
+const (
+	LeaveImpactActionsCancelAtPeriodEnd LeaveImpactActions = "cancelAtPeriodEnd"
+	LeaveImpactActionsKeep              LeaveImpactActions = "keep"
+	LeaveImpactActionsTransfer          LeaveImpactActions = "transfer"
+	LeaveImpactActionsUnpublish         LeaveImpactActions = "unpublish"
+)
+
+// Defines values for LeaveImpactSeverity.
+const (
+	Decision LeaveImpactSeverity = "decision"
+	Info     LeaveImpactSeverity = "info"
+)
+
+// Defines values for LeaveTenantResultMembershipStatus.
+const (
+	LeaveTenantResultMembershipStatusInactive LeaveTenantResultMembershipStatus = "inactive"
+)
+
 // Defines values for MFAStatusAal.
 const (
 	Aal1 MFAStatusAal = "aal1"
@@ -57,6 +90,14 @@ const (
 	CUSTOMERADMIN Role = "CUSTOMER_ADMIN"
 	SUPERADMIN    Role = "SUPER_ADMIN"
 	USER          Role = "USER"
+)
+
+// Defines values for TenantMembershipStatus.
+const (
+	TenantMembershipStatusActive   TenantMembershipStatus = "active"
+	TenantMembershipStatusInactive TenantMembershipStatus = "inactive"
+	TenantMembershipStatusPending  TenantMembershipStatus = "pending"
+	TenantMembershipStatusRejected TenantMembershipStatus = "rejected"
 )
 
 // Defines values for UserActionSchemaName.
@@ -137,6 +178,32 @@ type APITokenCreated struct {
 // APITokenRevoke defines model for APITokenRevoke.
 type APITokenRevoke struct {
 	Reason string `json:"reason"`
+}
+
+// AccountDeletion defines model for AccountDeletion.
+type AccountDeletion struct {
+	// ExportAvailable Whether GET /api/v1/users/me/export can still be called.
+	ExportAvailable *bool `json:"exportAvailable,omitempty"`
+
+	// ScheduledAt When the caller asked for deletion.
+	ScheduledAt *time.Time `json:"scheduledAt,omitempty"`
+
+	// ScheduledFor When the deletion executes. Until then the account can be recovered by signing in and cancelling; after it, nothing is recoverable.
+	ScheduledFor *time.Time            `json:"scheduledFor,omitempty"`
+	Status       AccountDeletionStatus `json:"status"`
+
+	// TenantsAffected Memberships that end with the account.
+	TenantsAffected *int `json:"tenantsAffected,omitempty"`
+}
+
+// AccountDeletionStatus defines model for AccountDeletion.Status.
+type AccountDeletionStatus string
+
+// AccountDeletionRequest defines model for AccountDeletionRequest.
+type AccountDeletionRequest struct {
+	// ConfirmEmail Must equal the caller's own email. Verified server-side — the typed confirmation is a real check, not a client-side speed bump.
+	ConfirmEmail openapi_types.Email `json:"confirmEmail"`
+	Reason       *string             `json:"reason,omitempty"`
 }
 
 // BasicEntity defines model for BasicEntity.
@@ -281,6 +348,76 @@ type HealthResponseStatus string
 type Identify struct {
 	Email openapi_types.Email `json:"email"`
 }
+
+// LeaveDecision One answer to an impact the preview reported with severity `decision`.
+type LeaveDecision struct {
+	Action LeaveDecisionAction `json:"action"`
+
+	// Key The impact key being answered, e.g. `lms.authoredPublishedCourses`.
+	Key string `json:"key"`
+
+	// TargetUserId Required for `transfer` — the member the content moves to.
+	TargetUserId *string `json:"targetUserId,omitempty"`
+}
+
+// LeaveDecisionAction defines model for LeaveDecision.Action.
+type LeaveDecisionAction string
+
+// LeaveImpact Contributed by the module that owns the data. Core cannot enumerate it, so `key` is open-ended.
+type LeaveImpact struct {
+	// Actions Actions this decision accepts, in the order to offer them.
+	Actions *[]LeaveImpactActions `json:"actions,omitempty"`
+	Count   *int                  `json:"count,omitempty"`
+
+	// Key Stable identifier used as a translation key by the SPA, e.g. `lms.enrollments`, `lms.authoredPublishedCourses`, `lms.activeSubscription`.
+	Key string `json:"key"`
+
+	// Label Fallback text for a key the SPA has no translation for.
+	Label *string `json:"label,omitempty"`
+
+	// Module Module that contributed this impact, e.g. `lms`.
+	Module *string `json:"module,omitempty"`
+
+	// Severity `info` is stated in the dialog. `decision` must be resolved by a matching entry in LeaveTenantRequest.decisions.
+	Severity LeaveImpactSeverity `json:"severity"`
+}
+
+// LeaveImpactActions defines model for LeaveImpact.Actions.
+type LeaveImpactActions string
+
+// LeaveImpactSeverity `info` is stated in the dialog. `decision` must be resolved by a matching entry in LeaveTenantRequest.decisions.
+type LeaveImpactSeverity string
+
+// LeaveTenantPreview What leaving would cost, and nothing else. Identity and membership facts already came with the row this dialog was opened from.
+type LeaveTenantPreview struct {
+	// CanLeaveNow False while an impact of severity `decision` is unanswered.
+	CanLeaveNow bool `json:"canLeaveNow"`
+
+	// DormantUntil When the tenant-scoped data kept for a possible return would be purged if the caller leaves now. The membership row itself is never purged — it is what makes returning a reactivation.
+	DormantUntil *time.Time    `json:"dormantUntil,omitempty"`
+	Impacts      []LeaveImpact `json:"impacts"`
+}
+
+// LeaveTenantRequest defines model for LeaveTenantRequest.
+type LeaveTenantRequest struct {
+	// Decisions One entry per impact the preview reported with severity `decision`. Absent or incomplete, the leave is refused with 409 and the current preview.
+	Decisions *[]LeaveDecision `json:"decisions,omitempty"`
+
+	// Reason Optional, free text. Product feedback only; never gates the leave.
+	Reason *string `json:"reason,omitempty"`
+}
+
+// LeaveTenantResult defines model for LeaveTenantResult.
+type LeaveTenantResult struct {
+	DormantUntil *time.Time `json:"dormantUntil,omitempty"`
+
+	// MembershipStatus The row is kept, not deleted. Reactivating it is how a returning user gets their history back.
+	MembershipStatus LeaveTenantResultMembershipStatus `json:"membershipStatus"`
+	SeatReleased     *bool                             `json:"seatReleased,omitempty"`
+}
+
+// LeaveTenantResultMembershipStatus The row is kept, not deleted. Reactivating it is how a returning user gets their history back.
+type LeaveTenantResultMembershipStatus string
 
 // MFAStatus defines model for MFAStatus.
 type MFAStatus struct {
@@ -562,6 +699,32 @@ type TenantFeatureLicenses map[string]struct {
 // TenantFeatures Dynamic feature flags for tenants. Each key represents a feature name and the boolean value indicates if it's enabled
 type TenantFeatures map[string]bool
 
+// TenantMembership One row of core_user_tenant_memberships joined to its tenant. Field names are snake_case because this payload predates its spec — it is the sqlc row, serialized as-is, and a live SPA already reads it. Renaming is a separate, breaking decision.
+type TenantMembership struct {
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+
+	// FeatureLicenses License info per feature for a tenant. Key is the feature name. Only features enabled in TenantFeatures should have an entry.
+	FeatureLicenses *TenantFeatureLicenses `json:"feature_licenses,omitempty"`
+	Id              openapi_types.UUID     `json:"id"`
+	InvitedAt       *time.Time             `json:"invited_at"`
+	InvitedBy       *string                `json:"invited_by"`
+
+	// JoinedAt Null while pending — only an accepted membership has joined.
+	JoinedAt *time.Time `json:"joined_at"`
+	Roles    *[]Role    `json:"roles,omitempty"`
+
+	// Status `inactive` is a membership that ended — left or removed. The row is kept because reactivating it is what restores a returning member's history.
+	Status     TenantMembershipStatus `json:"status"`
+	Subdomain  string                 `json:"subdomain"`
+	TenantId   string                 `json:"tenant_id"`
+	TenantName string                 `json:"tenant_name"`
+	UpdatedAt  *time.Time             `json:"updated_at,omitempty"`
+	UserId     string                 `json:"user_id"`
+}
+
+// TenantMembershipStatus `inactive` is a membership that ended — left or removed. The row is kept because reactivating it is what restores a returning member's history.
+type TenantMembershipStatus string
+
 // TenantProfile defines model for TenantProfile.
 type TenantProfile struct {
 	DarkColors struct {
@@ -684,6 +847,16 @@ type UserActionSchema struct {
 
 // UserActionSchemaName defines model for UserActionSchema.Name.
 type UserActionSchemaName string
+
+// UserDataExport Assembled by core from what it owns, plus one section per registered data contributor. Core cannot enumerate module data — `modules` is deliberately open, and its keys are the contributors that answered, which is also how a reader sees what the export covered.
+type UserDataExport struct {
+	ExportedAt  time.Time          `json:"exportedAt"`
+	Memberships []TenantMembership `json:"memberships"`
+
+	// Modules Keyed by contributor name (`lms`, `aiemployee`, …). The shape of each value is the contributing module's business, not core's.
+	Modules map[string]interface{} `json:"modules"`
+	User    User                   `json:"user"`
+}
 
 // UserProfileSchema defines model for UserProfileSchema.
 type UserProfileSchema struct {

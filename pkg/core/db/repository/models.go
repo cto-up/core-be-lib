@@ -130,12 +130,15 @@ type CoreTranslation struct {
 }
 
 type CoreUser struct {
-	ID        string                `json:"id"`
-	Profile   subentity.UserProfile `json:"profile"`
-	Email     pgtype.Text           `json:"email"`
-	CreatedAt time.Time             `json:"created_at"`
-	TenantID  pgtype.Text           `json:"tenant_id"`
-	Roles     []string              `json:"roles"`
+	ID                  string                `json:"id"`
+	Profile             subentity.UserProfile `json:"profile"`
+	Email               pgtype.Text           `json:"email"`
+	CreatedAt           time.Time             `json:"created_at"`
+	TenantID            pgtype.Text           `json:"tenant_id"`
+	Roles               []string              `json:"roles"`
+	DeletionRequestedAt pgtype.Timestamptz    `json:"deletion_requested_at"`
+	DeletionScheduledAt pgtype.Timestamptz    `json:"deletion_scheduled_at"`
+	DeletionReason      pgtype.Text           `json:"deletion_reason"`
 }
 
 type CoreUserTenantMembership struct {
@@ -150,4 +153,5 @@ type CoreUserTenantMembership struct {
 	UpdatedAt       time.Time                       `json:"updated_at"`
 	Roles           []string                        `json:"roles"`
 	FeatureLicenses subentity.TenantFeatureLicenses `json:"feature_licenses"`
+	DormantPurgedAt pgtype.Timestamptz              `json:"dormant_purged_at"`
 }

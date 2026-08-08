@@ -1,0 +1,30 @@
+get:
+  summary: The tenants the caller belongs to
+  description: >
+    Active memberships only. Scoped to the caller from the auth context, never
+    from the path, so one user cannot read another's. Backs the Organizations
+    page, where each row carries its own Leave action.
+  operationId: listMyTenants
+  tags:
+    - me
+  responses:
+    "200":
+      description: Memberships
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../../../core-schema.yaml#/components/schemas/TenantMembership"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"

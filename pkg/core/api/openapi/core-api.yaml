@@ -33,6 +33,12 @@ paths:
     $ref: "./parts/auth/identify-path.yaml"
   /public-api/v1/auth/social/complete:
     $ref: "./parts/auth/social-complete-path.yaml"
+  # invitations: answered on the inviting tenant's host, where the invitee has
+  # no membership claim yet — so, like social/complete, outside the middleware.
+  /public-api/v1/invitations/accept:
+    $ref: "./parts/auth/invitation-accept-path.yaml"
+  /public-api/v1/invitations/reject:
+    $ref: "./parts/auth/invitation-reject-path.yaml"
   # users (api token not allowed)
   /api/v1/users/check:
     $ref: "./parts/users/users-check-path.yaml"
@@ -90,6 +96,23 @@ paths:
     $ref: "./parts/users/me/users-me-profile-picture-path.yaml"
   /api/v1/me/feature-licenses:
     $ref: "./parts/users/me/users-me-feature-licenses-path.yaml"
+
+  # me - memberships and invitations (mounted by hand until now, see ADR 040)
+  /api/v1/users/me/tenants:
+    $ref: "./parts/users/me/users-me-tenants-path.yaml"
+  /api/v1/users/me/tenants/pending:
+    $ref: "./parts/users/me/users-me-tenants-pending-path.yaml"
+
+  # me - membership lifecycle (leaving a tenant is not closing an account).
+  # The tenant comes from Origin/Host, like every other tenant-scoped call.
+  /api/v1/users/me/leave-preview:
+    $ref: "./parts/users/me/users-me-leave-preview-path.yaml"
+  /api/v1/users/me/leave:
+    $ref: "./parts/users/me/users-me-leave-path.yaml"
+  /api/v1/users/me/deletion:
+    $ref: "./parts/users/me/users-me-deletion-path.yaml"
+  /api/v1/users/me/export:
+    $ref: "./parts/users/me/users-me-export-path.yaml"
 
   # mfa
   /api/v1/mfa/status:

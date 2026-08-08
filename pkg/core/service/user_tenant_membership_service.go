@@ -14,6 +14,7 @@ import (
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
 	"ctoup.com/coreapp/pkg/core/db/repository"
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/emailservice"
 	sharedservice "ctoup.com/coreapp/pkg/shared/service"
 	"ctoup.com/coreapp/pkg/shared/util"
@@ -45,10 +46,22 @@ var (
 
 type UserTenantMembershipService struct {
 	store *db.Store
+	// authProvider is needed to write the identity claim on accept. Optional so
+	// that callers which only read (listing invitations) can construct the
+	// service without one; accepting without it would produce a membership that
+	// grants nothing, so that path checks.
+	authProvider auth.AuthProvider
 }
 
 func NewUserTenantMembershipService(store *db.Store) *UserTenantMembershipService {
 	return &UserTenantMembershipService{store: store}
+}
+
+// NewUserTenantMembershipServiceWithAuth is the constructor for any caller that
+// mutates membership — accepting an invitation writes a Kratos claim, not just a
+// row.
+func NewUserTenantMembershipServiceWithAuth(store *db.Store, authProvider auth.AuthProvider) *UserTenantMembershipService {
+	return &UserTenantMembershipService{store: store, authProvider: authProvider}
 }
 
 // GetUserTenants lists the workspaces a person is an active member of.
@@ -213,11 +226,29 @@ func (s *UserTenantMembershipService) AcceptInvitation(ctx context.Context, user
 		return err
 	}
 
-	_, err = s.store.UpdateUserTenantMembershipJoinedAt(ctx, repository.UpdateUserTenantMembershipJoinedAtParams{
+	if _, err := s.store.UpdateUserTenantMembershipJoinedAt(ctx, repository.UpdateUserTenantMembershipJoinedAtParams{
 		UserID: userID, TenantID: tenantID,
 		JoinedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-	})
-	return err
+	}); err != nil {
+		return err
+	}
+
+	// The row is not what grants access. VerifyTokenWithTenantID reads
+	// metadata_public.tenant_memberships on the identity and nothing else, so an
+	// active membership without this claim is an accepted invitation that still
+	// 401s on every request — which is exactly what this flow did before.
+	if s.authProvider != nil {
+		claims := map[string]interface{}{
+			"tenant_memberships": map[string]interface{}{
+				"tenant_id": tenantID,
+				"roles":     m.Roles,
+			},
+		}
+		if err := s.authProvider.GetAuthClient().SetCustomUserClaims(ctx, userID, claims); err != nil {
+			return fmt.Errorf("membership accepted but the identity claim was not written: %w", err)
+		}
+	}
+	return nil
 }
 
 // RejectInvitation declines it. The row is kept as 'rejected' rather than

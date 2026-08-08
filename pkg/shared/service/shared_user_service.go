@@ -323,6 +323,16 @@ func (uh *SharedUserService) RemoveUserFromTenant(c *gin.Context, authClient aut
 		return err
 	}
 
+	// The row is not what grants access — VerifyTokenWithTenantID reads the
+	// identity's tenant_memberships claim, and re-reads it from the provider on
+	// every request. Without this, a removed member keeps working access and the
+	// admin who removed them is told it worked.
+	if err := authClient.RemoveTenantMembershipClaim(c, userId, tenantId); err != nil {
+		logger.Err(err).Str("user_id", userId).Str("tenant_id", tenantId).
+			Msg("Removed membership row but failed to remove the identity claim — access NOT revoked")
+		return err
+	}
+
 	err = tx.Commit(c)
 
 	if err != nil {

@@ -20,7 +20,7 @@ SET roles = array_append(roles, $1::TEXT), updated_at = NOW()
 WHERE user_id = $2 
   AND tenant_id = $3 
   AND NOT ($1::TEXT = ANY(roles))
-RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses, dormant_purged_at
 `
 
 type AddRoleToUserTenantMembershipParams struct {
@@ -44,6 +44,7 @@ func (q *Queries) AddRoleToUserTenantMembership(ctx context.Context, arg AddRole
 		&i.UpdatedAt,
 		&i.Roles,
 		&i.FeatureLicenses,
+		&i.DormantPurgedAt,
 	)
 	return i, err
 }
@@ -82,7 +83,7 @@ DO UPDATE SET
     -- must not erase when they did.
     joined_at = COALESCE(core_user_tenant_memberships.joined_at, EXCLUDED.joined_at),
     updated_at = NOW()
-RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses, dormant_purged_at
 `
 
 type AddSharedUserToTenantParams struct {
@@ -117,6 +118,35 @@ func (q *Queries) AddSharedUserToTenant(ctx context.Context, arg AddSharedUserTo
 		&i.UpdatedAt,
 		&i.Roles,
 		&i.FeatureLicenses,
+		&i.DormantPurgedAt,
+	)
+	return i, err
+}
+
+const cancelUserDeletion = `-- name: CancelUserDeletion :one
+UPDATE core_users
+SET deletion_requested_at = NULL,
+    deletion_scheduled_at = NULL,
+    deletion_reason = NULL
+WHERE id = $1
+RETURNING id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason
+`
+
+// Signing in during the grace period cancels. Idempotent: clearing a NULL is a
+// no-op, which is what "keep my account" means when nothing was scheduled.
+func (q *Queries) CancelUserDeletion(ctx context.Context, id string) (CoreUser, error) {
+	row := q.db.QueryRow(ctx, cancelUserDeletion, id)
+	var i CoreUser
+	err := row.Scan(
+		&i.ID,
+		&i.Profile,
+		&i.Email,
+		&i.CreatedAt,
+		&i.TenantID,
+		&i.Roles,
+		&i.DeletionRequestedAt,
+		&i.DeletionScheduledAt,
+		&i.DeletionReason,
 	)
 	return i, err
 }
@@ -183,7 +213,7 @@ INSERT INTO core_users (
 ) VALUES (
   $1, $3::text, $2, $4::VARCHAR[]
 )
-RETURNING id, profile, email, created_at, tenant_id, roles
+RETURNING id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason
 `
 
 type CreateSharedUserParams struct {
@@ -209,6 +239,9 @@ func (q *Queries) CreateSharedUser(ctx context.Context, arg CreateSharedUserPara
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
+		&i.DeletionRequestedAt,
+		&i.DeletionScheduledAt,
+		&i.DeletionReason,
 	)
 	return i, err
 }
@@ -220,7 +253,7 @@ WITH new_user AS (
     ) VALUES (
         $1, $3::text, $2
     )
-    RETURNING id, profile, email, created_at, tenant_id, roles
+    RETURNING id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason
 ),
 new_membership AS (
     INSERT INTO core_user_tenant_memberships (
@@ -251,7 +284,7 @@ new_membership AS (
     RETURNING roles as tenant_roles, status as membership_status, joined_at, tenant_id
 )
 SELECT 
-    new_user.id, new_user.profile, new_user.email, new_user.created_at, new_user.tenant_id, new_user.roles,
+    new_user.id, new_user.profile, new_user.email, new_user.created_at, new_user.tenant_id, new_user.roles, new_user.deletion_requested_at, new_user.deletion_scheduled_at, new_user.deletion_reason,
     new_membership.tenant_roles,
     new_membership.membership_status,
     new_membership.joined_at,
@@ -271,16 +304,19 @@ type CreateSharedUserWithTenantParams struct {
 }
 
 type CreateSharedUserWithTenantRow struct {
-	ID               string             `json:"id"`
-	Profile          []byte             `json:"profile"`
-	Email            pgtype.Text        `json:"email"`
-	CreatedAt        time.Time          `json:"created_at"`
-	TenantID         pgtype.Text        `json:"tenant_id"`
-	Roles            []string           `json:"roles"`
-	TenantRoles      []string           `json:"tenant_roles"`
-	MembershipStatus string             `json:"membership_status"`
-	JoinedAt         pgtype.Timestamptz `json:"joined_at"`
-	TenantID_2       string             `json:"tenant_id_2"`
+	ID                  string             `json:"id"`
+	Profile             []byte             `json:"profile"`
+	Email               pgtype.Text        `json:"email"`
+	CreatedAt           time.Time          `json:"created_at"`
+	TenantID            pgtype.Text        `json:"tenant_id"`
+	Roles               []string           `json:"roles"`
+	DeletionRequestedAt pgtype.Timestamptz `json:"deletion_requested_at"`
+	DeletionScheduledAt pgtype.Timestamptz `json:"deletion_scheduled_at"`
+	DeletionReason      pgtype.Text        `json:"deletion_reason"`
+	TenantRoles         []string           `json:"tenant_roles"`
+	MembershipStatus    string             `json:"membership_status"`
+	JoinedAt            pgtype.Timestamptz `json:"joined_at"`
+	TenantID_2          string             `json:"tenant_id_2"`
 }
 
 // USED
@@ -302,12 +338,24 @@ func (q *Queries) CreateSharedUserWithTenant(ctx context.Context, arg CreateShar
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
+		&i.DeletionRequestedAt,
+		&i.DeletionScheduledAt,
+		&i.DeletionReason,
 		&i.TenantRoles,
 		&i.MembershipStatus,
 		&i.JoinedAt,
 		&i.TenantID_2,
 	)
 	return i, err
+}
+
+const deleteAllUserTenantMemberships = `-- name: DeleteAllUserTenantMemberships :exec
+DELETE FROM core_user_tenant_memberships WHERE user_id = $1
+`
+
+func (q *Queries) DeleteAllUserTenantMemberships(ctx context.Context, userID string) error {
+	_, err := q.db.Exec(ctx, deleteAllUserTenantMemberships, userID)
+	return err
 }
 
 const deleteSharedUser = `-- name: DeleteSharedUser :one
@@ -347,8 +395,17 @@ func (q *Queries) DeleteSharedUserByTenant(ctx context.Context, arg DeleteShared
 	return id, err
 }
 
+const deleteSharedUserRow = `-- name: DeleteSharedUserRow :exec
+DELETE FROM core_users WHERE id = $1
+`
+
+func (q *Queries) DeleteSharedUserRow(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteSharedUserRow, id)
+	return err
+}
+
 const getSharedUserByID = `-- name: GetSharedUserByID :one
-SELECT id, profile, email, created_at, tenant_id, roles FROM core_users
+SELECT id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason FROM core_users
 WHERE id = $1
 LIMIT 1
 `
@@ -363,13 +420,16 @@ func (q *Queries) GetSharedUserByID(ctx context.Context, id string) (CoreUser, e
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
+		&i.DeletionRequestedAt,
+		&i.DeletionScheduledAt,
+		&i.DeletionReason,
 	)
 	return i, err
 }
 
 const getSharedUserByTenantByEmail = `-- name: GetSharedUserByTenantByEmail :one
 SELECT 
-    u.id, u.profile, u.email, u.created_at, u.tenant_id, u.roles,
+    u.id, u.profile, u.email, u.created_at, u.tenant_id, u.roles, u.deletion_requested_at, u.deletion_scheduled_at, u.deletion_reason,
     utm.roles as tenant_roles,
     utm.status as membership_status,
     utm.joined_at,
@@ -388,16 +448,19 @@ type GetSharedUserByTenantByEmailParams struct {
 }
 
 type GetSharedUserByTenantByEmailRow struct {
-	ID               string                `json:"id"`
-	Profile          subentity.UserProfile `json:"profile"`
-	Email            pgtype.Text           `json:"email"`
-	CreatedAt        time.Time             `json:"created_at"`
-	TenantID         pgtype.Text           `json:"tenant_id"`
-	Roles            []string              `json:"roles"`
-	TenantRoles      []string              `json:"tenant_roles"`
-	MembershipStatus string                `json:"membership_status"`
-	JoinedAt         pgtype.Timestamptz    `json:"joined_at"`
-	TenantID_2       string                `json:"tenant_id_2"`
+	ID                  string                `json:"id"`
+	Profile             subentity.UserProfile `json:"profile"`
+	Email               pgtype.Text           `json:"email"`
+	CreatedAt           time.Time             `json:"created_at"`
+	TenantID            pgtype.Text           `json:"tenant_id"`
+	Roles               []string              `json:"roles"`
+	DeletionRequestedAt pgtype.Timestamptz    `json:"deletion_requested_at"`
+	DeletionScheduledAt pgtype.Timestamptz    `json:"deletion_scheduled_at"`
+	DeletionReason      pgtype.Text           `json:"deletion_reason"`
+	TenantRoles         []string              `json:"tenant_roles"`
+	MembershipStatus    string                `json:"membership_status"`
+	JoinedAt            pgtype.Timestamptz    `json:"joined_at"`
+	TenantID_2          string                `json:"tenant_id_2"`
 }
 
 func (q *Queries) GetSharedUserByTenantByEmail(ctx context.Context, arg GetSharedUserByTenantByEmailParams) (GetSharedUserByTenantByEmailRow, error) {
@@ -410,6 +473,9 @@ func (q *Queries) GetSharedUserByTenantByEmail(ctx context.Context, arg GetShare
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
+		&i.DeletionRequestedAt,
+		&i.DeletionScheduledAt,
+		&i.DeletionReason,
 		&i.TenantRoles,
 		&i.MembershipStatus,
 		&i.JoinedAt,
@@ -420,7 +486,7 @@ func (q *Queries) GetSharedUserByTenantByEmail(ctx context.Context, arg GetShare
 
 const getSharedUserByTenantByID = `-- name: GetSharedUserByTenantByID :one
 SELECT 
-    u.id, u.profile, u.email, u.created_at, u.tenant_id, u.roles,
+    u.id, u.profile, u.email, u.created_at, u.tenant_id, u.roles, u.deletion_requested_at, u.deletion_scheduled_at, u.deletion_reason,
     utm.roles as tenant_roles,
     utm.status as membership_status,
     utm.joined_at,
@@ -439,16 +505,19 @@ type GetSharedUserByTenantByIDParams struct {
 }
 
 type GetSharedUserByTenantByIDRow struct {
-	ID               string                `json:"id"`
-	Profile          subentity.UserProfile `json:"profile"`
-	Email            pgtype.Text           `json:"email"`
-	CreatedAt        time.Time             `json:"created_at"`
-	TenantID         pgtype.Text           `json:"tenant_id"`
-	Roles            []string              `json:"roles"`
-	TenantRoles      []string              `json:"tenant_roles"`
-	MembershipStatus string                `json:"membership_status"`
-	JoinedAt         pgtype.Timestamptz    `json:"joined_at"`
-	TenantID_2       string                `json:"tenant_id_2"`
+	ID                  string                `json:"id"`
+	Profile             subentity.UserProfile `json:"profile"`
+	Email               pgtype.Text           `json:"email"`
+	CreatedAt           time.Time             `json:"created_at"`
+	TenantID            pgtype.Text           `json:"tenant_id"`
+	Roles               []string              `json:"roles"`
+	DeletionRequestedAt pgtype.Timestamptz    `json:"deletion_requested_at"`
+	DeletionScheduledAt pgtype.Timestamptz    `json:"deletion_scheduled_at"`
+	DeletionReason      pgtype.Text           `json:"deletion_reason"`
+	TenantRoles         []string              `json:"tenant_roles"`
+	MembershipStatus    string                `json:"membership_status"`
+	JoinedAt            pgtype.Timestamptz    `json:"joined_at"`
+	TenantID_2          string                `json:"tenant_id_2"`
 }
 
 func (q *Queries) GetSharedUserByTenantByID(ctx context.Context, arg GetSharedUserByTenantByIDParams) (GetSharedUserByTenantByIDRow, error) {
@@ -461,6 +530,9 @@ func (q *Queries) GetSharedUserByTenantByID(ctx context.Context, arg GetSharedUs
 		&i.CreatedAt,
 		&i.TenantID,
 		&i.Roles,
+		&i.DeletionRequestedAt,
+		&i.DeletionScheduledAt,
+		&i.DeletionReason,
 		&i.TenantRoles,
 		&i.MembershipStatus,
 		&i.JoinedAt,
@@ -470,7 +542,7 @@ func (q *Queries) GetSharedUserByTenantByID(ctx context.Context, arg GetSharedUs
 }
 
 const getSharedUserTenantMembership = `-- name: GetSharedUserTenantMembership :one
-SELECT id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses FROM core_user_tenant_memberships
+SELECT id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses, dormant_purged_at FROM core_user_tenant_memberships
 WHERE user_id = $1 AND tenant_id = $2
 LIMIT 1
 `
@@ -495,6 +567,7 @@ func (q *Queries) GetSharedUserTenantMembership(ctx context.Context, arg GetShar
 		&i.UpdatedAt,
 		&i.Roles,
 		&i.FeatureLicenses,
+		&i.DormantPurgedAt,
 	)
 	return i, err
 }
@@ -605,6 +678,61 @@ func (q *Queries) GetUserFeatureLicenses(ctx context.Context, arg GetUserFeature
 	return feature_licenses, err
 }
 
+const getUserTenantMembership = `-- name: GetUserTenantMembership :one
+SELECT 
+    utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles, utm.feature_licenses, utm.dormant_purged_at,
+    t.name as tenant_name,
+    t.subdomain
+FROM core_user_tenant_memberships utm
+JOIN core_tenants t ON utm.tenant_id = t.tenant_id
+WHERE utm.user_id = $1 AND utm.tenant_id = $2
+LIMIT 1
+`
+
+type GetUserTenantMembershipParams struct {
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+type GetUserTenantMembershipRow struct {
+	ID              uuid.UUID                       `json:"id"`
+	UserID          string                          `json:"user_id"`
+	TenantID        string                          `json:"tenant_id"`
+	Status          string                          `json:"status"`
+	InvitedBy       pgtype.Text                     `json:"invited_by"`
+	InvitedAt       pgtype.Timestamptz              `json:"invited_at"`
+	JoinedAt        pgtype.Timestamptz              `json:"joined_at"`
+	CreatedAt       time.Time                       `json:"created_at"`
+	UpdatedAt       time.Time                       `json:"updated_at"`
+	Roles           []string                        `json:"roles"`
+	FeatureLicenses subentity.TenantFeatureLicenses `json:"feature_licenses"`
+	DormantPurgedAt pgtype.Timestamptz              `json:"dormant_purged_at"`
+	TenantName      string                          `json:"tenant_name"`
+	Subdomain       string                          `json:"subdomain"`
+}
+
+func (q *Queries) GetUserTenantMembership(ctx context.Context, arg GetUserTenantMembershipParams) (GetUserTenantMembershipRow, error) {
+	row := q.db.QueryRow(ctx, getUserTenantMembership, arg.UserID, arg.TenantID)
+	var i GetUserTenantMembershipRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TenantID,
+		&i.Status,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.JoinedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Roles,
+		&i.FeatureLicenses,
+		&i.DormantPurgedAt,
+		&i.TenantName,
+		&i.Subdomain,
+	)
+	return i, err
+}
+
 const getUserTenantRoles = `-- name: GetUserTenantRoles :one
 SELECT roles FROM core_user_tenant_memberships
 WHERE user_id = $1 AND tenant_id = $2 AND status = 'active'
@@ -643,9 +771,119 @@ func (q *Queries) IsUserMemberOfTenant(ctx context.Context, arg IsUserMemberOfTe
 	return is_member, err
 }
 
+const listAllUserTenantMemberships = `-- name: ListAllUserTenantMemberships :many
+SELECT 
+    utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles, utm.feature_licenses, utm.dormant_purged_at,
+    t.name as tenant_name,
+    t.subdomain
+FROM core_user_tenant_memberships utm
+JOIN core_tenants t ON utm.tenant_id = t.tenant_id
+WHERE utm.user_id = $1
+ORDER BY utm.created_at DESC
+`
+
+type ListAllUserTenantMembershipsRow struct {
+	ID              uuid.UUID                       `json:"id"`
+	UserID          string                          `json:"user_id"`
+	TenantID        string                          `json:"tenant_id"`
+	Status          string                          `json:"status"`
+	InvitedBy       pgtype.Text                     `json:"invited_by"`
+	InvitedAt       pgtype.Timestamptz              `json:"invited_at"`
+	JoinedAt        pgtype.Timestamptz              `json:"joined_at"`
+	CreatedAt       time.Time                       `json:"created_at"`
+	UpdatedAt       time.Time                       `json:"updated_at"`
+	Roles           []string                        `json:"roles"`
+	FeatureLicenses subentity.TenantFeatureLicenses `json:"feature_licenses"`
+	DormantPurgedAt pgtype.Timestamptz              `json:"dormant_purged_at"`
+	TenantName      string                          `json:"tenant_name"`
+	Subdomain       string                          `json:"subdomain"`
+}
+
+// Every membership of a user whatever its status. The status-filtered
+// ListUserTenantMemberships answers "my organizations"; this one answers
+// "everything that must be ended, exported or erased".
+func (q *Queries) ListAllUserTenantMemberships(ctx context.Context, userID string) ([]ListAllUserTenantMembershipsRow, error) {
+	rows, err := q.db.Query(ctx, listAllUserTenantMemberships, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAllUserTenantMembershipsRow{}
+	for rows.Next() {
+		var i ListAllUserTenantMembershipsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.TenantID,
+			&i.Status,
+			&i.InvitedBy,
+			&i.InvitedAt,
+			&i.JoinedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Roles,
+			&i.FeatureLicenses,
+			&i.DormantPurgedAt,
+			&i.TenantName,
+			&i.Subdomain,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMembershipsDueForDormancyPurge = `-- name: ListMembershipsDueForDormancyPurge :many
+SELECT user_id, tenant_id, updated_at
+FROM core_user_tenant_memberships
+WHERE status = 'inactive'
+  AND dormant_purged_at IS NULL
+  AND updated_at < $1
+ORDER BY updated_at ASC
+LIMIT $2
+`
+
+type ListMembershipsDueForDormancyPurgeParams struct {
+	UpdatedAt time.Time `json:"updated_at"`
+	Limit     int32     `json:"limit"`
+}
+
+type ListMembershipsDueForDormancyPurgeRow struct {
+	UserID    string    `json:"user_id"`
+	TenantID  string    `json:"tenant_id"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Memberships that ended longer ago than the dormancy window and whose
+// tenant-scoped data has not been purged yet. The ROW is never deleted — it is
+// the return path; only the data the return path no longer needs goes.
+func (q *Queries) ListMembershipsDueForDormancyPurge(ctx context.Context, arg ListMembershipsDueForDormancyPurgeParams) ([]ListMembershipsDueForDormancyPurgeRow, error) {
+	rows, err := q.db.Query(ctx, listMembershipsDueForDormancyPurge, arg.UpdatedAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMembershipsDueForDormancyPurgeRow{}
+	for rows.Next() {
+		var i ListMembershipsDueForDormancyPurgeRow
+		if err := rows.Scan(&i.UserID, &i.TenantID, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPendingInvitations = `-- name: ListPendingInvitations :many
 SELECT 
-    utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles, utm.feature_licenses,
+    utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles, utm.feature_licenses, utm.dormant_purged_at,
     t.name as tenant_name,
     t.subdomain
 FROM core_user_tenant_memberships utm
@@ -666,6 +904,7 @@ type ListPendingInvitationsRow struct {
 	UpdatedAt       time.Time                       `json:"updated_at"`
 	Roles           []string                        `json:"roles"`
 	FeatureLicenses subentity.TenantFeatureLicenses `json:"feature_licenses"`
+	DormantPurgedAt pgtype.Timestamptz              `json:"dormant_purged_at"`
 	TenantName      string                          `json:"tenant_name"`
 	Subdomain       string                          `json:"subdomain"`
 }
@@ -691,6 +930,7 @@ func (q *Queries) ListPendingInvitations(ctx context.Context, userID string) ([]
 			&i.UpdatedAt,
 			&i.Roles,
 			&i.FeatureLicenses,
+			&i.DormantPurgedAt,
 			&i.TenantName,
 			&i.Subdomain,
 		); err != nil {
@@ -831,7 +1071,7 @@ func (q *Queries) ListSharedUsersByRoles(ctx context.Context, arg ListSharedUser
 
 const listSharedUsersByTenant = `-- name: ListSharedUsersByTenant :many
 SELECT 
-    u.id, u.profile, u.email, u.created_at, u.tenant_id, u.roles,
+    u.id, u.profile, u.email, u.created_at, u.tenant_id, u.roles, u.deletion_requested_at, u.deletion_scheduled_at, u.deletion_reason,
     utm.roles as tenant_roles,
     utm.status as membership_status,
     utm.joined_at
@@ -856,15 +1096,18 @@ type ListSharedUsersByTenantParams struct {
 }
 
 type ListSharedUsersByTenantRow struct {
-	ID               string                `json:"id"`
-	Profile          subentity.UserProfile `json:"profile"`
-	Email            pgtype.Text           `json:"email"`
-	CreatedAt        time.Time             `json:"created_at"`
-	TenantID         pgtype.Text           `json:"tenant_id"`
-	Roles            []string              `json:"roles"`
-	TenantRoles      []string              `json:"tenant_roles"`
-	MembershipStatus string                `json:"membership_status"`
-	JoinedAt         pgtype.Timestamptz    `json:"joined_at"`
+	ID                  string                `json:"id"`
+	Profile             subentity.UserProfile `json:"profile"`
+	Email               pgtype.Text           `json:"email"`
+	CreatedAt           time.Time             `json:"created_at"`
+	TenantID            pgtype.Text           `json:"tenant_id"`
+	Roles               []string              `json:"roles"`
+	DeletionRequestedAt pgtype.Timestamptz    `json:"deletion_requested_at"`
+	DeletionScheduledAt pgtype.Timestamptz    `json:"deletion_scheduled_at"`
+	DeletionReason      pgtype.Text           `json:"deletion_reason"`
+	TenantRoles         []string              `json:"tenant_roles"`
+	MembershipStatus    string                `json:"membership_status"`
+	JoinedAt            pgtype.Timestamptz    `json:"joined_at"`
 }
 
 func (q *Queries) ListSharedUsersByTenant(ctx context.Context, arg ListSharedUsersByTenantParams) ([]ListSharedUsersByTenantRow, error) {
@@ -888,6 +1131,9 @@ func (q *Queries) ListSharedUsersByTenant(ctx context.Context, arg ListSharedUse
 			&i.CreatedAt,
 			&i.TenantID,
 			&i.Roles,
+			&i.DeletionRequestedAt,
+			&i.DeletionScheduledAt,
+			&i.DeletionReason,
 			&i.TenantRoles,
 			&i.MembershipStatus,
 			&i.JoinedAt,
@@ -904,7 +1150,7 @@ func (q *Queries) ListSharedUsersByTenant(ctx context.Context, arg ListSharedUse
 
 const listSharedUsersByTenantAllStatuses = `-- name: ListSharedUsersByTenantAllStatuses :many
 SELECT
-    u.id, u.profile, u.email, u.created_at, u.tenant_id, u.roles,
+    u.id, u.profile, u.email, u.created_at, u.tenant_id, u.roles, u.deletion_requested_at, u.deletion_scheduled_at, u.deletion_reason,
     utm.roles as tenant_roles,
     utm.status as membership_status,
     utm.joined_at
@@ -928,15 +1174,18 @@ type ListSharedUsersByTenantAllStatusesParams struct {
 }
 
 type ListSharedUsersByTenantAllStatusesRow struct {
-	ID               string                `json:"id"`
-	Profile          subentity.UserProfile `json:"profile"`
-	Email            pgtype.Text           `json:"email"`
-	CreatedAt        time.Time             `json:"created_at"`
-	TenantID         pgtype.Text           `json:"tenant_id"`
-	Roles            []string              `json:"roles"`
-	TenantRoles      []string              `json:"tenant_roles"`
-	MembershipStatus string                `json:"membership_status"`
-	JoinedAt         pgtype.Timestamptz    `json:"joined_at"`
+	ID                  string                `json:"id"`
+	Profile             subentity.UserProfile `json:"profile"`
+	Email               pgtype.Text           `json:"email"`
+	CreatedAt           time.Time             `json:"created_at"`
+	TenantID            pgtype.Text           `json:"tenant_id"`
+	Roles               []string              `json:"roles"`
+	DeletionRequestedAt pgtype.Timestamptz    `json:"deletion_requested_at"`
+	DeletionScheduledAt pgtype.Timestamptz    `json:"deletion_scheduled_at"`
+	DeletionReason      pgtype.Text           `json:"deletion_reason"`
+	TenantRoles         []string              `json:"tenant_roles"`
+	MembershipStatus    string                `json:"membership_status"`
+	JoinedAt            pgtype.Timestamptz    `json:"joined_at"`
 }
 
 func (q *Queries) ListSharedUsersByTenantAllStatuses(ctx context.Context, arg ListSharedUsersByTenantAllStatusesParams) ([]ListSharedUsersByTenantAllStatusesRow, error) {
@@ -960,6 +1209,9 @@ func (q *Queries) ListSharedUsersByTenantAllStatuses(ctx context.Context, arg Li
 			&i.CreatedAt,
 			&i.TenantID,
 			&i.Roles,
+			&i.DeletionRequestedAt,
+			&i.DeletionScheduledAt,
+			&i.DeletionReason,
 			&i.TenantRoles,
 			&i.MembershipStatus,
 			&i.JoinedAt,
@@ -975,7 +1227,7 @@ func (q *Queries) ListSharedUsersByTenantAllStatuses(ctx context.Context, arg Li
 }
 
 const listTenantMembers = `-- name: ListTenantMembers :many
-SELECT utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles, utm.feature_licenses
+SELECT utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles, utm.feature_licenses, utm.dormant_purged_at
 FROM core_user_tenant_memberships utm
 WHERE utm.tenant_id = $1 AND utm.status = $2
 ORDER BY utm.created_at DESC
@@ -1007,6 +1259,7 @@ func (q *Queries) ListTenantMembers(ctx context.Context, arg ListTenantMembersPa
 			&i.UpdatedAt,
 			&i.Roles,
 			&i.FeatureLicenses,
+			&i.DormantPurgedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1020,7 +1273,7 @@ func (q *Queries) ListTenantMembers(ctx context.Context, arg ListTenantMembersPa
 
 const listUserTenantMemberships = `-- name: ListUserTenantMemberships :many
 SELECT 
-    utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles, utm.feature_licenses,
+    utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles, utm.feature_licenses, utm.dormant_purged_at,
     t.name as tenant_name,
     t.subdomain
 FROM core_user_tenant_memberships utm
@@ -1046,6 +1299,7 @@ type ListUserTenantMembershipsRow struct {
 	UpdatedAt       time.Time                       `json:"updated_at"`
 	Roles           []string                        `json:"roles"`
 	FeatureLicenses subentity.TenantFeatureLicenses `json:"feature_licenses"`
+	DormantPurgedAt pgtype.Timestamptz              `json:"dormant_purged_at"`
 	TenantName      string                          `json:"tenant_name"`
 	Subdomain       string                          `json:"subdomain"`
 }
@@ -1071,6 +1325,7 @@ func (q *Queries) ListUserTenantMemberships(ctx context.Context, arg ListUserTen
 			&i.UpdatedAt,
 			&i.Roles,
 			&i.FeatureLicenses,
+			&i.DormantPurgedAt,
 			&i.TenantName,
 			&i.Subdomain,
 		); err != nil {
@@ -1082,6 +1337,62 @@ func (q *Queries) ListUserTenantMemberships(ctx context.Context, arg ListUserTen
 		return nil, err
 	}
 	return items, nil
+}
+
+const listUsersDueForDeletion = `-- name: ListUsersDueForDeletion :many
+SELECT id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason FROM core_users
+WHERE deletion_scheduled_at IS NOT NULL
+  AND deletion_scheduled_at <= NOW()
+ORDER BY deletion_scheduled_at ASC
+LIMIT $1
+`
+
+// The cron job's queue. Ordered oldest-first so a backlog drains in the order
+// people asked.
+func (q *Queries) ListUsersDueForDeletion(ctx context.Context, limit int32) ([]CoreUser, error) {
+	rows, err := q.db.Query(ctx, listUsersDueForDeletion, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CoreUser{}
+	for rows.Next() {
+		var i CoreUser
+		if err := rows.Scan(
+			&i.ID,
+			&i.Profile,
+			&i.Email,
+			&i.CreatedAt,
+			&i.TenantID,
+			&i.Roles,
+			&i.DeletionRequestedAt,
+			&i.DeletionScheduledAt,
+			&i.DeletionReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markDormantDataPurged = `-- name: MarkDormantDataPurged :exec
+UPDATE core_user_tenant_memberships
+SET dormant_purged_at = NOW()
+WHERE user_id = $1 AND tenant_id = $2
+`
+
+type MarkDormantDataPurgedParams struct {
+	UserID   string `json:"user_id"`
+	TenantID string `json:"tenant_id"`
+}
+
+func (q *Queries) MarkDormantDataPurged(ctx context.Context, arg MarkDormantDataPurgedParams) error {
+	_, err := q.db.Exec(ctx, markDormantDataPurged, arg.UserID, arg.TenantID)
+	return err
 }
 
 const reactivateUserMembership = `-- name: ReactivateUserMembership :exec
@@ -1106,7 +1417,7 @@ SET roles = array_remove(roles, $1::TEXT), updated_at = NOW()
 WHERE user_id = $2 
   AND tenant_id = $3 
   AND $1::TEXT = ANY(roles)
-RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses, dormant_purged_at
 `
 
 type RemoveRoleFromUserTenantMembershipParams struct {
@@ -1130,6 +1441,7 @@ func (q *Queries) RemoveRoleFromUserTenantMembership(ctx context.Context, arg Re
 		&i.UpdatedAt,
 		&i.Roles,
 		&i.FeatureLicenses,
+		&i.DormantPurgedAt,
 	)
 	return i, err
 }
@@ -1149,6 +1461,40 @@ type RemoveSharedUserFromTenantParams struct {
 func (q *Queries) RemoveSharedUserFromTenant(ctx context.Context, arg RemoveSharedUserFromTenantParams) error {
 	_, err := q.db.Exec(ctx, removeSharedUserFromTenant, arg.UserID, arg.TenantID)
 	return err
+}
+
+const scheduleUserDeletion = `-- name: ScheduleUserDeletion :one
+UPDATE core_users
+SET deletion_requested_at = NOW(),
+    deletion_scheduled_at = $2,
+    deletion_reason = $3
+WHERE id = $1
+RETURNING id, profile, email, created_at, tenant_id, roles, deletion_requested_at, deletion_scheduled_at, deletion_reason
+`
+
+type ScheduleUserDeletionParams struct {
+	ID                  string             `json:"id"`
+	DeletionScheduledAt pgtype.Timestamptz `json:"deletion_scheduled_at"`
+	DeletionReason      pgtype.Text        `json:"deletion_reason"`
+}
+
+// Closes an account: stamps when it was asked for and when it fires. Nothing is
+// deleted here — a cron job executes past-due rows (ADR 040).
+func (q *Queries) ScheduleUserDeletion(ctx context.Context, arg ScheduleUserDeletionParams) (CoreUser, error) {
+	row := q.db.QueryRow(ctx, scheduleUserDeletion, arg.ID, arg.DeletionScheduledAt, arg.DeletionReason)
+	var i CoreUser
+	err := row.Scan(
+		&i.ID,
+		&i.Profile,
+		&i.Email,
+		&i.CreatedAt,
+		&i.TenantID,
+		&i.Roles,
+		&i.DeletionRequestedAt,
+		&i.DeletionScheduledAt,
+		&i.DeletionReason,
+	)
+	return i, err
 }
 
 const updateSharedProfile = `-- name: UpdateSharedProfile :one
@@ -1277,7 +1623,7 @@ SET roles = $2::TEXT[],
     updated_at = NOW()
 WHERE user_id = $1 
     AND tenant_id = $3
-RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses, dormant_purged_at
 `
 
 type UpdateSharedUserRolesInTenantParams struct {
@@ -1302,6 +1648,7 @@ func (q *Queries) UpdateSharedUserRolesInTenant(ctx context.Context, arg UpdateS
 		&i.UpdatedAt,
 		&i.Roles,
 		&i.FeatureLicenses,
+		&i.DormantPurgedAt,
 	)
 	return i, err
 }
@@ -1334,7 +1681,7 @@ const updateUserTenantMembershipJoinedAt = `-- name: UpdateUserTenantMembershipJ
 UPDATE core_user_tenant_memberships
 SET joined_at = $3, status = 'active', updated_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2
-RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses, dormant_purged_at
 `
 
 type UpdateUserTenantMembershipJoinedAtParams struct {
@@ -1358,6 +1705,7 @@ func (q *Queries) UpdateUserTenantMembershipJoinedAt(ctx context.Context, arg Up
 		&i.UpdatedAt,
 		&i.Roles,
 		&i.FeatureLicenses,
+		&i.DormantPurgedAt,
 	)
 	return i, err
 }
@@ -1366,7 +1714,7 @@ const updateUserTenantMembershipRoles = `-- name: UpdateUserTenantMembershipRole
 UPDATE core_user_tenant_memberships
 SET roles = $3, updated_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2
-RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses, dormant_purged_at
 `
 
 type UpdateUserTenantMembershipRolesParams struct {
@@ -1390,6 +1738,7 @@ func (q *Queries) UpdateUserTenantMembershipRoles(ctx context.Context, arg Updat
 		&i.UpdatedAt,
 		&i.Roles,
 		&i.FeatureLicenses,
+		&i.DormantPurgedAt,
 	)
 	return i, err
 }
@@ -1398,7 +1747,7 @@ const updateUserTenantMembershipStatus = `-- name: UpdateUserTenantMembershipSta
 UPDATE core_user_tenant_memberships
 SET status = $3, updated_at = NOW()
 WHERE user_id = $1 AND tenant_id = $2
-RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses
+RETURNING id, user_id, tenant_id, status, invited_by, invited_at, joined_at, created_at, updated_at, roles, feature_licenses, dormant_purged_at
 `
 
 type UpdateUserTenantMembershipStatusParams struct {
@@ -1422,6 +1771,7 @@ func (q *Queries) UpdateUserTenantMembershipStatus(ctx context.Context, arg Upda
 		&i.UpdatedAt,
 		&i.Roles,
 		&i.FeatureLicenses,
+		&i.DormantPurgedAt,
 	)
 	return i, err
 }

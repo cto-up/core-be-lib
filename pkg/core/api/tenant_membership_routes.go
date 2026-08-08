@@ -15,15 +15,10 @@ import (
 // authenticated caller: two act on "me", and four act on a workspace's
 // membership.
 func RegisterTenantMembershipRoutes(router gin.IRouter, h *TenantMembershipHandler, middlewares ...gin.HandlerFunc) {
-	// "My workspaces" and "my invitations" — the invitee's own view. Scoped to
-	// the caller by the handler, which reads the user from the auth context and
-	// never from the path, so one user cannot read another's invitations.
-	me := router.Group("/api/v1/users/me/tenants", middlewares...)
-	me.GET("", h.ListUserTenants)
-	me.GET("/pending", h.ListPendingInvitations)
-	me.POST("/:tenantId/accept", h.AcceptTenantInvitation)
-	me.POST("/:tenantId/reject", h.RejectTenantInvitation)
-
+	// The "me" group moved into the OpenAPI spec (ADR 040 §8) and is mounted by
+	// the generated router. Registering it here as well would bind each route
+	// twice and gin panics at boot.
+	//
 	// Workspace membership administration.
 	members := router.Group("/api/v1/tenants/:tenantId/members", middlewares...)
 	members.GET("", h.ListTenantMembers)

@@ -18,6 +18,219 @@ components:
       $ref: "./parts/auth/identify-schema.yaml"
     SocialSignInResult:
       $ref: "./parts/auth/social-complete-schema.yaml"
+    # Self-service membership lifecycle (ADR 040 in the LMS repo).
+    # Defined inline rather than in parts/: a schema part may only reference
+    # other parts, never back into this file, and these need Role, User and
+    # TenantFeatureLicenses.
+    TenantMembership:
+      type: object
+      description: >
+        One row of core_user_tenant_memberships joined to its tenant. Field names
+        are snake_case because this payload predates its spec — it is the sqlc
+        row, serialized as-is, and a live SPA already reads it. Renaming is a
+        separate, breaking decision.
+      required: [id, user_id, tenant_id, status, tenant_name, subdomain]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+        tenant_id:
+          type: string
+        status:
+          type: string
+          enum: [active, pending, inactive, rejected]
+          description: >
+            `inactive` is a membership that ended — left or removed. The row is
+            kept because reactivating it is what restores a returning member's
+            history.
+        invited_by:
+          type: string
+          nullable: true
+        invited_at:
+          type: string
+          format: date-time
+          nullable: true
+        joined_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Null while pending — only an accepted membership has joined.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        feature_licenses:
+          $ref: "#/components/schemas/TenantFeatureLicenses"
+        tenant_name:
+          type: string
+        subdomain:
+          type: string
+    LeaveImpact:
+      type: object
+      description: >
+        Contributed by the module that owns the data. Core cannot enumerate it,
+        so `key` is open-ended.
+      required: [key, severity]
+      properties:
+        module:
+          type: string
+          description: Module that contributed this impact, e.g. `lms`.
+        key:
+          type: string
+          description: >
+            Stable identifier used as a translation key by the SPA, e.g.
+            `lms.enrollments`, `lms.authoredPublishedCourses`,
+            `lms.activeSubscription`.
+        label:
+          type: string
+          description: Fallback text for a key the SPA has no translation for.
+        count:
+          type: integer
+        severity:
+          type: string
+          enum: [info, decision]
+          description: >
+            `info` is stated in the dialog. `decision` must be resolved by a
+            matching entry in LeaveTenantRequest.decisions.
+        actions:
+          type: array
+          description: Actions this decision accepts, in the order to offer them.
+          items:
+            type: string
+            enum: [transfer, keep, unpublish, cancelAtPeriodEnd]
+    LeaveTenantPreview:
+      type: object
+      description: >
+        What leaving would cost, and nothing else. Identity and membership facts
+        already came with the row this dialog was opened from.
+      required: [canLeaveNow, impacts]
+      properties:
+        canLeaveNow:
+          type: boolean
+          description: False while an impact of severity `decision` is unanswered.
+        dormantUntil:
+          type: string
+          format: date-time
+          description: >
+            When the tenant-scoped data kept for a possible return would be
+            purged if the caller leaves now. The membership row itself is never
+            purged — it is what makes returning a reactivation.
+        impacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaveImpact"
+    LeaveDecision:
+      type: object
+      description: One answer to an impact the preview reported with severity `decision`.
+      required: [key, action]
+      properties:
+        key:
+          type: string
+          description: The impact key being answered, e.g. `lms.authoredPublishedCourses`.
+        action:
+          type: string
+          enum: [transfer, keep, unpublish, cancelAtPeriodEnd]
+        targetUserId:
+          type: string
+          description: Required for `transfer` — the member the content moves to.
+    LeaveTenantRequest:
+      type: object
+      properties:
+        decisions:
+          type: array
+          description: >
+            One entry per impact the preview reported with severity `decision`.
+            Absent or incomplete, the leave is refused with 409 and the current
+            preview.
+          items:
+            $ref: "#/components/schemas/LeaveDecision"
+        reason:
+          type: string
+          maxLength: 500
+          description: Optional, free text. Product feedback only; never gates the leave.
+    LeaveTenantResult:
+      type: object
+      required: [membershipStatus]
+      properties:
+        membershipStatus:
+          type: string
+          enum: [inactive]
+          description: >
+            The row is kept, not deleted. Reactivating it is how a returning user
+            gets their history back.
+        dormantUntil:
+          type: string
+          format: date-time
+        seatReleased:
+          type: boolean
+    AccountDeletion:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [none, scheduled]
+        scheduledAt:
+          type: string
+          format: date-time
+          description: When the caller asked for deletion.
+        scheduledFor:
+          type: string
+          format: date-time
+          description: >
+            When the deletion executes. Until then the account can be recovered
+            by signing in and cancelling; after it, nothing is recoverable.
+        tenantsAffected:
+          type: integer
+          description: Memberships that end with the account.
+        exportAvailable:
+          type: boolean
+          description: Whether GET /api/v1/users/me/export can still be called.
+    AccountDeletionRequest:
+      type: object
+      required: [confirmEmail]
+      properties:
+        confirmEmail:
+          type: string
+          format: email
+          description: >
+            Must equal the caller's own email. Verified server-side — the typed
+            confirmation is a real check, not a client-side speed bump.
+        reason:
+          type: string
+          maxLength: 500
+    UserDataExport:
+      type: object
+      description: >
+        Assembled by core from what it owns, plus one section per registered data
+        contributor. Core cannot enumerate module data — `modules` is
+        deliberately open, and its keys are the contributors that answered, which
+        is also how a reader sees what the export covered.
+      required: [exportedAt, user, memberships, modules]
+      properties:
+        exportedAt:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/User"
+        memberships:
+          type: array
+          items:
+            $ref: "#/components/schemas/TenantMembership"
+        modules:
+          type: object
+          additionalProperties: true
+          description: >
+            Keyed by contributor name (`lms`, `aiemployee`, …). The shape of each
+            value is the contributing module's business, not core's.
     NewSignUp:
       type: object
       required:

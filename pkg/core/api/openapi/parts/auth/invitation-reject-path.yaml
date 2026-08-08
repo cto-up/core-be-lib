@@ -1,0 +1,36 @@
+post:
+  summary: Decline the invitation to the tenant of the current host
+  description: >
+    The membership row is kept as `rejected` rather than deleted, so re-inviting
+    somebody who already said no is a visible act rather than a silent retry. No
+    claim is written — declining grants nothing.
+
+
+    Outside the auth middleware for the same reason as the accept endpoint: the
+    invitee has no membership claim for the inviting tenant, so a call on that
+    host is rejected before any handler runs. The session is verified here and
+    the tenant comes from Origin.
+  operationId: rejectInvitation
+  tags:
+    - auth
+  responses:
+    "204":
+      description: Invitation declined
+    "401":
+      description: No valid session
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "404":
+      description: No pending invitation for this caller and tenant
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"

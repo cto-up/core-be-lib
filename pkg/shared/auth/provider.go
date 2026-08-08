@@ -230,6 +230,19 @@ type AuthClient interface {
 	// Custom Claims (Roles/Permissions)
 	SetCustomUserClaims(ctx context.Context, uid string, customClaims map[string]interface{}) error
 
+	// RemoveTenantMembershipClaim drops one tenant from the identity's
+	// tenant_memberships. This — not the database row — is what
+	// VerifyTokenWithTenantID reads, so it is the step that actually revokes
+	// access, and the claim is re-read from the provider on every request.
+	// Removing a membership that is not there is not an error.
+	RemoveTenantMembershipClaim(ctx context.Context, uid string, tenantID string) error
+
+	// RevokeSessions invalidates every session of an identity. Correct when the
+	// person is leaving the platform (account deletion); wrong when they leave
+	// one organization, since a session belongs to the identity and would sign
+	// them out of the tenants they kept.
+	RevokeSessions(ctx context.Context, uid string) error
+
 	// BuildGlobalRoleClaims creates a provider-specific claims map for global roles
 	// Kratos: {"global_roles": ["SUPER_ADMIN", "ADMIN"]}
 	BuildGlobalRoleClaims(roles []string) map[string]interface{}

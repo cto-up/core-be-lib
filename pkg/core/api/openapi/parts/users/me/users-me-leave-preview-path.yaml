@@ -1,0 +1,38 @@
+get:
+  summary: What leaving this tenant would cost the caller
+  description: >
+    Returns the impacts of leaving, so the confirmation dialog can state real
+    numbers instead of a generic warning. The tenant is the one the request is
+    addressed to — resolved from Origin/Host by TenantMiddleware, like every
+    other tenant-scoped call — never a caller-supplied id: you can only preview
+    leaving the organization you are currently signed in to.
+
+
+    Impacts are contributed by the modules that own user-attributed data (core
+    knows nothing about enrollments or authored courses), so the set of keys is
+    open-ended: render a known key from its translation, and fall back to
+    `label` for anything else. An impact with severity `decision` must be
+    resolved by the matching entry in the leave request; while one is
+    outstanding, `canLeaveNow` is false and POST .../leave answers 409.
+  operationId: getMyLeaveTenantPreview
+  tags:
+    - me
+  responses:
+    "200":
+      description: Leave preview
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/LeaveTenantPreview"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"

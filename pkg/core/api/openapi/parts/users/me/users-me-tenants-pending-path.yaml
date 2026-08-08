@@ -1,0 +1,30 @@
+get:
+  summary: Invitations awaiting the caller's answer
+  description: >
+    Pending memberships, with expired ones filtered out server-side: accepting
+    an expired invitation fails, and offering something that cannot be taken is
+    worse than showing nothing.
+  operationId: listMyPendingInvitations
+  tags:
+    - me
+  responses:
+    "200":
+      description: Pending invitations
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../../../core-schema.yaml#/components/schemas/TenantMembership"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"

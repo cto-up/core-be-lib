@@ -443,6 +443,85 @@ func (k *KratosAuthClient) SetCustomUserClaims(ctx context.Context, uid string, 
 	return auth.ConvertKratosError(err)
 }
 
+// RemoveTenantMembershipClaim drops one tenant from metadata_public.tenant_memberships.
+//
+// The counterpart of SetCustomUserClaims's upsert, and the step that actually
+// revokes access: VerifyTokenWithTenantID reads this array, never the database,
+// and VerifyIDToken re-reads it from Kratos on every request — so the next call
+// after this one is already refused. Setting the membership row to 'inactive'
+// without this reports success and revokes nothing.
+func (k *KratosAuthClient) RemoveTenantMembershipClaim(ctx context.Context, uid string, tenantID string) error {
+	log := util.GetLoggerFromCtx(ctx)
+	existing, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
+	if err != nil {
+		log.Err(err).Msg("Failed to get identity")
+		return auth.ConvertKratosError(err)
+	}
+
+	metadataPublic, ok := existing.MetadataPublic.(map[string]interface{})
+	if !ok {
+		// No metadata at all means no membership to remove. Not an error: the
+		// caller's goal — "this identity must not hold this tenant" — is met.
+		return nil
+	}
+
+	rawMemberships, ok := metadataPublic["tenant_memberships"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	kept := make([]interface{}, 0, len(rawMemberships))
+	removed := false
+	for _, m := range rawMemberships {
+		if mMap, isMap := m.(map[string]interface{}); isMap && mMap["tenant_id"] == tenantID {
+			removed = true
+			continue
+		}
+		kept = append(kept, m)
+	}
+	if !removed {
+		return nil
+	}
+	metadataPublic["tenant_memberships"] = kept
+
+	// The legacy single-tenant mirror is stale the moment it names the tenant
+	// being removed. Left behind, it is a second, contradictory answer to
+	// "which tenant is this identity in".
+	if tid, ok := metadataPublic["tenant_id"].(string); ok && tid == tenantID {
+		delete(metadataPublic, "tenant_id")
+		delete(metadataPublic, "subdomain")
+		delete(metadataPublic, "tenant_name")
+	}
+
+	traits, ok := existing.Traits.(map[string]interface{})
+	if !ok {
+		traits = make(map[string]interface{})
+	}
+	state := ""
+	if existing.State != nil {
+		state = string(*existing.State)
+	}
+	updateBody := *ory.NewUpdateIdentityBody(existing.SchemaId, state, traits)
+	updateBody.MetadataPublic = metadataPublic
+
+	_, _, err = k.adminClient.IdentityAPI.UpdateIdentity(ctx, uid).UpdateIdentityBody(updateBody).Execute()
+	return auth.ConvertKratosError(err)
+}
+
+// RevokeSessions invalidates every session of an identity.
+func (k *KratosAuthClient) RevokeSessions(ctx context.Context, uid string) error {
+	_, err := k.adminClient.IdentityAPI.DeleteIdentitySessions(ctx, uid).Execute()
+	if err != nil {
+		// Kratos answers 404 when the identity simply has no active session.
+		// That is the state the caller asked for, not a failure.
+		if auth.IsUserNotFound(auth.ConvertKratosError(err)) {
+			return nil
+		}
+		return auth.ConvertKratosError(err)
+	}
+	return nil
+}
+
 // BuildGlobalRoleClaims creates Kratos-specific claims format for global roles
 // Returns: {"global_roles": ["SUPER_ADMIN", "ADMIN"]}
 func (k *KratosAuthClient) BuildGlobalRoleClaims(roles []string) map[string]interface{} {

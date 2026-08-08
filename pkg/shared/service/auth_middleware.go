@@ -136,8 +136,18 @@ func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *auth.Authen
 func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.AuthenticatedUser) bool {
 	claims := user.Claims
 
+	// Self-service, and therefore exempt from the admin gate below: everything
+	// under /api/v1/users/me acts on the CALLER, resolved from the session and
+	// never from the path. The gate exists to stop one user mutating another; a
+	// learner leaving an organization or closing their own account is neither
+	// (ADR 040). Without this exemption the whole self-service lifecycle is
+	// reachable only by admins — that is, by nobody who needs it.
+	isSelfService := c.Request.URL.Path == "/api/v1/users/me" ||
+		strings.HasPrefix(c.Request.URL.Path, "/api/v1/users/me/")
+
 	// Only admin users can alter users
-	if strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
+	if !isSelfService &&
+		strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
 		util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
 
 		if claims[string(core.SUPERADMIN)] == true || claims[string(core.ADMIN)] == true || claims[string(core.CUSTOMERADMIN)] == true || claims[string(auth.ACTING_RESELLER)] == true {

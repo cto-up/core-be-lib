@@ -1,0 +1,110 @@
+get:
+  summary: Whether the caller's account is scheduled for deletion
+  description: >
+    Read by the SPA on sign-in so a returning user is intercepted before the app
+    loads and offered the chance to keep their account. `status` is `none` when
+    nothing is scheduled.
+  operationId: getMyAccountDeletion
+  tags:
+    - me
+  responses:
+    "200":
+      description: Deletion status
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/AccountDeletion"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+post:
+  summary: Schedule deletion of the caller's account
+  description: >
+    Closes the account across every tenant. Nothing is deleted, ended or revoked
+    synchronously: the account is stamped with a deletion date 30 days out, and
+    a daily sweeper performs the deletion — memberships, sessions and identity —
+    once that date passes. The grace period is what makes an account takeover
+    non-destructive and a change of mind cheap; signing in during the window
+    surfaces the cancel path.
+
+
+    Ending memberships now would make cancelling impossible: this endpoint's
+    DELETE sits behind the auth middleware, which rejects a session whose
+    identity holds no membership claim for the host tenant. To lose access
+    immediately, leave each organization instead.
+
+
+    `confirmEmail` must equal the caller's own email; the server checks it
+    rather than trusting the client's typed-confirmation dialog.
+  operationId: scheduleMyAccountDeletion
+  tags:
+    - me
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../../../core-schema.yaml#/components/schemas/AccountDeletionRequest"
+  responses:
+    "200":
+      description: Deletion scheduled
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/AccountDeletion"
+    "400":
+      description: confirmEmail does not match the caller
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "409":
+      description: A deletion is already scheduled
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/AccountDeletion"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+delete:
+  summary: Cancel a scheduled account deletion
+  description: >
+    Keeps the account. There is nothing to restore — scheduling ended no
+    membership, precisely so this call is reachable — so clearing the stamp is
+    the whole cancellation. Idempotent: with nothing scheduled, answers 200 with
+    status `none`.
+  operationId: cancelMyAccountDeletion
+  tags:
+    - me
+  responses:
+    "200":
+      description: Deletion cancelled
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/AccountDeletion"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"

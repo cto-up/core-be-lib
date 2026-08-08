@@ -26,7 +26,7 @@ func NewTenantMembershipHandler(
 	return &TenantMembershipHandler{
 		store:             store,
 		authProvider:      authProvider,
-		membershipService: service.NewUserTenantMembershipService(store),
+		membershipService: service.NewUserTenantMembershipServiceWithAuth(store, authProvider),
 	}
 }
 
@@ -46,6 +46,85 @@ func membershipErrorStatus(err error) int {
 	default:
 		return http.StatusInternalServerError
 	}
+}
+
+// ListMyTenants implements core.ServerInterface.
+// (GET /api/v1/users/me/tenants)
+func (h *TenantMembershipHandler) ListMyTenants(c *gin.Context) {
+	h.ListUserTenants(c)
+}
+
+// ListMyPendingInvitations implements core.ServerInterface.
+// (GET /api/v1/users/me/tenants/pending)
+func (h *TenantMembershipHandler) ListMyPendingInvitations(c *gin.Context) {
+	h.ListPendingInvitations(c)
+}
+
+// AcceptInvitation implements core.ServerInterface.
+// (POST /public-api/v1/invitations/accept)
+//
+// Public on purpose, exactly like /public-api/v1/auth/social/complete: an
+// invitee has a pending row and NO membership claim for the inviting tenant, so
+// the auth middleware — which evaluates against the host's tenant — would 401
+// them before this code ever ran. The session is verified here instead, and the
+// tenant comes from Origin (the invitation email links to the tenant's own
+// host). The alternative is letting the caller name a tenant, which is the one
+// thing tenancy in this codebase never does.
+func (h *TenantMembershipHandler) AcceptInvitation(c *gin.Context) {
+	userID, tenantID, ok := h.invitationCaller(c)
+	if !ok {
+		return
+	}
+
+	if err := h.membershipService.AcceptInvitation(c.Request.Context(), userID, tenantID); err != nil {
+		logCtxErr(c, err).
+			Str("tenant_id", tenantID).Msg("Failed to accept invitation")
+		c.JSON(membershipErrorStatus(err), helpers.ErrorResponse(err))
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// RejectInvitation implements core.ServerInterface.
+// (POST /public-api/v1/invitations/reject)
+func (h *TenantMembershipHandler) RejectInvitation(c *gin.Context) {
+	userID, tenantID, ok := h.invitationCaller(c)
+	if !ok {
+		return
+	}
+
+	if err := h.membershipService.RejectInvitation(c.Request.Context(), userID, tenantID); err != nil {
+		logCtxErr(c, err).
+			Str("tenant_id", tenantID).Msg("Failed to reject invitation")
+		c.JSON(membershipErrorStatus(err), helpers.ErrorResponse(err))
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// invitationCaller verifies the Kratos session itself — the auth middleware does
+// not run on /public-api — and resolves the tenant from the request's host.
+func (h *TenantMembershipHandler) invitationCaller(c *gin.Context) (string, string, bool) {
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
+	sessionToken := socialSessionToken(c)
+	if sessionToken == "" {
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(errors.New("no session")))
+		return "", "", false
+	}
+	token, err := h.authProvider.GetAuthClient().VerifyIDToken(c.Request.Context(), sessionToken)
+	if err != nil {
+		logger.Warn().Err(err).Msg("Invitation: session verification failed")
+		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(errors.New("invalid session")))
+		return "", "", false
+	}
+
+	tenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, helpers.ErrorResponse(errors.New("no tenant for this host")))
+		return "", "", false
+	}
+	return token.UID, tenantID, true
 }
 
 // ListUserTenants returns all tenants the current user belongs to

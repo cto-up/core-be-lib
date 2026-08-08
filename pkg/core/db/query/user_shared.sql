@@ -459,3 +459,78 @@ WHERE user_id = sqlc.arg(user_id)
     AND tenant_id = sqlc.arg(tenant_id)
     AND status = 'active'
 RETURNING user_id AS id;
+
+-- name: ScheduleUserDeletion :one
+-- Closes an account: stamps when it was asked for and when it fires. Nothing is
+-- deleted here — a cron job executes past-due rows (ADR 040).
+UPDATE core_users
+SET deletion_requested_at = NOW(),
+    deletion_scheduled_at = $2,
+    deletion_reason = $3
+WHERE id = $1
+RETURNING *;
+
+-- name: CancelUserDeletion :one
+-- Signing in during the grace period cancels. Idempotent: clearing a NULL is a
+-- no-op, which is what "keep my account" means when nothing was scheduled.
+UPDATE core_users
+SET deletion_requested_at = NULL,
+    deletion_scheduled_at = NULL,
+    deletion_reason = NULL
+WHERE id = $1
+RETURNING *;
+
+-- name: ListUsersDueForDeletion :many
+-- The cron job's queue. Ordered oldest-first so a backlog drains in the order
+-- people asked.
+SELECT * FROM core_users
+WHERE deletion_scheduled_at IS NOT NULL
+  AND deletion_scheduled_at <= NOW()
+ORDER BY deletion_scheduled_at ASC
+LIMIT $1;
+
+-- name: ListAllUserTenantMemberships :many
+-- Every membership of a user whatever its status. The status-filtered
+-- ListUserTenantMemberships answers "my organizations"; this one answers
+-- "everything that must be ended, exported or erased".
+SELECT 
+    utm.*,
+    t.name as tenant_name,
+    t.subdomain
+FROM core_user_tenant_memberships utm
+JOIN core_tenants t ON utm.tenant_id = t.tenant_id
+WHERE utm.user_id = $1
+ORDER BY utm.created_at DESC;
+
+-- name: GetUserTenantMembership :one
+SELECT 
+    utm.*,
+    t.name as tenant_name,
+    t.subdomain
+FROM core_user_tenant_memberships utm
+JOIN core_tenants t ON utm.tenant_id = t.tenant_id
+WHERE utm.user_id = $1 AND utm.tenant_id = $2
+LIMIT 1;
+
+-- name: DeleteAllUserTenantMemberships :exec
+DELETE FROM core_user_tenant_memberships WHERE user_id = $1;
+
+-- name: DeleteSharedUserRow :exec
+DELETE FROM core_users WHERE id = $1;
+
+-- name: ListMembershipsDueForDormancyPurge :many
+-- Memberships that ended longer ago than the dormancy window and whose
+-- tenant-scoped data has not been purged yet. The ROW is never deleted — it is
+-- the return path; only the data the return path no longer needs goes.
+SELECT user_id, tenant_id, updated_at
+FROM core_user_tenant_memberships
+WHERE status = 'inactive'
+  AND dormant_purged_at IS NULL
+  AND updated_at < $1
+ORDER BY updated_at ASC
+LIMIT $2;
+
+-- name: MarkDormantDataPurged :exec
+UPDATE core_user_tenant_memberships
+SET dormant_purged_at = NOW()
+WHERE user_id = $1 AND tenant_id = $2;

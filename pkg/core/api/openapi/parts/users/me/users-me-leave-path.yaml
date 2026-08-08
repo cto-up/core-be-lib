@@ -1,0 +1,71 @@
+post:
+  summary: Leave the current tenant (self-service)
+  description: >
+    The caller ends their own membership of the tenant this request is addressed
+    to — resolved from Origin/Host by TenantMiddleware, never named in the path
+    or the body. You leave the organization you are signed in to; the
+    Organizations page sends the browser to that organization's host first.
+    Distinct from closing an account: the identity survives, every other
+    membership survives, and the membership row survives as `inactive` — that
+    row is the return path, so a later invitation or self-service signup
+    reactivates it with the original joined_at and the learner's history intact.
+
+
+    Order matters. The tenant is removed from the identity's
+    `metadata_public.tenant_memberships` FIRST, because that claim — not the
+    membership row — is what VerifyTokenWithTenantID reads, and it is re-read
+    from Kratos on every request, so the next call is already refused. The row
+    is then set to `inactive` and the seat released. A row-only update would
+    report success and revoke nothing.
+
+
+    The Kratos session is left alone on purpose: it belongs to the identity, not
+    to a tenant, so revoking it would sign the member out of the organizations
+    they did not leave.
+
+
+    Any impact the preview reported with severity `decision` (authored published
+    courses, an active paid subscription) must be answered in `decisions`, or
+    the call is refused with 409 rather than silently orphaning content learners
+    are enrolled in. Leaving is deliberately NOT blocked on being the tenant's
+    last administrator.
+  operationId: leaveTenant
+  tags:
+    - me
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          $ref: "../../../core-schema.yaml#/components/schemas/LeaveTenantRequest"
+  responses:
+    "200":
+      description: Membership ended
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/LeaveTenantResult"
+    "401":
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "409":
+      description: An impact of severity `decision` is unresolved
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/LeaveTenantPreview"
+    "429":
+      description: Rate limited — leave/rejoin is capped per tenant per day
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "../../../core-schema.yaml#/components/schemas/ErrorSchema"

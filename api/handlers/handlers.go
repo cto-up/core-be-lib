@@ -22,6 +22,8 @@ type Handlers struct {
 	*core.TranslationHandler
 	*core.RecoveryHandler
 	*core.MFAHandler
+	*core.TenantMembershipHandler
+	*core.MembershipLifecycleHandler
 }
 
 func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool auth.AuthProvider, multiTenantService *access.MultitenantService, clientAppService *access.ClientApplicationService) Handlers {
@@ -38,6 +40,10 @@ func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool auth.AuthProvider
 		TranslationHandler:       core.NewTranslationHandler(store),
 		RecoveryHandler:          core.NewRecoveryHandler(authClientPool),
 		MFAHandler:               core.NewMFAHandler(authClientPool),
+		// Self-service membership lifecycle (ADR 040): the "me" membership
+		// reads and the invitation answers, plus leaving and closing an account.
+		TenantMembershipHandler:    core.NewTenantMembershipHandler(store, authClientPool),
+		MembershipLifecycleHandler: core.NewMembershipLifecycleHandler(store, authClientPool),
 	}
 	return handlers
 }
