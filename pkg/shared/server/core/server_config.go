@@ -79,8 +79,12 @@ var outerMiddlewares []gin.HandlerFunc
 //
 // Outermost is the correct position for a tracer specifically: the span must
 // enclose auth (a network round-trip to Kratos), tenant resolution and the
-// handler, or the trace shows a gap it cannot explain. It also means the tracer
-// sees panics before Recovery converts them into a 500.
+// handler, or the trace shows a gap it cannot explain.
+//
+// "Outermost" means outermost on GIN'S chain, under Recovery — see the block in
+// initializeServerConfig. A tracer in APIOptions.Middlewares would close its
+// span before the handler ran, and report every generated route as an empty
+// ~40µs 200.
 //
 // MUST be called before NewServerConfig. NewServerConfig is a sync.Once
 // singleton, so a later call is silently ignored — hence the panic, which turns
@@ -150,6 +154,28 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	// produced. Also before cors, so preflight cost counts as the server-side
 	// time it really is.
 	router.Use(observability.HTTPMetricsMiddleware())
+
+	// The access log goes here for both of the reasons above, and they apply to
+	// it just as literally.
+	//
+	// It was in APIOptions.Middlewares until roadmap 020 follow-up, where
+	// oapi-codegen's plain sequential invocation meant everything after its
+	// c.Next() ran BEFORE the handler: it recorded the default 200 and a ~40µs
+	// duration on every generated route, so a 500 from any generated handler
+	// was logged in Loki as a fast success. The Prometheus histogram had
+	// already been moved out for exactly this; the log line had not, and the
+	// two disagreed with nobody noticing because only one of them was ever read
+	// during an incident.
+	//
+	// OUTSIDE gin.Recovery(), same as metrics: a panic unwinds THROUGH this
+	// middleware, so anything it logs after c.Next() is skipped entirely unless
+	// Recovery has already converted the panic into a 500 further out. Inside
+	// Recovery, a panicking request produces no access-log line at all — the
+	// worst case, since a panic is the one failure you most want a line for.
+	// It skips /metrics and /healthz itself (see the middleware), so its
+	// position above their registration costs nothing.
+	router.Use(service.RequestIDMiddleware())
+
 	router.Use(gin.Recovery())
 	router.Use(cors)
 
@@ -180,6 +206,27 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	checks := append([]checks.Check{sqlCheck}, additionalChecks...)
 	setupHealthCheck(router, checks...)
 
+	// Consumer-supplied tracing goes on gin's chain too, and for the same reason
+	// the access log above does: from APIOptions.Middlewares, sentrygin's
+	// deferred span-finish ran before the handler, so every generated route was
+	// reported to Sentry as an empty ~40µs 200 — and the panics it exists to
+	// catch never reached it either, because its recover() had already returned.
+	//
+	// POSITION IS LOAD-BEARING, in three directions:
+	//
+	//   - UNDER gin.Recovery(), because sentrygin runs with Repanic: true. The
+	//     panic it re-raises must land in a Recovery still outside it, or the
+	//     client gets a dead connection instead of a 500.
+	//   - UNDER cors, so a preflight is answered without minting a transaction.
+	//   - AFTER /metrics and the health checks are registered, because gin
+	//     snapshots the chain at route-registration time. Prometheus scrapes
+	//     every few seconds and the runtime polls health continuously; neither
+	//     is worth a Sentry transaction. Register API surfaces BELOW this point
+	//     or they silently opt out of tracing.
+	for _, mw := range outerMiddlewares {
+		router.Use(mw)
+	}
+
 	multiTenantService := service.NewMultitenantService(coreStore)
 
 	authProvider, err := auth.InitializeAuthProvider(context.Background(), multiTenantService)
@@ -203,13 +250,16 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	// Auth dispatches through authSlot so WrapAuthMiddleware can layer
 	// behavior on top without depending on slice position.
 	//
-	// 0. RED metrics (roadmap 020 Tier 1.1) — FIRST, so the histogram covers
-	//    the entire server-side cost of the request. Anything placed above it
-	//    is time the metric cannot see and nobody can later explain.
-	// 1. Request ID middleware (also emits the structured access log)
-	// 2. Tenant middleware (extract tenant ID)
-	// 3. Auth middleware (verify token, via authSlot), separately timed
-	// 4. Logger enrichment (stamp tenant_id/user_id onto the request logger)
+	// This list holds only middleware that runs entirely BEFORE the handler and
+	// reports nothing afterwards. Anything that needs to observe the response —
+	// status, duration, a span to close — belongs on router.Use() instead; from
+	// here it would run to completion first and see a 200 that had not happened
+	// yet. Metrics, the access log and tracing all live there for that reason.
+	//
+	// 1. Tenant middleware (extract tenant ID)
+	// 2. Auth middleware (verify token, via authSlot), separately timed
+	// 3. Logger enrichment (stamp tenant_id/user_id onto the request logger,
+	//    which the access log on router.Use() then picks up)
 	//
 	// The auth step is BRACKETED by a timer pair because it makes a NETWORK
 	// round-trip to Kratos on every authenticated request. Roadmap 018 dropped
@@ -218,16 +268,11 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	// http_server_request_duration_seconds is that measurement.
 	authSlot := &authMiddlewareSlot{inner: authMiddleware.MiddlewareFunc()}
 
-	// Consumer-supplied outer middleware (tracing) goes ahead of everything, so
-	// its span encloses auth and the handler. Empty unless a consumer called
-	// RegisterOuterMiddleware.
-	for _, mw := range outerMiddlewares {
-		middlewares = append(middlewares, core.MiddlewareFunc(mw))
-	}
-
 	middlewares = append(middlewares,
-		// NOTE: HTTPMetricsMiddleware is NOT here — it is on router.Use() above.
-		core.MiddlewareFunc(service.RequestIDMiddleware()),
+		// NOTE: HTTPMetricsMiddleware, RequestIDMiddleware and the consumer's
+		// outer tracing middleware are NOT here — they are on router.Use()
+		// above, each with a comment saying why moving one back here breaks it
+		// silently.
 		core.MiddlewareFunc(tenantMiddleware.MiddlewareFunc()),
 		// AuthTimerStart / AuthTimerEnd MUST bracket auth adjacently — anything
 		// between them is counted as auth time. A single wrapping middleware
@@ -251,7 +296,6 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	handlers := handlers.CreateCoreHandlers(connPool, authProvider, multiTenantService, clientAppService)
 
 	core.RegisterHandlersWithOptions(router, handlers, apiOptions)
-
 
 	// Self-service membership (W1.1): invite / accept / decline, plus workspace
 	// member administration. Registered here rather than generated from the spec

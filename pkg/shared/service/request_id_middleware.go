@@ -11,10 +11,35 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// infraPaths are polled continuously by machines, never by a user, and a line
+// each in Loki buries the traffic anyone actually reads. Prometheus scrapes
+// /metrics every few seconds and the container runtime polls /healthz just as
+// often; between them they would be the majority of the access log.
+//
+// Skipping them here rather than by registration order is deliberate: it makes
+// the exclusion independent of where router.Use() sits relative to those two
+// routes, so the access log can be placed outside gin.Recovery() — the only
+// position from which it can observe a recovered panic. HTTPMetricsMiddleware
+// excludes /metrics from its own histogram the same way.
+var infraPaths = map[string]bool{
+	"/metrics": true,
+	"/healthz": true,
+}
+
 // RequestIDMiddleware is a Gin middleware to add a unique request ID to each request.
-// It also creates a request-scoped zerolog instance.
+// It also creates a request-scoped zerolog instance and emits the application
+// access log once the request has been handled.
+//
+// MUST be installed with router.Use(), NOT via APIOptions.Middlewares — see the
+// block in initializeServerConfig, and the regression tests in
+// request_id_middleware_test.go that fail if it moves back.
 func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if infraPaths[c.Request.URL.Path] {
+			c.Next()
+			return
+		}
+
 		requestID := c.GetHeader("X-Request-ID")
 		if requestID == "" {
 			requestID = uuid.New().String()
