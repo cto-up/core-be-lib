@@ -205,14 +205,28 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 				// Always derive TENANT_IS_RESELLER from DB so it stays accurate when:
 				//   - a tenant's reseller_id is assigned/removed
 				//   - a tenant is deleted by the reseller
-				// Only CUSTOMER_ADMIN users of a reseller-managed tenant get this flag.
+				// Only a CUSTOMER_ADMIN of the reseller tenant that actually manages
+				// the current tenant gets this flag — tid must be that reseller, or a
+				// CUSTOMER_ADMIN of any tenant would inherit admin rights on every
+				// reseller-managed tenant.
 				if hasCustAdmin {
-					if managed, err := k.multitenantService.IsActingReseller(ctx, tenantID); err == nil && managed {
+					if managed, err := k.multitenantService.IsResellerOf(ctx, tid, tenantID); err == nil && managed {
 						user.IsActingReseller = true
 						claims[auth.ACTING_RESELLER] = true
+						// A reseller's CUSTOMER_ADMIN *is* a CUSTOMER_ADMIN of every tenant
+						// that reseller manages, so grant the role itself rather than a
+						// parallel claim every call site would have to know about. The
+						// membership is synthetic — it exists for this request only and is
+						// never written to core_user_tenant_memberships.
+						//
+						// ACTING_RESELLER is kept alongside it so code that must tell an
+						// inherited admin from a native one still can. It does NOT widen the
+						// reseller role cap: granting ADMIN/SUPER_ADMIN is gated on
+						// IsAdmin/IsSuperAdmin, which this does not set.
+						claims[string(core.CUSTOMERADMIN)] = true
 						user.TenantMemberships = append(user.TenantMemberships, auth.TenantMembership{
 							TenantID: tenantID,
-							Roles:    []string{auth.ACTING_RESELLER},
+							Roles:    []string{string(core.CUSTOMERADMIN), auth.ACTING_RESELLER},
 						})
 						return user, nil
 					}

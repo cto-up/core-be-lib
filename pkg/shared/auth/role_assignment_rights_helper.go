@@ -19,8 +19,12 @@ const (
 )
 
 func HasRightsForRole(c *gin.Context, role core.Role) error {
-	if role == core.CUSTOMERADMIN && (!IsCustomerAdmin(c) && !IsSuperAdmin(c) && !IsAdmin(c)) {
-		return errors.New("must be at a CUSTOMER_ADMIN or SUPER_ADMIN or ADMIN to perform such operation")
+	// HasAdminPrivileges also covers the acting reseller, which has no
+	// CUSTOMER_ADMIN membership in the tenant it is switched into — its rights come
+	// from the ACTING_RESELLER claim instead — yet is expected to appoint the first
+	// CUSTOMER_ADMIN of a customer tenant.
+	if role == core.CUSTOMERADMIN && !HasAdminPrivileges(c) {
+		return errors.New("must be a CUSTOMER_ADMIN, acting reseller, ADMIN or SUPER_ADMIN to perform such operation")
 	}
 	if role == core.ADMIN && (!IsSuperAdmin(c) && !IsAdmin(c)) {
 		return errors.New("must be an ADMIN or SUPER_ADMIN to perform such operation")
@@ -226,4 +230,3 @@ func IsTenantCustomerAdmin(c *gin.Context) bool {
 	}
 	return false
 }
-
