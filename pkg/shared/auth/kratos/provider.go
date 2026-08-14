@@ -202,15 +202,15 @@ func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenant
 					}
 				}
 
-				// Always derive TENANT_IS_RESELLER from DB so it stays accurate when:
+				// Always derive the acting-reseller relation from the DB so it stays
+				// accurate when:
 				//   - a tenant's reseller_id is assigned/removed
 				//   - a tenant is deleted by the reseller
-				// Only a CUSTOMER_ADMIN of the reseller tenant that actually manages
-				// the current tenant gets this flag — tid must be that reseller, or a
-				// CUSTOMER_ADMIN of any tenant would inherit admin rights on every
-				// reseller-managed tenant.
+				// tid is the tenant where this user holds CUSTOMER_ADMIN; it must be the
+				// reseller of the tenant being entered, or a CUSTOMER_ADMIN of any tenant
+				// would inherit admin rights on every reseller-managed tenant.
 				if hasCustAdmin {
-					if managed, err := k.multitenantService.IsResellerOf(ctx, tid, tenantID); err == nil && managed {
+					if managed, err := k.multitenantService.IsActingResellerFor(ctx, tid, tenantID); err == nil && managed {
 						user.IsActingReseller = true
 						claims[auth.ACTING_RESELLER] = true
 						// A reseller's CUSTOMER_ADMIN *is* a CUSTOMER_ADMIN of every tenant

@@ -189,14 +189,15 @@ func (uh *MultitenantService) InvalidateTenantByID(ctx context.Context, id uuid.
 	getTenantCache().invalidate(tenant.TenantID)
 }
 
-// IsResellerOf reports whether resellerTenantID is the reseller that manages
+// IsActingResellerFor reports whether resellerTenantID acts as the reseller of
 // tenantID: tenantID.reseller_id must point at resellerTenantID, and that tenant
 // must actually carry is_reseller=true.
 //
-// The resellerTenantID comparison is what keeps ACTING_RESELLER from leaking
-// across resellers — asking only "is this tenant managed by someone?" would let
-// a CUSTOMER_ADMIN of any tenant act as admin on every reseller-managed tenant.
-func (uh *MultitenantService) IsResellerOf(ctx context.Context, resellerTenantID, tenantID string) (bool, error) {
+// This is the tenant-to-tenant relation behind the is_acting_reseller flag that
+// runs from the ACTING_RESELLER claim through to the frontend store. Both tenants
+// are required: asking only "is this tenant managed by someone?" would let a
+// CUSTOMER_ADMIN of any tenant act as admin on every reseller-managed tenant.
+func (uh *MultitenantService) IsActingResellerFor(ctx context.Context, resellerTenantID, tenantID string) (bool, error) {
 	if tenantID == "" || resellerTenantID == "" || resellerTenantID == tenantID {
 		return false, nil
 	}

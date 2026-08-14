@@ -92,7 +92,7 @@ type UserRecord struct {
 type MultitenantService interface {
 	GetTenantIDWithSubdomain(ctx context.Context, subdomain string) (string, error)
 	IsReseller(ctx context.Context, tenantID string) (bool, error)
-	IsResellerOf(ctx context.Context, resellerTenantID, tenantID string) (bool, error)
+	IsActingResellerFor(ctx context.Context, resellerTenantID, tenantID string) (bool, error)
 	GetTenantAllowSignUp(ctx context.Context, tenantID string) (bool, error)
 }
 
