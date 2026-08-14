@@ -25,6 +25,7 @@ sqlc:
 
 BASE_API_BE_DIR := api/openapi
 BASE_API_FE_DIR := ../core-fe-lib/lib/openapi
+BASE_API_FE_QN_DIR := ../core-fe-lib-vue-next/lib/openapi
 
 # Define the pattern to search for and replace
 SEARCH_STRING_1 := from \'./core
@@ -40,6 +41,7 @@ openapi:
 	@echo "Generating Core OpenAPI code"
 	@rm -rf $(BASE_API_FE_DIR)/core
 	openapi --input $(BASE_OPENAPI_CORE_DIR)/core-api.yaml --output $(BASE_API_FE_DIR)/core --client axios
+	openapi --input $(BASE_OPENAPI_CORE_DIR)/core-api.yaml --output $(BASE_API_FE_QN_DIR)/core --client axios
 	oapi-codegen -config $(BASE_OPENAPI_CORE_DIR)/parts/_oapi-schema-config.yaml $(BASE_OPENAPI_CORE_DIR)/core-schema.yaml
 	oapi-codegen -config $(BASE_OPENAPI_CORE_DIR)/parts/_oapi-service-config.yaml $(BASE_OPENAPI_CORE_DIR)/core-api.yaml
 
