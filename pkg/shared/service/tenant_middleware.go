@@ -33,9 +33,22 @@ func (fam *TenantMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			return
 		}
 
-		// Admin/auth subdomains have no tenant — let the request through with no
-		// tenant context.
-		if utils.IsAdminSubdomain(subdomain) || subdomain == "auth" {
+		// Infrastructure subdomains have no tenant — let the request through
+		// with no tenant context.
+		//
+		// "api" belongs here for the same reason as "auth": it names a vhost,
+		// never a tenant. It matters only for requests that arrive WITHOUT an
+		// Origin header, because GetHost prefers Origin and falls back to Host —
+		// so every normal browser call still resolves its tenant from Origin and
+		// is unaffected by this branch.
+		//
+		// Requests with no Origin are exactly the ones an external system makes:
+		// a provider redirecting a browser to an OAuth callback (a cross-site
+		// top-level navigation sends no Origin), or a webhook POST. Those used
+		// to resolve subdomain "api", find no tenant, and get 404 "Tenant not
+		// found" before reaching the handler — which in both cases carries its
+		// own tenant context anyway (the OAuth `state` row, the webhook id).
+		if utils.IsAdminSubdomain(subdomain) || subdomain == "auth" || subdomain == "api" {
 			ctx.Set(auth.AUTH_TENANT_ID_KEY, "")
 			ctx.Next()
 			return
