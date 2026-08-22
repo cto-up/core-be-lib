@@ -13,6 +13,7 @@ import (
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/util"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	ory "github.com/ory/kratos-client-go"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -1187,9 +1188,26 @@ func (k *KratosAuthClient) GetUserActivity(ctx context.Context, uids []string) (
 		return result, nil
 	}
 
+	// Kratos rejects the WHOLE batch with a 400 if a single id is not a valid
+	// UUID, and core_users still holds pre-Kratos Firebase uids (28-char
+	// strings) for accounts that were never migrated. Unfiltered, one such row
+	// blanks status and last sign-in for every other user on the page. They
+	// cannot have a Kratos identity anyway, so drop them here and let them fall
+	// through as "unknown".
+	kratosIDs := make([]string, 0, len(uids))
+	for _, uid := range uids {
+		if _, err := uuid.Parse(uid); err != nil {
+			continue
+		}
+		kratosIDs = append(kratosIDs, uid)
+	}
+	if len(kratosIDs) == 0 {
+		return result, nil
+	}
+
 	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).
-		Ids(uids).
-		PageSize(int64(len(uids))).
+		Ids(kratosIDs).
+		PageSize(int64(len(kratosIDs))).
 		Execute()
 	if err != nil {
 		log.Err(err).Msg("Failed to list identities for user activity")
@@ -1242,9 +1260,17 @@ func (k *KratosAuthClient) GetUserActivity(ctx context.Context, uids []string) (
 // Kratos still holds for an identity — expired ones included, since they are
 // the only evidence of an older sign-in. Returns nil once Kratos has pruned
 // them all.
+//
+// Kratos returns sessions ordered by issued_at descending, so the first page is
+// the newest ones and a small page is enough. It is still a max rather than
+// sessions[0]: re-authenticating an existing session (an MFA step-up) moves its
+// authenticated_at without moving its issued_at, so the newest sign-in is not
+// always the first row. A page this size costs little — each session carries a
+// full embedded identity and device list, and an active user accumulates
+// dozens.
 func (k *KratosAuthClient) lastAuthenticatedAt(ctx context.Context, uid string) (*time.Time, error) {
 	sessions, _, err := k.adminClient.IdentityAPI.ListIdentitySessions(ctx, uid).
-		PageSize(50).
+		PageSize(10).
 		Execute()
 	if err != nil {
 		return nil, auth.ConvertKratosError(err)
