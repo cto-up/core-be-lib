@@ -364,11 +364,13 @@ components:
           type: string
           format: date-time
           description: >-
-            When the user was last active — stamped by us on the request path,
-            accurate to within a few minutes. Distinct from
-            last_authenticated_at, which is the last time credentials were
-            entered and can be weeks earlier on a long-lived session. Null
-            means no activity recorded since the column was introduced.
+            When the user was last active: the later of our own request-path
+            stamp (throttled, so it lags by a few minutes) and their last
+            authentication, since signing in is itself activity. Never earlier
+            than last_authenticated_at. Distinct from last_authenticated_at,
+            which counts only credential entry and can be weeks older on a
+            long-lived session. Null means no activity recorded since the
+            column was introduced.
           nullable: true
         last_authenticated_at:
           type: string

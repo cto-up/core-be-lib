@@ -69,7 +69,7 @@ func TestLastSeenMapIsBounded(t *testing.T) {
 // authenticated request, including in setups that never wired a store.
 func TestLastSeenTouchIsSafeWhenDisabled(t *testing.T) {
 	var r *LastSeenRecorder
-	r.Touch(t.Context(), "u1")                      // nil receiver
+	r.Touch(t.Context(), "u1")                        // nil receiver
 	NewLastSeenRecorder(nil).Touch(t.Context(), "u1") // no store
 	NewLastSeenRecorder(nil).Touch(t.Context(), "")   // no user
 }

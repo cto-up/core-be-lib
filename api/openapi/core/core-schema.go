@@ -874,7 +874,7 @@ type User struct {
 	// LastAuthenticatedAt When the user most recently authenticated, taken from the newest session the auth provider still holds. Null means no session on record — which after session pruning is not the same as "never signed in".
 	LastAuthenticatedAt *time.Time `json:"last_authenticated_at"`
 
-	// LastSeenAt When the user was last active — stamped by us on the request path, accurate to within a few minutes. Distinct from last_authenticated_at, which is the last time credentials were entered and can be weeks earlier on a long-lived session. Null means no activity recorded since the column was introduced.
+	// LastSeenAt When the user was last active: the later of our own request-path stamp (throttled, so it lags by a few minutes) and their last authentication, since signing in is itself activity. Never earlier than last_authenticated_at. Distinct from last_authenticated_at, which counts only credential entry and can be weeks older on a long-lived session. Null means no activity recorded since the column was introduced.
 	LastSeenAt *time.Time `json:"last_seen_at"`
 
 	// MembershipStatus Membership status (active, inactive, etc.)

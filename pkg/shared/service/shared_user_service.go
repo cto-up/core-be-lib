@@ -478,21 +478,41 @@ func (uh *SharedUserService) EnrichWithAuthActivity(c *gin.Context, users []core
 	for i := range users {
 		a, ok := activity[users[i].Id]
 		if !ok {
+			// Could not ask the provider about this one — leave every field
+			// nil, which the UI reads as "unknown".
 			continue
 		}
-		if a.State != "" {
-			state := a.State
-			users[i].AuthState = &state
-		}
-		if !a.Found {
-			// No identity behind the row. Reporting "unverified, never signed
-			// in" here would read as facts about a person; they are just the
-			// zero value.
-			continue
-		}
-		verified := a.EmailVerified
-		users[i].EmailVerified = &verified
-		users[i].LastAuthenticatedAt = a.LastAuthenticatedAt
+		applyActivity(&users[i], a)
+	}
+}
+
+// applyActivity folds one provider answer into a user. Split out from
+// EnrichWithAuthActivity so the precedence rules are testable without a gin
+// context or a database.
+func applyActivity(user *core.User, a auth.UserActivity) {
+	if a.State != "" {
+		state := a.State
+		user.AuthState = &state
+	}
+	if !a.Found {
+		// No identity behind the row. Reporting "unverified, never signed in"
+		// here would read as facts about a person; they are just the zero
+		// value.
+		return
+	}
+
+	verified := a.EmailVerified
+	user.EmailVerified = &verified
+	user.LastAuthenticatedAt = a.LastAuthenticatedAt
+
+	// Signing in IS activity, and the provider records it the instant it
+	// happens, whereas our own stamp is throttled and lags by up to
+	// lastSeenInterval. Straight after a sign-in that made last_seen_at read
+	// *older* than last_authenticated_at — a pair that cannot be true. Both are
+	// evidence of the same thing, so the answer is the later one.
+	if a.LastAuthenticatedAt != nil &&
+		(user.LastSeenAt == nil || a.LastAuthenticatedAt.After(*user.LastSeenAt)) {
+		user.LastSeenAt = a.LastAuthenticatedAt
 	}
 }
 
