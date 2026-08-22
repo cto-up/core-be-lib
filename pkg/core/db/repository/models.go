@@ -140,6 +140,7 @@ type CoreUser struct {
 	DeletionScheduledAt pgtype.Timestamptz    `json:"deletion_scheduled_at"`
 	DeletionReason      pgtype.Text           `json:"deletion_reason"`
 	DeletionDecisions   []byte                `json:"deletion_decisions"`
+	LastSeenAt          pgtype.Timestamptz    `json:"last_seen_at"`
 }
 
 type CoreUserTenantMembership struct {

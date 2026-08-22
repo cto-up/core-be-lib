@@ -21,16 +21,20 @@ const (
 type AuthMiddleware struct {
 	authProvider auth.AuthProvider
 	apiToken     *ClientApplicationService
+	lastSeen     *LastSeenRecorder
 }
 
-// NewAuthMiddleware creates a new combined authentication middleware
+// NewAuthMiddleware creates a new combined authentication middleware.
+// lastSeen may be nil, which disables activity stamping.
 func NewAuthMiddleware(
 	authProvider auth.AuthProvider,
 	apiToken *ClientApplicationService,
+	lastSeen *LastSeenRecorder,
 ) *AuthMiddleware {
 	return &AuthMiddleware{
 		authProvider: authProvider,
 		apiToken:     apiToken,
+		lastSeen:     lastSeen,
 	}
 }
 
@@ -99,6 +103,12 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+
+		// Only past every gate: a request that was rejected is not activity by
+		// this user. Throttled and asynchronous, so it costs the request
+		// nothing.
+		am.lastSeen.Touch(c.Request.Context(), c.GetString(auth.AUTH_USER_ID))
+
 		c.Next()
 	}
 }

@@ -96,11 +96,12 @@ func (g *GlobalUserStrategy) ListUsers(c *gin.Context, store *db.Store, pagingSq
 	users := make([]core.User, len(adminUsers))
 	for j, membership := range adminUsers {
 		user := core.User{
-			Id:        membership.ID,
-			Name:      membership.Profile.Name,
-			Email:     membership.Email.String,
-			Roles:     convertToRoleDTOs(membership.Roles),
-			CreatedAt: &membership.CreatedAt,
+			Id:         membership.ID,
+			Name:       membership.Profile.Name,
+			Email:      membership.Email.String,
+			Roles:      convertToRoleDTOs(membership.Roles),
+			CreatedAt:  &membership.CreatedAt,
+			LastSeenAt: timePtr(membership.LastSeenAt),
 		}
 		users[j] = user
 	}

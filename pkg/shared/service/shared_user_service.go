@@ -48,6 +48,16 @@ func validateTenantScopedRoles(roles []core.Role) error {
 	return nil
 }
 
+// timePtr unwraps a nullable timestamp column. A NULL becomes nil rather than
+// the zero time, so "never seen" stays distinguishable from "seen at year 1".
+func timePtr(t pgtype.Timestamptz) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	v := t.Time
+	return &v
+}
+
 type StrategyType string
 
 const (
@@ -431,11 +441,12 @@ func (uh *SharedUserService) ListAllUsers(c *gin.Context, pagingSql sqlservice.P
 	users := make([]core.User, len(rows))
 	for i, row := range rows {
 		users[i] = core.User{
-			Id:        row.ID,
-			Name:      row.Profile.Name,
-			Email:     row.Email.String,
-			Roles:     convertToRoleDTOs(row.Roles),
-			CreatedAt: &row.CreatedAt,
+			Id:         row.ID,
+			Name:       row.Profile.Name,
+			Email:      row.Email.String,
+			Roles:      convertToRoleDTOs(row.Roles),
+			CreatedAt:  &row.CreatedAt,
+			LastSeenAt: timePtr(row.LastSeenAt),
 		}
 	}
 	return users, nil

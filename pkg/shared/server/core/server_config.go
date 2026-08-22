@@ -240,6 +240,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 	authMiddleware := service.NewAuthMiddleware(
 		authProvider,
 		clientAppService,
+		service.NewLastSeenRecorder(coreStore),
 	)
 
 	// Configure middleware order based on provider type

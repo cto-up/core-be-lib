@@ -282,7 +282,8 @@ SELECT
     email, 
     profile, 
     roles, 
-    created_at
+    created_at,
+    last_seen_at
 FROM core_users
 WHERE 
     -- Use GIN index for array overlap
@@ -305,7 +306,8 @@ SELECT
     email,
     profile,
     roles,
-    created_at
+    created_at,
+    last_seen_at
 FROM core_users
 WHERE
     email ILIKE sqlc.narg('search_prefix')::text || '%'
@@ -554,3 +556,8 @@ LIMIT 1;
 -- than normalised: they are an answer given at a moment in time, replayed once,
 -- and nothing else ever queries them.
 UPDATE core_users SET deletion_decisions = $2 WHERE id = $1;
+
+-- name: TouchSharedUserLastSeen :exec
+UPDATE core_users
+SET last_seen_at = NOW()
+WHERE id = $1;
