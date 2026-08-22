@@ -471,6 +471,15 @@ func (k *KratosAuthClient) RemoveTenantMembershipClaim(ctx context.Context, uid 
 	log := util.GetLoggerFromCtx(ctx)
 	existing, _, err := k.adminClient.IdentityAPI.GetIdentity(ctx, uid).Execute()
 	if err != nil {
+		// A user row can outlive its identity — records left behind by the
+		// earlier provider have none at all. There is then no claim holding the
+		// tenant, which is exactly what the caller asked for, so removing such a
+		// member must not fail the way it did with "user_not_found".
+		if converted := auth.ConvertKratosError(err); auth.IsUserNotFound(converted) {
+			log.Info().Str("user_id", uid).Str("tenant_id", tenantID).
+				Msg("No identity at the provider — no membership claim to remove")
+			return nil
+		}
 		log.Err(err).Msg("Failed to get identity")
 		return auth.ConvertKratosError(err)
 	}
