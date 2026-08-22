@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"ctoup.com/coreapp/pkg/shared/auth"
 	ory "github.com/ory/kratos-client-go"
 )
 
@@ -72,8 +73,13 @@ func TestGetUserActivitySkipsNonUUIDIDs(t *testing.T) {
 	if len(gotIDs) != 1 || gotIDs[0] != realID {
 		t.Errorf("sent ids = %v, want only the UUID %q", gotIDs, realID)
 	}
-	if _, ok := got[legacyID]; ok {
-		t.Errorf("legacy id %q should be absent, not fabricated", legacyID)
+	legacy, ok := got[legacyID]
+	if !ok {
+		t.Fatalf("legacy id %q should be reported, not silently dropped", legacyID)
+	}
+	if legacy.Found || legacy.State != auth.UserActivityStateMissing {
+		t.Errorf("legacy id = %+v, want not-found and state %q",
+			legacy, auth.UserActivityStateMissing)
 	}
 
 	real, ok := got[realID]
@@ -105,7 +111,13 @@ func TestGetUserActivityAllLegacyIDs(t *testing.T) {
 	if called {
 		t.Error("Kratos was called with no valid UUID to ask about")
 	}
-	if len(got) != 0 {
-		t.Errorf("got %v, want empty", got)
+	if len(got) != 2 {
+		t.Fatalf("got %v, want both ids reported as missing", got)
+	}
+	for id, a := range got {
+		if a.Found || a.State != auth.UserActivityStateMissing {
+			t.Errorf("%s = %+v, want not-found and state %q",
+				id, a, auth.UserActivityStateMissing)
+		}
 	}
 }

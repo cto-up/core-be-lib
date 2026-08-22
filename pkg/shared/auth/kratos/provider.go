@@ -1197,6 +1197,9 @@ func (k *KratosAuthClient) GetUserActivity(ctx context.Context, uids []string) (
 	kratosIDs := make([]string, 0, len(uids))
 	for _, uid := range uids {
 		if _, err := uuid.Parse(uid); err != nil {
+			// Not a UUID, so Kratos cannot be holding it. That is an answer,
+			// not a gap: the row has no identity behind it.
+			result[uid] = auth.UserActivity{State: auth.UserActivityStateMissing}
 			continue
 		}
 		kratosIDs = append(kratosIDs, uid)
@@ -1227,7 +1230,19 @@ func (k *KratosAuthClient) GetUserActivity(ctx context.Context, uids []string) (
 				break
 			}
 		}
-		result[ident.Id] = auth.UserActivity{State: state, EmailVerified: verified}
+		result[ident.Id] = auth.UserActivity{
+			Found:         true,
+			State:         state,
+			EmailVerified: verified,
+		}
+	}
+
+	// Kratos answered, so anything it left out genuinely does not exist there.
+	// Saying so beats leaving the row blank, which reads as "we don't know".
+	for _, id := range kratosIDs {
+		if _, ok := result[id]; !ok {
+			result[id] = auth.UserActivity{State: auth.UserActivityStateMissing}
+		}
 	}
 
 	g, gctx := errgroup.WithContext(ctx)

@@ -268,10 +268,20 @@ type AuthClient interface {
 	RequiresRecoveryProxy() bool
 }
 
+// UserActivityStateMissing is reported for a user the provider answered about
+// and does not have. It is not one of the provider's own states: it means the
+// row has no identity behind it at all, so nobody can sign in as it. Distinct
+// from an absent map entry, which means we could not ask.
+const UserActivityStateMissing = "missing"
+
 // UserActivity is the auth-provider-side view of an account: is it usable, and
 // when was it last used. It is derived from the provider, never stored by us.
 type UserActivity struct {
-	// State is the provider's identity state — "active" or "inactive".
+	// Found is false when the provider has no identity for this id. The other
+	// fields are then meaningless and must not be reported as facts.
+	Found bool
+	// State is the provider's identity state — "active" or "inactive" — or
+	// UserActivityStateMissing when Found is false.
 	State string
 	// EmailVerified is true when at least one verifiable address is verified.
 	EmailVerified bool

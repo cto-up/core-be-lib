@@ -473,6 +473,12 @@ func (uh *SharedUserService) EnrichWithAuthActivity(c *gin.Context, users []core
 			state := a.State
 			users[i].AuthState = &state
 		}
+		if !a.Found {
+			// No identity behind the row. Reporting "unverified, never signed
+			// in" here would read as facts about a person; they are just the
+			// zero value.
+			continue
+		}
 		verified := a.EmailVerified
 		users[i].EmailVerified = &verified
 		users[i].LastAuthenticatedAt = a.LastAuthenticatedAt
