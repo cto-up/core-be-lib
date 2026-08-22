@@ -441,6 +441,44 @@ func (uh *SharedUserService) ListAllUsers(c *gin.Context, pagingSql sqlservice.P
 	return users, nil
 }
 
+// EnrichWithAuthActivity fills auth_state, email_verified and
+// last_authenticated_at on an already-listed page of users. Kept out of the
+// list queries themselves because it costs auth-provider round trips, so
+// callers that only need names and ids (detail=basic pickers) skip it.
+// Best-effort: a provider failure logs and leaves the fields nil rather than
+// failing the whole list.
+func (uh *SharedUserService) EnrichWithAuthActivity(c *gin.Context, users []core.User) {
+	if len(users) == 0 || uh.authClientPool == nil {
+		return
+	}
+	logger := util.GetLoggerFromCtx(c.Request.Context())
+
+	uids := make([]string, 0, len(users))
+	for _, u := range users {
+		uids = append(uids, u.Id)
+	}
+
+	activity, err := uh.authClientPool.GetAuthClient().GetUserActivity(c.Request.Context(), uids)
+	if err != nil {
+		logger.Warn().Err(err).Msg("Failed to read user activity from auth provider")
+		return
+	}
+
+	for i := range users {
+		a, ok := activity[users[i].Id]
+		if !ok {
+			continue
+		}
+		if a.State != "" {
+			state := a.State
+			users[i].AuthState = &state
+		}
+		verified := a.EmailVerified
+		users[i].EmailVerified = &verified
+		users[i].LastAuthenticatedAt = a.LastAuthenticatedAt
+	}
+}
+
 func (uh *SharedUserService) AssignRole(c *gin.Context, authClient auth.AuthClient, tenantId string, userID string, role core.Role) error {
 	if tenantId != "" {
 		if err := validateTenantScopedRole(role); err != nil {

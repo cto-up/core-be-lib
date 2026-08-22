@@ -34,6 +34,10 @@ type UserService interface {
 	// for the admin (tenantless) domain so a super admin can find any user to
 	// promote to a global role. Returns global roles only.
 	ListAllUsers(c *gin.Context, pagingSql sqlservice.PagingSQL, like pgtype.Text) ([]core.User, error)
+	// EnrichWithAuthActivity fills auth_state, email_verified and
+	// last_authenticated_at from the auth provider, in place. Separate from the
+	// list calls because it costs provider round trips.
+	EnrichWithAuthActivity(c *gin.Context, users []core.User)
 
 	GetUserByEmailGlobal(c context.Context, email string) (*core.User, error)
 

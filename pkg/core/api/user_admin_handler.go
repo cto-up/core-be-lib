@@ -425,6 +425,7 @@ func (u *UserAdminHandler) ListUsers(c *gin.Context, params core.ListUsersParams
 		}
 		c.JSON(http.StatusOK, basicEntities)
 	} else {
+		u.userService.EnrichWithAuthActivity(c, users)
 		c.JSON(http.StatusOK, users)
 	}
 }

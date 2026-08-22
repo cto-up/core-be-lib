@@ -278,6 +278,7 @@ func (uh *UserSuperAdminHandler) ListUsersFromSuperAdmin(c *gin.Context, tenantI
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
+	uh.userService.EnrichWithAuthActivity(c, users)
 
 	c.JSON(http.StatusOK, users)
 }

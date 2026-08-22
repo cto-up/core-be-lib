@@ -351,6 +351,19 @@ components:
           type: string
           description: Membership status (active, inactive, etc.)
           nullable: true
+        auth_state:
+          type: string
+          description: Identity state at the auth provider (active, inactive). Null when the provider could not be reached.
+          nullable: true
+        last_authenticated_at:
+          type: string
+          format: date-time
+          description: >-
+            When the user most recently authenticated, taken from the newest
+            session the auth provider still holds. Null means no session on
+            record — which after session pruning is not the same as "never
+            signed in".
+          nullable: true
     UserProfileSchema:
       $ref: "./parts/users/user-profile-schema.yaml"
     UserActionSchema:

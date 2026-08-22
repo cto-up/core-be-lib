@@ -257,10 +257,28 @@ type AuthClient interface {
 	// Token Verification
 	VerifyIDToken(ctx context.Context, idToken string) (*Token, error)
 
+	// GetUserActivity returns account state and most-recent authentication time
+	// for a batch of users. Best-effort per user: an id the provider does not
+	// know is simply absent from the map.
+	GetUserActivity(ctx context.Context, uids []string) (map[string]UserActivity, error)
+
 	// Provider Capabilities
 	// RequiresRecoveryProxy returns true if the provider needs a backend proxy endpoint
 	// for password recovery (like Kratos), false if recovery links work directly (like Firebase)
 	RequiresRecoveryProxy() bool
+}
+
+// UserActivity is the auth-provider-side view of an account: is it usable, and
+// when was it last used. It is derived from the provider, never stored by us.
+type UserActivity struct {
+	// State is the provider's identity state — "active" or "inactive".
+	State string
+	// EmailVerified is true when at least one verifiable address is verified.
+	EmailVerified bool
+	// LastAuthenticatedAt is the newest session's authentication time. Nil means
+	// the provider holds no session for this user. Providers prune expired
+	// sessions, so nil is "nothing on record", not proof the user never signed in.
+	LastAuthenticatedAt *time.Time
 }
 
 // TenantManager defines the interface for multi-tenant authentication management

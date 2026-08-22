@@ -863,11 +863,16 @@ type Translation struct {
 
 // User defines model for User.
 type User struct {
+	// AuthState Identity state at the auth provider (active, inactive). Null when the provider could not be reached.
+	AuthState     *string    `json:"auth_state"`
 	CreatedAt     *time.Time `json:"created_at,omitempty"`
 	Disabled      *bool      `json:"disabled,omitempty"`
 	Email         string     `json:"email"`
 	EmailVerified *bool      `json:"email_verified,omitempty"`
 	Id            string     `json:"id"`
+
+	// LastAuthenticatedAt When the user most recently authenticated, taken from the newest session the auth provider still holds. Null means no session on record — which after session pruning is not the same as "never signed in".
+	LastAuthenticatedAt *time.Time `json:"last_authenticated_at"`
 
 	// MembershipStatus Membership status (active, inactive, etc.)
 	MembershipStatus *string            `json:"membership_status"`

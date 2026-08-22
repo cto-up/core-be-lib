@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"ctoup.com/coreapp/api/openapi/core"
@@ -14,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	ory "github.com/ory/kratos-client-go"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 )
 
 func init() {
@@ -1170,4 +1172,93 @@ func convertKratosIdentityToUserRecord(ident *ory.Identity) *auth.UserRecord {
 		CreatedAt:     createdAt,
 		CustomClaims:  traits, // Map traits to claims
 	}
+}
+
+// GetUserActivity reads identity state and last-authentication time for a page
+// of users. State comes from one batched ListIdentities call; the last
+// authentication time needs one session listing per identity, because Kratos
+// has no bulk "sessions by identity ids" endpoint — so those run concurrently
+// with a small bound. Individual failures are logged and skipped: a users list
+// must still render when Kratos is degraded.
+func (k *KratosAuthClient) GetUserActivity(ctx context.Context, uids []string) (map[string]auth.UserActivity, error) {
+	log := util.GetLoggerFromCtx(ctx)
+	result := make(map[string]auth.UserActivity, len(uids))
+	if len(uids) == 0 {
+		return result, nil
+	}
+
+	idents, _, err := k.adminClient.IdentityAPI.ListIdentities(ctx).
+		Ids(uids).
+		PageSize(int64(len(uids))).
+		Execute()
+	if err != nil {
+		log.Err(err).Msg("Failed to list identities for user activity")
+		return nil, auth.ConvertKratosError(err)
+	}
+
+	var mu sync.Mutex
+	for _, ident := range idents {
+		state := ""
+		if ident.State != nil {
+			state = *ident.State
+		}
+		verified := false
+		for _, addr := range ident.VerifiableAddresses {
+			if addr.Verified {
+				verified = true
+				break
+			}
+		}
+		result[ident.Id] = auth.UserActivity{State: state, EmailVerified: verified}
+	}
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(8)
+	for _, ident := range idents {
+		id := ident.Id
+		g.Go(func() error {
+			last, err := k.lastAuthenticatedAt(gctx, id)
+			if err != nil {
+				log.Warn().Err(err).Str("identity_id", id).Msg("Failed to read identity sessions")
+				return nil
+			}
+			if last == nil {
+				return nil
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			activity := result[id]
+			activity.LastAuthenticatedAt = last
+			result[id] = activity
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	return result, nil
+}
+
+// lastAuthenticatedAt returns the newest authenticated_at across the sessions
+// Kratos still holds for an identity — expired ones included, since they are
+// the only evidence of an older sign-in. Returns nil once Kratos has pruned
+// them all.
+func (k *KratosAuthClient) lastAuthenticatedAt(ctx context.Context, uid string) (*time.Time, error) {
+	sessions, _, err := k.adminClient.IdentityAPI.ListIdentitySessions(ctx, uid).
+		PageSize(50).
+		Execute()
+	if err != nil {
+		return nil, auth.ConvertKratosError(err)
+	}
+
+	var newest *time.Time
+	for i := range sessions {
+		at := sessions[i].AuthenticatedAt
+		if at == nil {
+			continue
+		}
+		if newest == nil || at.After(*newest) {
+			newest = at
+		}
+	}
+	return newest, nil
 }
