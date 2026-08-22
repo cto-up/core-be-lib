@@ -84,6 +84,18 @@ func ConvertKratosError(err error) error {
 					Message: "A user with this email address already exists.",
 				}
 			}
+			// Kratos answers a missing identity with a bare 404 carrying no
+			// error id, so without this it fell through as a generic
+			// "kratos-error: Unable to locate the resource". Callers that
+			// legitimately tolerate a missing identity — every deletion path —
+			// test IsUserNotFound, and so were failing on rows whose identity
+			// no longer exists.
+			if eg.Error.Code != nil && *eg.Error.Code == 404 {
+				return &AuthError{
+					Code:    ErrorCodeUserNotFound,
+					Message: "No such user at the authentication provider.",
+				}
+			}
 		} else if fe, ok := model.(ory.FlowError); ok {
 			// Some flows (like settings/login) return FlowError
 			if fe.Id != "" {
@@ -107,6 +119,12 @@ func ConvertKratosError(err error) error {
 				return &AuthError{
 					Code:    ErrorCodeEmailAlreadyExists,
 					Message: "A user with this email address already exists.",
+				}
+			}
+			if raw.Error.Code == 404 {
+				return &AuthError{
+					Code:    ErrorCodeUserNotFound,
+					Message: "No such user at the authentication provider.",
 				}
 			}
 			if raw.Error.ID != "" {
