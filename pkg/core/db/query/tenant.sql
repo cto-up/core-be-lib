@@ -12,7 +12,9 @@ WHERE subdomain = $1 LIMIT 1;
 
 -- name: ListTenants :many
 SELECT * FROM core_tenants
-WHERE (UPPER(name) LIKE UPPER(sqlc.narg('like')) OR sqlc.narg('like') IS NULL)
+WHERE (sqlc.narg('like')::text IS NULL
+       OR UPPER(name) LIKE UPPER(sqlc.narg('like')::text)
+       OR UPPER(subdomain) LIKE UPPER(sqlc.narg('like')::text))
 AND (reseller_id = sqlc.narg('reseller_id') OR sqlc.narg('reseller_id') IS NULL)
 ORDER BY
   CASE

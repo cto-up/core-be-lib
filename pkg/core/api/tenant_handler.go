@@ -422,8 +422,10 @@ func (exh *TenantHandler) ListTenants(c *gin.Context, params api.ListTenantsPara
 		Valid: false,
 	}
 
-	if params.Q != nil {
-		like.String = *params.Q + "%"
+	// Substring match so the caller can search on any part of the name or
+	// subdomain, not just its first characters.
+	if params.Q != nil && *params.Q != "" {
+		like.String = "%" + *params.Q + "%"
 		like.Valid = true
 	}
 

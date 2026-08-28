@@ -32,7 +32,7 @@ get:
         enum: [asc, desc]
     - name: q
       in: query
-      description: starts with
+      description: case-insensitive substring match on tenant name or subdomain
       required: false
       schema:
         type: string

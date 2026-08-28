@@ -464,7 +464,7 @@ type ListTenantsParams struct {
 	// Order sort order
 	Order *ListTenantsParamsOrder `form:"order,omitempty" json:"order,omitempty"`
 
-	// Q starts with
+	// Q case-insensitive substring match on tenant name or subdomain
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
 
 	// ResellerId filter by reseller id

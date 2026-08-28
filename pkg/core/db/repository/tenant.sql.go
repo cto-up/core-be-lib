@@ -286,7 +286,9 @@ func (q *Queries) ListResellerTenants(ctx context.Context, userID string) ([]Cor
 
 const listTenants = `-- name: ListTenants :many
 SELECT id, tenant_id, name, subdomain, allow_password_sign_up, user_id, created_at, updated_at, profile, features, allow_sign_up, is_reseller, reseller_id, contract_end_date, is_disabled, feature_licenses FROM core_tenants
-WHERE (UPPER(name) LIKE UPPER($3) OR $3 IS NULL)
+WHERE ($3::text IS NULL
+       OR UPPER(name) LIKE UPPER($3::text)
+       OR UPPER(subdomain) LIKE UPPER($3::text))
 AND (reseller_id = $4 OR $4 IS NULL)
 ORDER BY
   CASE
@@ -306,7 +308,7 @@ OFFSET $2
 type ListTenantsParams struct {
 	Limit      int32       `json:"limit"`
 	Offset     int32       `json:"offset"`
-	Like       interface{} `json:"like"`
+	Like       pgtype.Text `json:"like"`
 	ResellerID pgtype.Text `json:"reseller_id"`
 	Order      string      `json:"order"`
 	SortBy     string      `json:"sortBy"`
