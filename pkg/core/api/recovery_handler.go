@@ -122,6 +122,40 @@ func (h *RecoveryHandler) HandleRecovery(c *gin.Context, params core.HandleRecov
 	}
 	defer resp.Body.Close()
 
+	// A rejected token — expired, already used, or from another flow — is not
+	// reported as an HTTP error. Kratos still answers 303, but it points at the
+	// recovery UI with a brand-new *recovery* flow id and issues no session.
+	// Reading the flow id out of that Location, as the redirect case below does,
+	// would hand the caller a recovery flow while telling it recovery succeeded.
+	// The session cookie is the only thing that separates the two redirects.
+	hasSession := false
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name == "ory_kratos_session" {
+			hasSession = true
+			break
+		}
+	}
+
+	isRedirect := resp.StatusCode == http.StatusSeeOther ||
+		resp.StatusCode == http.StatusFound ||
+		resp.StatusCode == http.StatusMovedPermanently
+
+	if isRedirect && !hasSession {
+		body, _ := io.ReadAll(resp.Body)
+		logger.Warn().
+			Str("flow", flowID).
+			Int("status", resp.StatusCode).
+			Str("location", resp.Header.Get("Location")).
+			Str("response", string(body)).
+			Msg("Recovery failed - Kratos issued no session for the token")
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "Recovery link is invalid or expired",
+		})
+		return
+	}
+
 	// Copy session cookies from Kratos response to client
 	// This logs the user in
 	// IMPORTANT: We need to set the cookie domain to the base domain (e.g., .localhost)
