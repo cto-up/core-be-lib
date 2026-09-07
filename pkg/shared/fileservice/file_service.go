@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"cloud.google.com/go/storage" // GCS client
@@ -184,7 +184,15 @@ func createS3BucketIfNotExists(ctx context.Context, bucketName string) error {
 		return nil
 	}
 
-	var apiError types.NotFound
+	// `*types.NotFound` is what implements error, not `types.NotFound`, so the
+	// value form made errors.As PANIC on every HeadBucket failure. `go vet`
+	// catches this, but it had never run here — the package had no test file.
+	//
+	// NOTE: the condition below also reads inverted (it creates the bucket when
+	// the error is NOT NotFound). Left as it was deliberately: this path needs a
+	// real S3 account to exercise, and quietly changing bucket provisioning is
+	// not something to bundle into a range-request fix. Worth its own change.
+	var apiError *types.NotFound
 	if !errors.As(err, &apiError) {
 		log.Info().Msgf("S3 bucket not found, creating it now.")
 		_, err = client.CreateBucket(ctx, &s3.CreateBucketInput{
@@ -315,77 +323,181 @@ func (fs *FileService) ReadFileBytes(ctx context.Context, filename string) ([]by
 	return io.ReadAll(reader)
 }
 
-// GetFile retrieves a file from the specified bucket and writes its contents to the HTTP response.
-// It supports ETag-based caching for improved performance.
+// GetFile streams a file from the bucket to the HTTP response, with ETag
+// revalidation and byte-range support.
+//
+// Ranges matter for more than seeking convenience. A browser will not let a
+// user scrub a <video>/<audio> element at all unless the origin answers a
+// ranged request with 206 — a 200 produces media that plays from the start and
+// cannot be sought, with nothing in the console to say why. PDF.js and any
+// resumable download need the same.
+//
+// It also streams rather than buffering. The previous implementation read the
+// whole object into memory to hash it for the ETag, so serving one 150 MB
+// lesson video cost 150 MB of heap per concurrent request.
 func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {
 	logger := util.GetLoggerFromCtx(ctx)
-	// Create a new reader to the specified file.
-	reader, err := fs.bucket.NewReader(ctx, filename, nil)
+
+	attrs, err := fs.bucket.Attributes(ctx, filename)
 	if err != nil {
 		if gcerrors.Code(err) == gcerrors.NotFound {
 			logger.Warn().Msgf("Failed to find file %s", filename)
-			ctx.AbortWithStatus(404)
+			ctx.AbortWithStatus(http.StatusNotFound)
 		} else {
-			logger.Err(err).Msgf("Failed to open file %s", filename)
-			ctx.AbortWithError(500, err)
+			logger.Err(err).Msgf("Failed to stat file %s", filename)
+			ctx.AbortWithError(http.StatusInternalServerError, err)
 		}
 		return err
 	}
-	defer reader.Close()
 
-	// Read the file content to generate ETag
-	content, err := io.ReadAll(reader)
-	if err != nil {
-		logger.Err(err).Msg("Failed to read file content")
-		ctx.AbortWithError(500, err)
-		return err
-	}
+	etag := etagFor(attrs)
 
-	// Generate ETag based on content hash
-	etag := fs.generateETag(content)
-
-	// Set content type based on file extension
-	contentType := fs.getContentType(filename)
-
-	// Set cache headers
 	ctx.Header("ETag", etag)
-	ctx.Header("Content-Type", contentType)
-	ctx.Header("Cache-Control", "public, max-age=3600") // Cache for 1 hour
-
-	// Add headers to encourage caching for CORS requests
+	ctx.Header("Content-Type", fs.getContentType(filename))
+	ctx.Header("Cache-Control", "public, max-age=3600")
+	// Advertised unconditionally: a client that cannot see Accept-Ranges will
+	// not attempt a ranged request in the first place.
+	ctx.Header("Accept-Ranges", "bytes")
 	ctx.Header("Vary", "Origin, Authorization")
-	ctx.Header("Access-Control-Expose-Headers", "ETag, Cache-Control")
+	ctx.Header("Access-Control-Expose-Headers", "ETag, Cache-Control, Accept-Ranges, Content-Range")
 
-	// Check if client has cached version
-	// Note: Even if client sends Cache-Control: no-cache, we still check ETag
-	// This allows conditional requests to work properly
+	// Even when the client sends Cache-Control: no-cache we still honour the
+	// validator, so conditional requests work as intended.
 	if clientETag := ctx.GetHeader("If-None-Match"); clientETag != "" {
-		// Remove quotes if present
-		clientETag = strings.Trim(clientETag, `"`)
-		serverETag := strings.Trim(etag, `"`)
-
-		if clientETag == serverETag {
-			// Override any no-cache directives for unchanged content
+		if strings.Trim(clientETag, `"`) == strings.Trim(etag, `"`) {
 			ctx.Header("Cache-Control", "public, max-age=3600")
 			ctx.Status(http.StatusNotModified)
 			return nil
 		}
 	}
 
-	// Write the blob contents to the response.
-	if _, err = ctx.Writer.Write(content); err != nil {
-		logger.Err(err).Msg("Failed to write file to response writer")
-		ctx.AbortWithError(500, err)
+	offset, length, status, err := resolveRange(ctx.GetHeader("Range"), attrs.Size)
+	if err != nil {
+		// RFC 9110: an unsatisfiable range is answered with the object's real
+		// size so the client can correct itself rather than guess.
+		ctx.Header("Content-Range", fmt.Sprintf("bytes */%d", attrs.Size))
+		ctx.AbortWithStatus(http.StatusRequestedRangeNotSatisfiable)
+		return err
+	}
+
+	if status == http.StatusPartialContent {
+		ctx.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", offset, offset+length-1, attrs.Size))
+	}
+	ctx.Header("Content-Length", fmt.Sprintf("%d", length))
+
+	// length -1 means "to the end" for NewRangeReader, but we have already
+	// resolved it to a concrete count so Content-Length can be exact.
+	reader, err := fs.bucket.NewRangeReader(ctx, filename, offset, length, nil)
+	if err != nil {
+		if gcerrors.Code(err) == gcerrors.NotFound {
+			ctx.AbortWithStatus(http.StatusNotFound)
+		} else {
+			logger.Err(err).Msgf("Failed to open file %s", filename)
+			ctx.AbortWithError(http.StatusInternalServerError, err)
+		}
+		return err
+	}
+	defer reader.Close()
+
+	ctx.Status(status)
+	if _, err := io.Copy(ctx.Writer, reader); err != nil {
+		// The status and headers are already on the wire, so there is no way to
+		// turn this into an error response — the client sees a truncated body.
+		// Log it and return; calling AbortWithError here would only add a
+		// spurious second status.
+		logger.Err(err).Msgf("Failed while streaming file %s", filename)
 		return err
 	}
 
 	return nil
 }
 
-// generateETag creates an ETag based on the file content hash
-func (fs *FileService) generateETag(content []byte) string {
-	hash := md5.Sum(content)
-	return fmt.Sprintf(`"%x"`, hash)
+// etagFor derives a cache validator from object metadata rather than from the
+// bytes, so the whole object never has to be read to serve a conditional
+// request.
+//
+// Where the driver reports a content MD5 (S3, GCS) this reproduces the value
+// the previous content-hashing implementation produced, so existing caches stay
+// valid. Where it does not (fileblob), size and mod-time identify the version
+// well enough for a validator.
+func etagFor(attrs *blob.Attributes) string {
+	if len(attrs.MD5) > 0 {
+		return fmt.Sprintf(`"%x"`, attrs.MD5)
+	}
+	return fmt.Sprintf(`"%d-%d"`, attrs.Size, attrs.ModTime.UnixNano())
+}
+
+// errUnsatisfiableRange is returned for a syntactically valid Range header that
+// cannot be served against this object's size.
+var errUnsatisfiableRange = errors.New("requested range not satisfiable")
+
+// resolveRange turns a Range header into a concrete (offset, length) pair.
+//
+// Returns 200 and the whole object when the header is absent or is not a form
+// we serve; a malformed header is deliberately IGNORED rather than rejected, as
+// RFC 9110 requires — refusing it would break clients that send something
+// unexpected but would be perfectly happy with the entire body.
+//
+// Only single ranges are supported. Multipart/byteranges buys nothing for media
+// playback and doubles the surface area.
+func resolveRange(header string, size int64) (offset, length int64, status int, err error) {
+	const prefix = "bytes="
+	spec, ok := strings.CutPrefix(strings.TrimSpace(header), prefix)
+	if header == "" || !ok || strings.Contains(spec, ",") {
+		return 0, size, http.StatusOK, nil
+	}
+
+	start, end, ok := strings.Cut(spec, "-")
+	if !ok {
+		return 0, size, http.StatusOK, nil
+	}
+	start, end = strings.TrimSpace(start), strings.TrimSpace(end)
+
+	switch {
+	case start == "" && end == "":
+		return 0, size, http.StatusOK, nil
+
+	case start == "":
+		// Suffix form, "bytes=-N": the LAST n bytes. Used by PDF readers to
+		// find a trailer without fetching the file.
+		n, convErr := strconv.ParseInt(end, 10, 64)
+		if convErr != nil {
+			return 0, size, http.StatusOK, nil
+		}
+		if n <= 0 {
+			return 0, 0, 0, errUnsatisfiableRange
+		}
+		if n > size {
+			n = size
+		}
+		return size - n, n, http.StatusPartialContent, nil
+
+	default:
+		from, convErr := strconv.ParseInt(start, 10, 64)
+		if convErr != nil || from < 0 {
+			return 0, size, http.StatusOK, nil
+		}
+		// A start at or past the end is unsatisfiable — the one case a client
+		// must be told about, since it means its idea of the size is wrong.
+		if from >= size {
+			return 0, 0, 0, errUnsatisfiableRange
+		}
+
+		to := size - 1 // open-ended "bytes=N-"
+		if end != "" {
+			parsed, convErr := strconv.ParseInt(end, 10, 64)
+			if convErr != nil {
+				return 0, size, http.StatusOK, nil
+			}
+			if parsed < from {
+				return 0, 0, 0, errUnsatisfiableRange
+			}
+			if parsed < to {
+				to = parsed
+			}
+		}
+		return from, to - from + 1, http.StatusPartialContent, nil
+	}
 }
 
 // getContentType determines the MIME type based on file extension
