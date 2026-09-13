@@ -2,6 +2,7 @@ package turn
 
 import (
 	"context"
+	"ctoup.com/coreapp/pkg/shared/config"
 	"log"
 	"net"
 	"os"
@@ -13,11 +14,11 @@ import (
 )
 
 func RunTurnServer(ctx context.Context) {
-	publicIP := os.Getenv("BACKEND_HOST")
+	turnCfg := config.TurnSettings()
+	publicIP, port := turnCfg.PublicIP, turnCfg.Port
 	if publicIP == "" {
 		log.Fatalf("'public-ip' is required, BACKEND_HOST env var not set")
 	}
-	port := os.Getenv("TURN_SERVER_PORT")
 	if port == "" {
 		log.Fatalf("'port' is required, TURN_SERVER_PORT env var not set")
 	}

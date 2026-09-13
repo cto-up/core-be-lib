@@ -2,9 +2,9 @@ package kratos
 
 import (
 	"context"
+	appconfig "ctoup.com/coreapp/pkg/shared/config"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -26,14 +26,9 @@ func init() {
 			return nil, fmt.Errorf("multitenantService not provided in config options")
 		}
 
-		adminURL := os.Getenv("KRATOS_ADMIN_URL")
-		if adminURL == "" {
-			adminURL = "http://localhost:4434"
-		}
-		publicURL := os.Getenv("KRATOS_PUBLIC_URL")
-		if publicURL == "" {
-			publicURL = "http://localhost:4433"
-		}
+		kratos := appconfig.KratosSettings()
+		adminURL := kratos.AdminURL
+		publicURL := kratos.PublicURL
 
 		adminCfg := ory.NewConfiguration()
 		adminCfg.Servers = ory.ServerConfigurations{{URL: adminURL}}

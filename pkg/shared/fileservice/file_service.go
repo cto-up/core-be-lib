@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	appconfig "ctoup.com/coreapp/pkg/shared/config"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,37 +45,31 @@ type FileService struct {
 }
 
 func NewFileService() *FileService {
-	provider := os.Getenv("FILE_STORAGE_PROVIDER")
-	var bucketName string
-	switch provider {
-	case "gcs":
-		bucketName = os.Getenv("GCS_BUCKET_NAME")
-		if bucketName == "" {
-			log.Error().Msg("GCS_BUCKET_NAME environment variable not set.")
+	cfg := appconfig.StorageSettings()
+	provider, bucketName := cfg.Provider, cfg.Bucket
+
+	if provider != "" && provider != "file" && bucketName == "" {
+		log.Error().Str("provider", provider).Msg("storage: no bucket configured for this provider")
+	}
+
+	// Creating the bucket is now OPT-IN. It used to run unconditionally, from
+	// two handler constructors — so a deployment whose storage is provisioned
+	// by terraform made two doomed round trips and logged two permission errors
+	// at every boot, and AZURE_STORAGE_KEY / GOOGLE_APPLICATION_CREDENTIALS
+	// existed solely to service them.
+	if cfg.BootstrapBucket && bucketName != "" {
+		var err error
+		switch provider {
+		case "gcs":
+			err = createGCSBucketIfNotExists(context.Background(), bucketName)
+		case "s3":
+			err = createS3BucketIfNotExists(context.Background(), bucketName)
+		case "azure":
+			err = createAzureContainerIfNotExists(context.Background(), bucketName)
 		}
-		err := createGCSBucketIfNotExists(context.Background(), bucketName)
 		if err != nil {
-			log.Err(err).Msg("Failed to create GCS bucket")
+			log.Err(err).Str("provider", provider).Msg("storage: could not ensure the bucket exists")
 		}
-	case "s3":
-		bucketName = os.Getenv("S3_BUCKET_NAME")
-		if bucketName == "" {
-			log.Error().Msg("S3_BUCKET_NAME environment variable not set.")
-		}
-		err := createS3BucketIfNotExists(context.Background(), bucketName)
-		if err != nil {
-			log.Err(err).Msg("Failed to create S3 bucket")
-		}
-	case "azure":
-		bucketName = os.Getenv("AZURE_STORAGE_CONTAINER_NAME")
-		if bucketName == "" {
-			log.Error().Msg("AZURE_STORAGE_CONTAINER_NAME environment variable not set.")
-		}
-		err := createAzureContainerIfNotExists(context.Background(), bucketName)
-		if err != nil {
-			log.Err(err).Msg("Failed to create Azure container")
-		}
-	case "file":
 	}
 
 	// Construct the bucket URL based on the provider and bucket name.
@@ -83,13 +78,13 @@ func NewFileService() *FileService {
 	case "gcs":
 		bucketURL = "gs://" + bucketName
 	case "s3":
-		bucketURL = "s3://" + bucketName + "?region=" + os.Getenv("AWS_REGION")
+		bucketURL = "s3://" + bucketName + "?region=" + cfg.AWSRegion
 	case "azure":
 		bucketURL = "azblob://" + bucketName
 	case "file":
 		fallthrough
 	default:
-		bucketURL = os.Getenv("FILE_FOLDER_URL")
+		bucketURL = cfg.LocalPath
 	}
 
 	// Open the bucket once and store the client
@@ -112,6 +107,11 @@ func createGCSBucketIfNotExists(ctx context.Context, bucketName string) error {
 
 	// Check for GCS credentials content first (for CI/CD)
 	//
+	// Google's own ADC convention, deliberately left as an environment read.
+	// The blob client resolves ADC by itself; this only parses the same file for
+	// its project_id. Routing it through Config would mean this library
+	// re-implementing credential discovery its SDK already does — and every
+	// other tool in the Google ecosystem reads this variable the same way.
 	credsPath := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	projectID := ""
 	if credsPath != "" {
@@ -198,7 +198,7 @@ func createS3BucketIfNotExists(ctx context.Context, bucketName string) error {
 		_, err = client.CreateBucket(ctx, &s3.CreateBucketInput{
 			Bucket: aws.String(bucketName),
 			CreateBucketConfiguration: &types.CreateBucketConfiguration{
-				LocationConstraint: types.BucketLocationConstraint(os.Getenv("AWS_REGION")),
+				LocationConstraint: types.BucketLocationConstraint(appconfig.StorageSettings().AWSRegion),
 			},
 		})
 		if err != nil {
@@ -215,8 +215,8 @@ func createAzureContainerIfNotExists(ctx context.Context, containerName string) 
 	log.Info().Msgf("Checking for existence of Azure container: %s", containerName)
 
 	// Get credentials from environment variables
-	accountName := os.Getenv("AZURE_STORAGE_ACCOUNT")
-	accountKey := os.Getenv("AZURE_STORAGE_KEY")
+	cfg := appconfig.StorageSettings()
+	accountName, accountKey := cfg.AzureAccount, cfg.AzureKey
 
 	// Create a SharedKeyCredential
 	cred, err := azblob.NewSharedKeyCredential(accountName, accountKey)

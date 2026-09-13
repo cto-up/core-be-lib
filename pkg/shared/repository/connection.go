@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"ctoup.com/coreapp/pkg/shared/config"
 	"database/sql"
 	"fmt"
 	"time"
@@ -9,8 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
-
-	"os"
 )
 
 func GetConnectionString() string {
@@ -21,19 +20,20 @@ func GetConnectionString() string {
 }
 
 func getConnectionInfo() (string, string, string) {
-	username := os.Getenv("DATABASE_USERNAME")
-	if username == "" {
+	// Required, all three: there is no sensible default for somebody else's
+	// database, so this fails loudly rather than connecting somewhere
+	// unintended. The names in the messages are the ones a deployment sets.
+	db := config.DatabaseSettings()
+	if db.Username == "" {
 		log.Fatal().Msg("DATABASE_USERNAME required")
 	}
-	password := os.Getenv("DATABASE_PASSWORD")
-	if password == "" {
+	if db.Password == "" {
 		log.Fatal().Msg("DATABASE_PASSWORD required")
 	}
-	databaseUrl := os.Getenv("DATABASE_URL")
-	if databaseUrl == "" {
+	if db.URL == "" {
 		log.Fatal().Msg("DATABASE_URL required")
 	}
-	return username, password, databaseUrl
+	return db.Username, db.Password, db.URL
 }
 
 func ConnectDB(connectionString string) (*sql.DB, error) {

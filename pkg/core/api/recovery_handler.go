@@ -1,11 +1,11 @@
 package core
 
 import (
+	"ctoup.com/coreapp/pkg/shared/config"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 
 	"ctoup.com/coreapp/api/helpers"
@@ -65,10 +65,7 @@ func NewRecoveryHandler(authProvider auth.AuthProvider) *RecoveryHandler {
 		return nil
 	}
 
-	kratosPublicURL := os.Getenv("KRATOS_PUBLIC_URL")
-	if kratosPublicURL == "" {
-		kratosPublicURL = "http://localhost:4433"
-	}
+	kratosPublicURL := config.KratosSettings().PublicURL
 
 	// Get Kratos public client from the auth provider
 	// This assumes the provider is KratosAuthProvider

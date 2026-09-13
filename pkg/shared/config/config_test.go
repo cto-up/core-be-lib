@@ -96,28 +96,23 @@ func TestFromEnvKeepsTheNamesDeploymentsAlreadyUse(t *testing.T) {
 // read the environment in more places than any of its siblings while
 // tooling-lib and workflow-lib read it zero times.
 //
-// This check covers pkg/ — the LIBRARY surface. cmd/ and internal/ are
-// core-be-lib's own application, where reading the environment is the host's
-// job and therefore correct.
+//	37 reads across 12 packages  ->  2, both deliberate
 //
-// The migration is landing group by group, so each package moves from the
-// pending list to nothing. A package still listed is work not yet done; a file
-// outside the list that reads the environment is a regression.
-func TestMigratedPackagesDoNotReadTheEnvironment(t *testing.T) {
-	// Named and dated, so this list is visibly a queue rather than a permanent
-	// exemption. Empty it and the check becomes a blanket one over pkg/.
-	pending := map[string]string{
-		"shared/fileservice":           "storage group — bucket, region, provider credentials",
-		"shared/auth/kratos":           "identity group — KRATOS_ADMIN_URL, KRATOS_PUBLIC_URL",
-		"core/api/recovery_handler.go": "identity group — KRATOS_PUBLIC_URL",
-		"shared/repository":            "database group — DATABASE_URL, USERNAME, PASSWORD",
-		"shared/observability":         "sentry group",
-		"shared/seedservice":           "seed group — SEED_USER_EMAIL, SEED_USER_PASSWORD",
-		"shared/server/turn":           "turn group — BACKEND_HOST, TURN_SERVER_PORT",
+// This covers pkg/ — the LIBRARY surface. cmd/ and internal/ are core-be-lib's
+// own application, where reading the environment is the host's job.
+func TestTheLibraryDoesNotReadTheEnvironment(t *testing.T) {
+	exempt := map[string]string{
+		// The environment strategy itself: named, opt-in, and the one place a
+		// read belongs.
+		"shared/config/from_env.go": "FromEnv is the strategy",
+
+		// Google's ADC convention. The blob client resolves ADC by itself; the
+		// read here only parses the same file for its project_id. Routing it
+		// through Config would mean re-implementing credential discovery the
+		// SDK already does, and every other tool in that ecosystem reads this
+		// variable the same way.
+		"shared/fileservice/file_service.go": "GOOGLE_APPLICATION_CREDENTIALS is Google's ADC convention",
 	}
-	// config/from_env.go IS the environment strategy — named, opt-in, and the
-	// one place a read belongs.
-	exempt := "shared/config/from_env.go"
 
 	getenv := regexp.MustCompile(`os\.Getenv\(|os\.LookupEnv\(`)
 
@@ -131,12 +126,9 @@ func TestMigratedPackagesDoNotReadTheEnvironment(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(root, path)
 		rel = filepath.ToSlash(rel)
-		if strings.HasSuffix(rel, exempt) {
-			return nil
-		}
-		for prefix, why := range pending {
-			if strings.Contains(rel, prefix) {
-				t.Logf("pending: %s — %s", rel, why)
+		for suffix, why := range exempt {
+			if strings.HasSuffix(rel, suffix) {
+				t.Logf("exempt: %s — %s", rel, why)
 				return nil
 			}
 		}
@@ -150,8 +142,10 @@ func TestMigratedPackagesDoNotReadTheEnvironment(t *testing.T) {
 			}
 			if getenv.MatchString(line) {
 				t.Errorf("%s reads the environment: %s\n\nThe host supplies configuration "+
-					"through config.Set. If this package is not migrated yet, add it to the "+
-					"pending list WITH a reason.", rel, strings.TrimSpace(line))
+					"through config.Set, and config.FromEnv is the strategy that reads it. "+
+					"If this read is genuinely a third-party convention rather than a "+
+					"deployment decision, add it to the exemption list WITH a reason.",
+					rel, strings.TrimSpace(line))
 			}
 		}
 		return nil

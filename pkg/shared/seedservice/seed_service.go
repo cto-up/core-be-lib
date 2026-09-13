@@ -2,8 +2,8 @@ package seedservice
 
 import (
 	"context"
+	"ctoup.com/coreapp/pkg/shared/config"
 	"fmt"
-	"os"
 
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
@@ -40,18 +40,17 @@ func (ss *SeedService) userExists(email string) (bool, error) {
 }
 
 func (ss *SeedService) Seed() error {
-	userEmail := os.Getenv("SEED_USER_EMAIL")
-	if userEmail == "" {
+	// Both or neither: half a credential is not an account.
+	seed := config.SeedSettings()
+	if seed.UserEmail == "" {
 		fmt.Println("No SEED_USER_EMAIL")
 		return nil
 	}
-
-	userPassword := os.Getenv("SEED_USER_PASSWORD")
-
-	if userPassword == "" {
+	if seed.UserPassword == "" {
 		fmt.Println("No SEED_USER_PASSWORD")
 		return nil
 	}
+	userEmail, userPassword := seed.UserEmail, seed.UserPassword
 
 	c := context.Background()
 

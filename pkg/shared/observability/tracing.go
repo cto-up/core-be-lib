@@ -24,8 +24,8 @@ package observability
 
 import (
 	"context"
+	"ctoup.com/coreapp/pkg/shared/config"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -54,14 +54,15 @@ func Enabled() bool { return enabled }
 //	SENTRY_RELEASE             — defaults to unset (Sentry infers nothing).
 //	SENTRY_TRACES_SAMPLE_RATE  — 0..1, defaults to 0.2.
 func Init() bool {
-	dsn := strings.TrimSpace(os.Getenv("SENTRY_DSN"))
+	sentryCfg := config.SentrySettings()
+	dsn := strings.TrimSpace(sentryCfg.DSN)
 	if dsn == "" {
 		log.Info().Msg("tracing: SENTRY_DSN unset — distributed tracing disabled")
 		return false
 	}
 
 	rate := 0.2
-	if raw := os.Getenv("SENTRY_TRACES_SAMPLE_RATE"); raw != "" {
+	if raw := sentryCfg.TracesSampleRate; raw != "" {
 		if parsed, err := strconv.ParseFloat(raw, 64); err == nil && parsed >= 0 && parsed <= 1 {
 			rate = parsed
 		} else {
@@ -69,7 +70,7 @@ func Init() bool {
 		}
 	}
 
-	env := os.Getenv("SENTRY_ENVIRONMENT")
+	env := sentryCfg.Environment
 	if env == "" {
 		env = "production"
 	}
@@ -77,7 +78,7 @@ func Init() bool {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              dsn,
 		Environment:      env,
-		Release:          os.Getenv("SENTRY_RELEASE"),
+		Release:          sentryCfg.Release,
 		EnableTracing:    true,
 		TracesSampleRate: rate,
 		// The whole point of this tier is latency attribution, not PII. The
