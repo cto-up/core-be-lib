@@ -143,6 +143,19 @@ func (uh *UserSuperAdminHandler) UpdateUserFromSuperAdmin(c *gin.Context, tenant
 // DeleteUser implements openapi.ServerInterface.
 func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userid string) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
+
+	// FIRST, ahead of the tenant lookup: this needs nothing but the caller's own
+	// identity, so refusing here saves a database round trip on a request that
+	// was never going to succeed — and it makes the guard testable without one.
+	//
+	// HardDeleteUserFromSuperAdmin in this same file already refuses
+	// self-deletion, so this is that decision applied to the softer operation
+	// next door rather than a new one.
+	if callerID := c.GetString(auth.AUTH_USER_ID); callerID != "" && callerID == userid {
+		logger.Error().Msg("Cannot remove self from tenant")
+		c.JSON(http.StatusForbidden, helpers.ErrorStringResponse("Cannot remove self from tenant"))
+		return
+	}
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
 		logger.Err(err).Msg("Failed to get tenant")
@@ -151,6 +164,17 @@ func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenant
 	}
 	if !auth.IsAllowedToManageTenant(c, tenant) {
 		c.JSON(http.StatusForbidden, helpers.ErrorResponse(errors.New("not allowed to manage this tenant")))
+		return
+	}
+	// The rank guard the /admin-api twin applies, never carried across when this
+	// handler was forked. It is not vacuous here: resellers reach these routes
+	// (the middleware's exemption tests HasPrefix(path,
+	// "/superadmin-api/v1/tenant") and these live under .../v1/tenants/...), so
+	// the caller does not necessarily outrank everybody. A plain SUPER_ADMIN
+	// passes it trivially.
+	if err := uh.refuseIfTargetOutranksCaller(c, tenant.TenantID, userid); err != nil {
+		logger.Err(err).Msg("caller does not have rights over this user")
+		c.JSON(http.StatusForbidden, helpers.ErrorResponse(err))
 		return
 	}
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
@@ -172,6 +196,19 @@ func (uh *UserSuperAdminHandler) DeleteUserFromSuperAdmin(c *gin.Context, tenant
 // (DELETE /superadmin-api/v1/tenants/{tenantid}/users/{userid}/remove-from-tenant)
 func (uh *UserSuperAdminHandler) RemoveUserFromTenantFromSuperAdmin(c *gin.Context, tenantId uuid.UUID, userid string) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
+
+	// FIRST, ahead of the tenant lookup: this needs nothing but the caller's own
+	// identity, so refusing here saves a database round trip on a request that
+	// was never going to succeed — and it makes the guard testable without one.
+	//
+	// HardDeleteUserFromSuperAdmin in this same file already refuses
+	// self-deletion, so this is that decision applied to the softer operation
+	// next door rather than a new one.
+	if callerID := c.GetString(auth.AUTH_USER_ID); callerID != "" && callerID == userid {
+		logger.Error().Msg("Cannot remove self from tenant")
+		c.JSON(http.StatusForbidden, helpers.ErrorStringResponse("Cannot remove self from tenant"))
+		return
+	}
 	tenant, err := uh.store.Queries.GetTenantByID(c, tenantId)
 	if err != nil {
 		logger.Err(err).Msg("Failed to get tenant")
@@ -192,6 +229,17 @@ func (uh *UserSuperAdminHandler) RemoveUserFromTenantFromSuperAdmin(c *gin.Conte
 	if err != nil || !isMember {
 		logger.Err(err).Msg("failed to check user membership")
 		c.JSON(http.StatusNotFound, helpers.ErrorResponse(errors.New("user not found in this tenant")))
+		return
+	}
+	// The rank guard the /admin-api twin applies, never carried across when this
+	// handler was forked. It is not vacuous here: resellers reach these routes
+	// (the middleware's exemption tests HasPrefix(path,
+	// "/superadmin-api/v1/tenant") and these live under .../v1/tenants/...), so
+	// the caller does not necessarily outrank everybody. A plain SUPER_ADMIN
+	// passes it trivially.
+	if err := uh.refuseIfTargetOutranksCaller(c, tenant.TenantID, userid); err != nil {
+		logger.Err(err).Msg("caller does not have rights over this user")
+		c.JSON(http.StatusForbidden, helpers.ErrorResponse(err))
 		return
 	}
 	baseAuthClient, err := uh.authProvider.GetAuthClientForTenant(c, tenant.TenantID)
@@ -690,4 +738,32 @@ func (uh *UserSuperAdminHandler) HardDeleteUserFromSuperAdmin(c *gin.Context, te
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+// refuseIfTargetOutranksCaller reads the target's roles WITHIN the named tenant
+// and refuses when the caller does not outrank them.
+//
+// It exists because the /admin-api handlers do this inline and the
+// /superadmin-api ones did not. A plain SUPER_ADMIN outranks everybody so this
+// is a no-op for them; it is a reseller — who reaches these routes and does not
+// outrank everybody — that it is actually for.
+//
+// A target with no membership in the tenant is not an error here: the caller
+// below reports "not found" more precisely than this can.
+func (uh *UserSuperAdminHandler) refuseIfTargetOutranksCaller(c *gin.Context, tenantID string, userID string) error {
+	roles, err := uh.store.GetUserTenantRoles(c, repository.GetUserTenantRolesParams{
+		UserID:   userID,
+		TenantID: tenantID,
+	})
+	if err != nil {
+		return err
+	}
+	if len(roles) == 0 {
+		return nil
+	}
+	target := make([]core.Role, len(roles))
+	for i, r := range roles {
+		target[i] = core.Role(r)
+	}
+	return auth.HasRightsForRoles(c, target)
 }
