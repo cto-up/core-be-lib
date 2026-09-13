@@ -3,9 +3,9 @@ package service
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"ctoup.com/coreapp/pkg/shared/config"
 	"encoding/base64"
 	"fmt"
-	"os"
 	"time"
 
 	"ctoup.com/coreapp/pkg/core/db"
@@ -226,8 +226,5 @@ func (s *EmailVerificationService) CleanupExpiredTokens(ctx *gin.Context) error 
 // Helper function to get system email
 func getSystemEmail() string {
 	// This should match the pattern used in other email functions
-	if fromEmail := os.Getenv("SYSTEM_EMAIL"); fromEmail != "" {
-		return fromEmail
-	}
-	return "noreply@ctoup.com"
+	return config.SystemEmailFrom()
 }

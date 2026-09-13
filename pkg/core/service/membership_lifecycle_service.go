@@ -38,11 +38,11 @@ const (
 )
 
 var (
-	ErrNoActiveMembership  = errors.New("no active membership of this tenant")
+	ErrNoActiveMembership   = errors.New("no active membership of this tenant")
 	ErrDecisionsOutstanding = errors.New("an impact requires a decision")
-	ErrDeletionScheduled   = errors.New("a deletion is already scheduled")
+	ErrDeletionScheduled    = errors.New("a deletion is already scheduled")
 	ErrConfirmEmailMismatch = errors.New("confirmEmail does not match the caller")
-	ErrRejoinTooSoon       = errors.New("rejoining is rate limited")
+	ErrRejoinTooSoon        = errors.New("rejoining is rate limited")
 )
 
 // MembershipLifecycleService owns leaving a tenant and closing an account.

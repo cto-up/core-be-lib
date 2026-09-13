@@ -3,6 +3,7 @@ package emailservice
 import (
 	"bytes"
 	"crypto/tls"
+	"ctoup.com/coreapp/pkg/shared/config"
 	"errors"
 	"fmt"
 	"html/template"
@@ -46,11 +47,12 @@ var (
 // InitializeSMTPConfig initializes SMTP configuration and ensures it's only done once
 func InitializeSMTPConfig() *SMTPConfig {
 	once.Do(func() {
+		s := config.SMTPSettings()
 		smtpConfig = &SMTPConfig{
-			Host:     os.Getenv("SMTP_HOST"),
-			Port:     os.Getenv("SMTP_PORT"),
-			Username: os.Getenv("SMTP_USERNAME"),
-			Password: os.Getenv("SMTP_PASSWORD"),
+			Host:     s.Host,
+			Port:     s.Port,
+			Username: s.Username,
+			Password: s.Password,
 		}
 	})
 	return smtpConfig

@@ -31,7 +31,7 @@ func (rl *RateLimiter) IsAllowed(key string) bool {
 	defer rl.mutex.Unlock()
 
 	now := time.Now()
-	
+
 	// Clean up old requests
 	if requests, exists := rl.requests[key]; exists {
 		var validRequests []time.Time
@@ -60,7 +60,7 @@ func (rl *RateLimiter) GetRemainingRequests(key string) int {
 
 	now := time.Now()
 	count := 0
-	
+
 	if requests, exists := rl.requests[key]; exists {
 		for _, reqTime := range requests {
 			if now.Sub(reqTime) < rl.window {
@@ -82,11 +82,11 @@ var EmailVerificationRateLimiter = NewRateLimiter(3, 15*time.Minute) // 3 reques
 // CheckEmailVerificationRateLimit checks rate limit for email verification
 func CheckEmailVerificationRateLimit(c *gin.Context, userID string) error {
 	key := fmt.Sprintf("email_verification:%s", userID)
-	
+
 	if !EmailVerificationRateLimiter.IsAllowed(key) {
 		remaining := EmailVerificationRateLimiter.GetRemainingRequests(key)
 		return fmt.Errorf("rate limit exceeded. You can request %d more verification emails in 15 minutes", remaining)
 	}
-	
+
 	return nil
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"ctoup.com/coreapp/pkg/shared/config"
 	"testing"
 	"time"
 
@@ -59,14 +60,26 @@ func TestMembershipStatusesAreDistinct(t *testing.T) {
 
 // The from-address must fall back rather than send from an empty sender, which
 // most SMTP servers reject outright — the invitation would vanish silently.
+//
+// This used to drive the code with t.Setenv. The host supplies the sender now,
+// so a test supplies it the same way; and the fallback is no longer a hardcoded
+// vendor domain but this deployment's own, which the third case checks.
 func TestSystemEmailFromFallsBack(t *testing.T) {
-	t.Setenv("SYSTEM_EMAIL", "")
+	t.Cleanup(func() { config.Set(config.Config{}) })
+
+	config.Set(config.Config{})
 	if got := systemEmailFrom(); got == "" {
 		t.Fatal("an empty from-address would be rejected by most SMTP servers")
 	}
-	t.Setenv("SYSTEM_EMAIL", "invites@acme.test")
+
+	config.Set(config.Config{Email: config.Email{SystemFrom: "invites@acme.test"}})
 	if got := systemEmailFrom(); got != "invites@acme.test" {
 		t.Fatalf("configured sender ignored, got %q", got)
+	}
+
+	config.Set(config.Config{Site: config.Site{Domain: "acme.test"}})
+	if got := systemEmailFrom(); got != "noreply@acme.test" {
+		t.Fatalf("with no explicit sender the deployment's OWN domain must be used, got %q", got)
 	}
 }
 

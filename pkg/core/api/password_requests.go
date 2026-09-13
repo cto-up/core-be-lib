@@ -1,8 +1,8 @@
 package core
 
 import (
+	"ctoup.com/coreapp/pkg/shared/config"
 	"fmt"
-	"os"
 	"strings"
 
 	"ctoup.com/coreapp/pkg/shared/auth"
@@ -76,10 +76,7 @@ func getWelcomeEmailURL(c *gin.Context, subdomains ...string) (string, error) {
 
 func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
-	fromEmail := os.Getenv("SYSTEM_EMAIL")
-	if fromEmail == "" {
-		fromEmail = "noreply@ctoup.com"
-	}
+	fromEmail := config.SystemEmailFrom()
 
 	actionCodeSettings := &auth.ActionCodeSettings{
 		URL: url,
@@ -128,10 +125,7 @@ func resetPasswordRequest(c *gin.Context, baseAuthClient auth.AuthClient, url, t
 
 func sendWelcomeEmail(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
-	fromEmail := os.Getenv("SYSTEM_EMAIL")
-	if fromEmail == "" {
-		fromEmail = "noreply@ctoup.com"
-	}
+	fromEmail := config.SystemEmailFrom()
 
 	actionCodeSettings := &auth.ActionCodeSettings{
 		URL: url,
@@ -180,10 +174,7 @@ func getConfirmationEmailURL(c *gin.Context) (string, error) {
 
 func sendConfirmationEmail(c *gin.Context, url, toEmail string, confirmationToken string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
-	fromEmail := os.Getenv("SYSTEM_EMAIL")
-	if fromEmail == "" {
-		fromEmail = "noreply@ctoup.com"
-	}
+	fromEmail := config.SystemEmailFrom()
 
 	// Option: Generate the email verification link manually
 	link := fmt.Sprintf("%s?token=%s", url, confirmationToken)
@@ -216,10 +207,7 @@ func sendConfirmationEmail(c *gin.Context, url, toEmail string, confirmationToke
 // the signup response.
 func sendAlreadyRegisteredEmail(c *gin.Context, baseAuthClient auth.AuthClient, signinURL, toEmail, tenantName string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
-	fromEmail := os.Getenv("SYSTEM_EMAIL")
-	if fromEmail == "" {
-		fromEmail = "noreply@ctoup.com"
-	}
+	fromEmail := config.SystemEmailFrom()
 
 	resetLink, err := baseAuthClient.PasswordResetLinkWithSettings(c, toEmail, &auth.ActionCodeSettings{URL: signinURL})
 	if err != nil {
@@ -256,10 +244,7 @@ func sendAlreadyRegisteredEmail(c *gin.Context, baseAuthClient auth.AuthClient, 
 
 func sendTenantAddedEmail(c *gin.Context, baseAuthClient auth.AuthClient, url, toEmail, tenantName string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
-	fromEmail := os.Getenv("SYSTEM_EMAIL")
-	if fromEmail == "" {
-		fromEmail = "noreply@ctoup.com"
-	}
+	fromEmail := config.SystemEmailFrom()
 
 	// Send the notification email
 	templateData := struct {
@@ -286,10 +271,7 @@ func sendTenantAddedEmail(c *gin.Context, baseAuthClient auth.AuthClient, url, t
 
 func sendMagicLink(c *gin.Context, baseAuthClient auth.AuthClient, origin, toEmail string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
-	fromEmail := os.Getenv("SYSTEM_EMAIL")
-	if fromEmail == "" {
-		fromEmail = "noreply@ctoup.com"
-	}
+	fromEmail := config.SystemEmailFrom()
 
 	actionCodeSettings := &auth.ActionCodeSettings{
 		URL: origin + "/signin", // Redirect to signin after using the link
@@ -323,10 +305,7 @@ func sendMagicLink(c *gin.Context, baseAuthClient auth.AuthClient, origin, toEma
 
 func sendSigninEmail(c *gin.Context, origin, toEmail string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
-	fromEmail := os.Getenv("SYSTEM_EMAIL")
-	if fromEmail == "" {
-		fromEmail = "noreply@ctoup.com"
-	}
+	fromEmail := config.SystemEmailFrom()
 
 	signinURL := origin + "/signin"
 

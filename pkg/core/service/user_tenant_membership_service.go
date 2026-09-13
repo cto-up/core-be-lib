@@ -2,9 +2,9 @@ package service
 
 import (
 	"context"
+	"ctoup.com/coreapp/pkg/shared/config"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -201,10 +201,7 @@ func (s *UserTenantMembershipService) sendInvitationEmail(ctx context.Context, e
 
 // systemEmailFrom mirrors the from-address resolution the rest of core uses.
 func systemEmailFrom() string {
-	if from := os.Getenv("SYSTEM_EMAIL"); from != "" {
-		return from
-	}
-	return "noreply@ctoup.com"
+	return config.SystemEmailFrom()
 }
 
 // AcceptInvitation turns a pending invitation into membership.

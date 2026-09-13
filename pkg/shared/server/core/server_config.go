@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	appconfig "ctoup.com/coreapp/pkg/shared/config"
 	"sync"
 
 	"ctoup.com/coreapp/api/handlers"
@@ -98,6 +99,11 @@ func RegisterOuterMiddleware(mw ...gin.HandlerFunc) {
 }
 
 func NewServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additionalChecks ...checks.Check) *ServerConfig {
+	// Before anything reads a setting. A host that supplied its own Config
+	// already is left alone; one that did not gets the environment, which is
+	// what this library did for itself until now.
+	appconfig.EnsureDefault()
+
 	serverConfigOnce.Do(func() {
 		serverConfigInstance = initializeServerConfig(connPool, cors, additionalChecks...)
 	})
