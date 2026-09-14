@@ -272,6 +272,54 @@ func (fs *FileService) SaveFile(ctx context.Context, data []byte, filename strin
 	return w.Close()
 }
 
+// SaveFileStream writes a file from a READER, returning how many bytes went in.
+//
+// SaveFile above takes a []byte, which means every caller has already
+// materialised the whole object — and an upload path that does that turns a
+// 64 MiB attachment into 64 MiB of heap per concurrent request (ADR 059 D6,
+// hub#125). gocloud.dev's writer streams to every backend it supports; nothing
+// was stopping us except the signature.
+//
+// On any write error the partial object is removed: a bucket key holding half
+// an object is worse than no key at all, because the row that points at it will
+// look fine.
+func (fs *FileService) SaveFileStream(ctx context.Context, r io.Reader, filename string) (int64, error) {
+	logger := util.GetLoggerFromCtx(ctx)
+	w, err := fs.bucket.NewWriter(ctx, filename, nil)
+	if err != nil {
+		logger.Err(err).Msg("Failed to create new writer")
+		return 0, err
+	}
+	n, err := io.Copy(w, r)
+	if err != nil {
+		_ = w.Close()
+		// Best effort: if this fails too there is an orphan object, which is
+		// still better than a half-written one a row points at.
+		_ = fs.bucket.Delete(ctx, filename)
+		logger.Err(err).Msg("Failed to stream data to file")
+		return n, err
+	}
+	if err := w.Close(); err != nil {
+		_ = fs.bucket.Delete(ctx, filename)
+		return n, err
+	}
+	return n, nil
+}
+
+// OpenFile streams a file back. The counterpart of SaveFileStream, and the
+// reason ReadFileBytes is no longer the only way in: a caller that wants to
+// hand an object to an HTTP response or a MIME part has no business allocating
+// it first.
+//
+// The caller closes it.
+func (fs *FileService) OpenFile(ctx context.Context, filename string) (io.ReadCloser, error) {
+	reader, err := fs.bucket.NewReader(ctx, filename, nil)
+	if err != nil {
+		return nil, fmt.Errorf("open file %s: %w", filename, err)
+	}
+	return reader, nil
+}
+
 // DeleteFile deletes a file from the specified bucket.
 func (fs *FileService) DeleteFile(ctx context.Context, filename string) error {
 	logger := util.GetLoggerFromCtx(ctx)
