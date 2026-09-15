@@ -86,15 +86,6 @@ func main() {
 	// Timeout for server shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	// Set up OpenTelemetry.
-	/* otelShutdown, err := core.SetupOTelSDK(ctx)
-	if err != nil {
-		return
-	}
-	defer func() {
-		err = errors.Join(err, otelShutdown(context.Background()))
-	}() */
-
 	go rest.RunRESTServer(ctx, connPool, restAddress, connectionString)
 
 	// Graceful shutdown setup
