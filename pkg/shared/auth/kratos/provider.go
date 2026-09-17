@@ -66,28 +66,11 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 	// Tenant
 	tenantID := c.GetString(auth.AUTH_TENANT_ID_KEY)
 
-	// Extract session token from cookie or header
-	sessionToken := c.GetHeader("X-Session-Token")
-	if sessionToken == "" {
-		// Try to get from cookie
-		cookie, err := c.Cookie("ory_kratos_session")
-		if err == nil {
-			sessionToken = cookie
-		}
-	}
-
-	if sessionToken == "" {
-		// Try Authorization header
-		authHeader := c.GetHeader("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			sessionToken = strings.TrimPrefix(authHeader, "Bearer ")
-		}
-	}
-
-	if sessionToken == "" {
+	cred, ok := auth.ExtractSessionCredential(c)
+	if !ok {
 		return nil, fmt.Errorf("missing session token")
 	}
-	return k.VerifyTokenWithTenantID(c, tenantID, sessionToken)
+	return k.VerifyTokenWithTenantID(c, tenantID, cred.Value)
 }
 
 func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenantID string, sessionToken string) (*auth.AuthenticatedUser, error) {

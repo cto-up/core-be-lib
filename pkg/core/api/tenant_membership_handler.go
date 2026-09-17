@@ -107,12 +107,12 @@ func (h *TenantMembershipHandler) RejectInvitation(c *gin.Context) {
 func (h *TenantMembershipHandler) invitationCaller(c *gin.Context) (string, string, bool) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 
-	sessionToken := socialSessionToken(c)
-	if sessionToken == "" {
+	cred, ok := auth.ExtractSessionCredential(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(errors.New("no session")))
 		return "", "", false
 	}
-	token, err := h.authProvider.GetAuthClient().VerifyIDToken(c.Request.Context(), sessionToken)
+	token, err := h.authProvider.GetAuthClient().VerifyIDToken(c.Request.Context(), cred.Value)
 	if err != nil {
 		logger.Warn().Err(err).Msg("Invitation: session verification failed")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(errors.New("invalid session")))

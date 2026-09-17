@@ -717,14 +717,14 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 func (uh *UserHandler) CompleteSocialSignIn(c *gin.Context) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 
-	sessionToken := socialSessionToken(c)
-	if sessionToken == "" {
+	cred, ok := auth.ExtractSessionCredential(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(errors.New("no session")))
 		return
 	}
 
 	authClient := uh.authProvider.GetAuthClient()
-	token, err := authClient.VerifyIDToken(c.Request.Context(), sessionToken)
+	token, err := authClient.VerifyIDToken(c.Request.Context(), cred.Value)
 	if err != nil {
 		logger.Warn().Err(err).Msg("Social sign-in: session verification failed")
 		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(errors.New("invalid session")))
@@ -801,22 +801,6 @@ func (uh *UserHandler) CompleteSocialSignIn(c *gin.Context) {
 		Msg("Social sign-in: user provisioned into tenant")
 
 	c.JSON(http.StatusOK, core.SocialSignInResult{Provisioned: true})
-}
-
-// socialSessionToken mirrors the extraction order of the Kratos auth provider,
-// so a request this endpoint accepts is one the auth middleware would also have
-// accepted had the membership existed.
-func socialSessionToken(c *gin.Context) string {
-	if token := c.GetHeader("X-Session-Token"); token != "" {
-		return token
-	}
-	if cookie, err := c.Cookie("ory_kratos_session"); err == nil && cookie != "" {
-		return cookie
-	}
-	if authHeader := c.GetHeader("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
-		return strings.TrimPrefix(authHeader, "Bearer ")
-	}
-	return ""
 }
 
 // hasTenantMembership reports whether the session's own claims already place
