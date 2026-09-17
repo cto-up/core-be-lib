@@ -255,7 +255,17 @@ type AuthClient interface {
 	EmailSignInLink(ctx context.Context, email string, settings *ActionCodeSettings) (string, error)
 
 	// Token Verification
+	//
+	// VerifyIDToken treats the credential as a browser cookie value, which is
+	// what it has always done and what every existing caller depends on.
+	// Prefer VerifySessionCredential, which hands the credential to the
+	// provider in the slot it actually arrived in.
 	VerifyIDToken(ctx context.Context, idToken string) (*Token, error)
+
+	// VerifySessionCredential verifies a credential that carries its own
+	// provenance, so a native session token is presented to the provider as a
+	// native token rather than re-wrapped as a cookie.
+	VerifySessionCredential(ctx context.Context, cred SessionCredential) (*Token, error)
 
 	// GetUserActivity returns account state and most-recent authentication time
 	// for a batch of users. Best-effort per user: an id the provider does not

@@ -70,14 +70,27 @@ func (k *KratosAuthProvider) VerifyToken(c *gin.Context) (*auth.AuthenticatedUse
 	if !ok {
 		return nil, fmt.Errorf("missing session token")
 	}
-	return k.VerifyTokenWithTenantID(c, tenantID, cred.Value)
+	return k.verifyCredentialWithTenantID(c, tenantID, cred)
 }
 
+// VerifyTokenWithTenantID verifies a credential of unknown provenance and so
+// treats it as a browser cookie value. It sits on the exported AuthProvider
+// interface and is called from outside this module (skeells' websocket auth),
+// so both its signature and its behaviour stay exactly as they were.
 func (k *KratosAuthProvider) VerifyTokenWithTenantID(ctx context.Context, tenantID string, sessionToken string) (*auth.AuthenticatedUser, error) {
+	return k.verifyCredentialWithTenantID(ctx, tenantID, auth.SessionCredential{
+		Value: sessionToken,
+		Kind:  auth.CredentialCookie,
+	})
+}
+
+// verifyCredentialWithTenantID verifies the credential as the kind it says it
+// is, then resolves tenancy and roles from the resulting claims.
+func (k *KratosAuthProvider) verifyCredentialWithTenantID(ctx context.Context, tenantID string, cred auth.SessionCredential) (*auth.AuthenticatedUser, error) {
 
 	authClient := k.GetAuthClient()
 
-	token, err := authClient.VerifyIDToken(ctx, sessionToken)
+	token, err := authClient.VerifySessionCredential(ctx, cred)
 	if err != nil {
 		return nil, err
 	}
@@ -615,16 +628,37 @@ func (k *KratosAuthClient) PasswordResetLink(ctx context.Context, email string) 
 	return recoveryLink.RecoveryLink, nil
 }
 
+// VerifyIDToken verifies a credential whose provenance is not known, treating
+// it as a browser cookie value. That is exactly what this function has always
+// done, so every existing caller keeps its behaviour to the byte. Callers that
+// know what they are holding should use VerifySessionCredential.
 func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, sessionToken string) (*auth.Token, error) {
-	logger := util.GetLoggerFromCtx(ctx)
-	// Construct the cookie string manually
-	cookieString := fmt.Sprintf("ory_kratos_session=%s", sessionToken)
+	return k.VerifySessionCredential(ctx, auth.SessionCredential{
+		Value: sessionToken,
+		Kind:  auth.CredentialCookie,
+	})
+}
 
-	// Use the SDK but inject the Cookie header into the context
-	// This keeps your code clean and leverages the SDK's built-in types
-	session, _, err := k.publicClient.FrontendAPI.ToSession(ctx).
-		Cookie(cookieString). // The SDK has a .Cookie() method for this!
-		Execute()
+// VerifySessionCredential hands the credential back to Kratos in the slot it
+// actually arrived in.
+//
+// A native session token presented in the cookie slot does not decode, and
+// Kratos answers "no active session" -- a 401 indistinguishable from a wrong
+// password. That is why every native client was refused: the token was correct
+// and was being asked the wrong question.
+func (k *KratosAuthClient) VerifySessionCredential(ctx context.Context, cred auth.SessionCredential) (*auth.Token, error) {
+	logger := util.GetLoggerFromCtx(ctx)
+
+	req := k.publicClient.FrontendAPI.ToSession(ctx)
+	switch cred.Kind {
+	case auth.CredentialNativeToken:
+		req = req.XSessionToken(cred.Value)
+	default:
+		// Cookie, and anything that did not say: the historical behaviour.
+		req = req.Cookie(fmt.Sprintf("ory_kratos_session=%s", cred.Value))
+	}
+
+	session, _, err := req.Execute()
 
 	if err != nil {
 		logger.Err(err).Msg("Failed to verify session token with Kratos")
