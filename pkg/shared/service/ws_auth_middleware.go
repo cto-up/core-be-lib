@@ -26,16 +26,7 @@ func NewWSAuthMiddleware(authProvider auth.AuthProvider) gin.HandlerFunc {
 		// Priority 1: ory_kratos_session cookie (browser clients — sent automatically)
 		// Priority 2: X-Session-Token header (native/mobile Kratos API clients)
 		// Priority 3: ?token= query param (mobile clients that can't set WS headers)
-		//
-		// VerifyToken already handles cookie and X-Session-Token natively, so we only
-		// need to promote the query param into the header as a fallback.
-		if _, err := c.Cookie("ory_kratos_session"); err != nil {
-			if c.GetHeader("X-Session-Token") == "" {
-				if token := c.Query("token"); token != "" {
-					c.Request.Header.Set("X-Session-Token", token)
-				}
-			}
-		}
+		promoteQueryToken(c)
 
 		user, err := authProvider.VerifyToken(c)
 		if err != nil {
@@ -53,10 +44,27 @@ func NewWSAuthMiddleware(authProvider auth.AuthProvider) gin.HandlerFunc {
 	}
 }
 
-// NewWSAuthMiddlewareWithQueryParams is an alias for NewWSAuthMiddleware kept for call-site compatibility.
-// Deprecated: use NewWSAuthMiddleware directly.
-var NewWSAuthMiddlewareWithQueryParams = NewWSAuthMiddleware
-
-// NewWSAuthMiddlewareWithHeaderFallback is an alias for NewWSAuthMiddleware kept for call-site compatibility.
-// Deprecated: use NewWSAuthMiddleware directly.
-var NewWSAuthMiddlewareWithHeaderFallback = NewWSAuthMiddleware
+// promoteQueryToken moves a ?token= query parameter into the X-Session-Token
+// header, so that the single extractor in pkg/shared/auth sees it like any
+// other credential. A browser cannot set headers on a WebSocket upgrade, which
+// is the entire reason this parameter exists.
+//
+// Promoting it declares the value to be a NATIVE session token, since that is
+// now what X-Session-Token means. A client that puts something else there -- a
+// session UUID, say -- is simply not authenticated, and should not be: that was
+// hub#182 on the HTTP path and hub#189 here.
+//
+// The cookie wins, and an already-present header is never overwritten: a
+// browser on a same-origin upgrade sends its cookie automatically, and it is
+// the better credential of the two.
+func promoteQueryToken(c *gin.Context) {
+	if _, err := c.Cookie("ory_kratos_session"); err == nil {
+		return
+	}
+	if c.GetHeader("X-Session-Token") != "" {
+		return
+	}
+	if token := c.Query("token"); token != "" {
+		c.Request.Header.Set("X-Session-Token", token)
+	}
+}
