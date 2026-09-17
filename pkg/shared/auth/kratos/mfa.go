@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"ctoup.com/coreapp/pkg/shared/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,8 +21,10 @@ func NewAAL2Middleware(provider *KratosAuthProvider) *AAL2Middleware {
 // RequireAAL2 returns a Gin middleware that enforces AAL2 (MFA required)
 func (m *AAL2Middleware) RequireAAL2() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		sessionCookie, err := c.Cookie("ory_kratos_session")
-		if err != nil {
+		// A native client carries its session token, not a cookie. The gate
+		// stays closed by default either way: no credential is still a 401.
+		cred, ok := auth.ExtractSessionCredential(c)
+		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "authentication_required",
 			})
@@ -29,10 +32,7 @@ func (m *AAL2Middleware) RequireAAL2() gin.HandlerFunc {
 			return
 		}
 
-		cookieString := "ory_kratos_session=" + sessionCookie
-		session, _, err := m.provider.publicClient.FrontendAPI.ToSession(context.Background()).
-			Cookie(cookieString).
-			Execute()
+		session, err := m.provider.sessionForCredential(context.Background(), cred)
 
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{

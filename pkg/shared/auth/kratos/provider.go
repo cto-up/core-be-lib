@@ -877,6 +877,28 @@ func hasAnyMFAConfigured(credentials map[string]ory.IdentityCredentials) bool {
 	return false
 }
 
+// sessionForCredential asks Kratos to resolve a credential, presenting it in
+// the slot it actually arrived in.
+//
+// These endpoints used to forward the raw Cookie header straight through, which
+// works only for a browser: a native client sends no Cookie at all, so every one
+// of them failed for the Android clients that are already in the tree.
+func (k *KratosAuthProvider) sessionForCredential(ctx context.Context, cred auth.SessionCredential) (*ory.Session, error) {
+	req := k.publicClient.FrontendAPI.ToSession(ctx)
+	switch cred.Kind {
+	case auth.CredentialNativeToken:
+		req = req.XSessionToken(cred.Value)
+	default:
+		req = req.Cookie(fmt.Sprintf("ory_kratos_session=%s", cred.Value))
+	}
+
+	session, resp, err := req.Execute()
+	if err != nil || resp == nil || resp.StatusCode != 200 {
+		return nil, auth.ConvertKratosError(err)
+	}
+	return session, nil
+}
+
 // GetSessionAALInfo returns both current and available AAL levels
 // This is the single source of truth for AAL information
 func (k *KratosAuthProvider) GetSessionAALInfo(c *gin.Context) (*auth.AALInfo, error) {
@@ -888,26 +910,22 @@ func (k *KratosAuthProvider) GetSessionAALInfo(c *gin.Context) (*auth.AALInfo, e
 		}
 	}
 
-	cookieHeader := c.GetHeader("Cookie")
-	if cookieHeader == "" {
-		// Return default AAL1 info when not authenticated
-		defaultInfo := &auth.AALInfo{
-			Current:    "aal1",
-			Available:  "aal1",
-			CanUpgrade: false,
-		}
-		return defaultInfo, nil
+	cred, ok := auth.ExtractSessionCredential(c)
+	if !ok {
+		// "I could not ask" is not the same statement as "aal1, and this user
+		// cannot upgrade". This used to return that fabricated default with a
+		// nil error: a confident negative claim about someone's MFA capability,
+		// derived from no information at all. A caller that wants a lenient
+		// default can apply one knowingly; inventing one on their behalf
+		// removes the choice and hides the reason.
+		logger.Warn().Msg("No session credential on the request; cannot determine AAL")
+		return nil, auth.NewAuthError(auth.ErrorCodeUnauthorized, "no session credential")
 	}
 
-	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
-		"Cookie": {Key: cookieHeader},
-	})
-
-	// Get session from Kratos
-	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
-	if err != nil || resp.StatusCode != 200 {
+	session, err := k.sessionForCredential(c.Request.Context(), cred)
+	if err != nil {
 		logger.Err(err).Msg("Failed to get session from Kratos")
-		return nil, auth.ConvertKratosError(err)
+		return nil, err
 	}
 
 	if session.Identity == nil {
@@ -986,19 +1004,15 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
 	}
 
 	// Get session to extract identity ID
-	cookieHeader := c.GetHeader("Cookie")
-	if cookieHeader == "" {
+	cred, ok := auth.ExtractSessionCredential(c)
+	if !ok {
 		return MFAStatus{}, auth.NewAuthError(auth.ErrorCodeUnauthorized, "Not authenticated")
 	}
 
-	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
-		"Cookie": {Key: cookieHeader},
-	})
-
-	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
-	if err != nil || resp.StatusCode != 200 {
+	session, err := k.sessionForCredential(c.Request.Context(), cred)
+	if err != nil {
 		logger.Err(err).Msg("Failed to get session")
-		return MFAStatus{}, auth.ConvertKratosError(err)
+		return MFAStatus{}, err
 	}
 
 	if session.Identity == nil {
@@ -1099,22 +1113,29 @@ func parseMFAStatusFromIdentity(identity *ory.Identity, aal string) MFAStatus {
 // InitializeSettingsFlow creates a new settings flow for MFA configuration
 func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.SettingsFlow, error) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
-	cookieHeader := c.GetHeader("Cookie")
-	if cookieHeader == "" {
+	cred, ok := auth.ExtractSessionCredential(c)
+	if !ok {
 		return nil, &auth.AuthError{Code: "unauthorized", Message: "Not authenticated"}
 	}
 
-	// Create context with Cookie header
-	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
-		"Cookie": {
-			Key: cookieHeader,
-		},
-	})
+	ctx := c.Request.Context()
 
-	// Create settings flow - SDK automatically adds Cookie header from context
-	flow, resp, err := k.publicClient.FrontendAPI.CreateBrowserSettingsFlow(ctx).Cookie(cookieHeader).Execute()
+	// A settings flow comes in two shapes, and a native client needs the native
+	// one: the browser flow sets a cookie and redirects, which an app cannot
+	// consume.
+	if cred.Kind == auth.CredentialNativeToken {
+		flow, resp, err := k.publicClient.FrontendAPI.CreateNativeSettingsFlow(ctx).
+			XSessionToken(cred.Value).Execute()
+		if err != nil || resp == nil || resp.StatusCode != 200 {
+			logger.Err(err).Msg("Failed to create native settings flow")
+			return nil, auth.ConvertKratosError(err)
+		}
+		return flow, nil
+	}
 
-	if err != nil || resp.StatusCode != 200 {
+	flow, resp, err := k.publicClient.FrontendAPI.CreateBrowserSettingsFlow(ctx).
+		Cookie(fmt.Sprintf("ory_kratos_session=%s", cred.Value)).Execute()
+	if err != nil || resp == nil || resp.StatusCode != 200 {
 		logger.Err(err).Msg("Failed to create settings flow")
 		return nil, auth.ConvertKratosError(err)
 	}
@@ -1125,19 +1146,15 @@ func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.Settin
 func (k *KratosAuthProvider) DisableWebAuthn(c *gin.Context) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	// Get session to extract identity ID
-	cookieHeader := c.GetHeader("Cookie")
-	if cookieHeader == "" {
+	cred, ok := auth.ExtractSessionCredential(c)
+	if !ok {
 		return auth.NewAuthError(auth.ErrorCodeUnauthorized, "Not authenticated")
 	}
 
-	ctx := context.WithValue(c.Request.Context(), ory.ContextAPIKeys, map[string]ory.APIKey{
-		"Cookie": {Key: cookieHeader},
-	})
-
-	session, resp, err := k.publicClient.FrontendAPI.ToSession(ctx).Cookie(cookieHeader).Execute()
-	if err != nil || resp.StatusCode != 200 {
+	session, err := k.sessionForCredential(c.Request.Context(), cred)
+	if err != nil {
 		logger.Err(err).Msg("Failed to get session")
-		return auth.ConvertKratosError(err)
+		return err
 	}
 
 	if session.Identity == nil {
