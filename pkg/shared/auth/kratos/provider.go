@@ -653,53 +653,61 @@ func (k *KratosAuthClient) VerifyIDToken(ctx context.Context, sessionToken strin
 		return nil, &auth.AuthError{Code: auth.ErrorCodeInvalidToken, Message: "session inactive"}
 	}
 
+	// An active session with no identity is not something to render a token
+	// from. The claims block below used to guard this pointer and the return
+	// then dereferenced it anyway, three lines after the guard closed; a token
+	// with an empty UID would be worse than the panic, because it authenticates
+	// as nobody.
+	if session.Identity == nil {
+		logger.Warn().Str("session_id", session.Id).Msg("Kratos session has no identity")
+		return nil, &auth.AuthError{Code: auth.ErrorCodeInvalidToken, Message: "session has no identity"}
+	}
+
 	claims := make(map[string]interface{})
-	if session.Identity != nil {
-		if traits, ok := session.Identity.Traits.(map[string]interface{}); ok {
-			for key, v := range traits {
-				claims[key] = v
-			}
+	if traits, ok := session.Identity.Traits.(map[string]interface{}); ok {
+		for key, v := range traits {
+			claims[key] = v
+		}
+	}
+
+	// Extract tenant and role information from metadata_public
+	if metadataPublic, ok := session.Identity.MetadataPublic.(map[string]interface{}); ok {
+		// Debug logging
+		logger.Debug().
+			Str("identity_id", session.Identity.Id).
+			Interface("metadata_public", metadataPublic).
+			Msg("Processing metadata_public from Kratos session")
+
+		// Add tenant_memberships to claims
+		if tenantMemberships, ok := metadataPublic[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
+			claims[auth.AUTH_TENANT_MEMBERSHIPS] = tenantMemberships
 		}
 
-		// Extract tenant and role information from metadata_public
-		if metadataPublic, ok := session.Identity.MetadataPublic.(map[string]interface{}); ok {
-			// Debug logging
-			logger.Debug().
-				Str("identity_id", session.Identity.Id).
-				Interface("metadata_public", metadataPublic).
-				Msg("Processing metadata_public from Kratos session")
+		// For backward compatibility, also set tenant_id and subdomain
+		if tenantID, ok := metadataPublic["tenant_id"].(string); ok {
+			claims["tenant_id"] = tenantID
+		}
 
-			// Add tenant_memberships to claims
-			if tenantMemberships, ok := metadataPublic[auth.AUTH_TENANT_MEMBERSHIPS].([]interface{}); ok {
-				claims[auth.AUTH_TENANT_MEMBERSHIPS] = tenantMemberships
-			}
-
-			// For backward compatibility, also set tenant_id and subdomain
-			if tenantID, ok := metadataPublic["tenant_id"].(string); ok {
-				claims["tenant_id"] = tenantID
-			}
-
-			// Extract global roles and flatten them as boolean claims for backward compatibility
-			if globalRolesArr, ok := metadataPublic["global_roles"].([]interface{}); ok {
-				claims["global_roles"] = globalRolesArr
-				for _, role := range globalRolesArr {
-					if roleStr, ok := role.(string); ok {
-						claims[roleStr] = true // e.g., claims["SUPER_ADMIN"] = true
-						logger.Debug().
-							Str("role", roleStr).
-							Msg("Setting global role as boolean claim")
-					}
+		// Extract global roles and flatten them as boolean claims for backward compatibility
+		if globalRolesArr, ok := metadataPublic["global_roles"].([]interface{}); ok {
+			claims["global_roles"] = globalRolesArr
+			for _, role := range globalRolesArr {
+				if roleStr, ok := role.(string); ok {
+					claims[roleStr] = true // e.g., claims["SUPER_ADMIN"] = true
+					logger.Debug().
+						Str("role", roleStr).
+						Msg("Setting global role as boolean claim")
 				}
-			} else {
-				logger.Debug().
-					Str("identity_id", session.Identity.Id).
-					Msg("No global_roles found in metadata_public")
 			}
 		} else {
 			logger.Debug().
 				Str("identity_id", session.Identity.Id).
-				Msg("No metadata_public found in session identity")
+				Msg("No global_roles found in metadata_public")
 		}
+	} else {
+		logger.Debug().
+			Str("identity_id", session.Identity.Id).
+			Msg("No metadata_public found in session identity")
 	}
 
 	return &auth.Token{
@@ -885,6 +893,11 @@ func (k *KratosAuthProvider) GetSessionAALInfo(c *gin.Context) (*auth.AALInfo, e
 		return nil, auth.ConvertKratosError(err)
 	}
 
+	if session.Identity == nil {
+		logger.Warn().Str("session_id", session.Id).Msg("Kratos session has no identity")
+		return nil, auth.NewAuthError(auth.ErrorCodeUnauthorized, "session has no identity")
+	}
+
 	// Extract current AAL from session
 	currentAAL := "aal1"
 	if session.AuthenticatorAssuranceLevel != nil {
@@ -969,6 +982,11 @@ func (k *KratosAuthProvider) GetMFAStatus(c *gin.Context) (MFAStatus, error) {
 	if err != nil || resp.StatusCode != 200 {
 		logger.Err(err).Msg("Failed to get session")
 		return MFAStatus{}, auth.ConvertKratosError(err)
+	}
+
+	if session.Identity == nil {
+		logger.Warn().Str("session_id", session.Id).Msg("Kratos session has no identity")
+		return MFAStatus{}, auth.NewAuthError(auth.ErrorCodeUnauthorized, "session has no identity")
 	}
 
 	identityID := session.Identity.Id
@@ -1103,6 +1121,11 @@ func (k *KratosAuthProvider) DisableWebAuthn(c *gin.Context) error {
 	if err != nil || resp.StatusCode != 200 {
 		logger.Err(err).Msg("Failed to get session")
 		return auth.ConvertKratosError(err)
+	}
+
+	if session.Identity == nil {
+		logger.Warn().Str("session_id", session.Id).Msg("Kratos session has no identity")
+		return auth.NewAuthError(auth.ErrorCodeUnauthorized, "session has no identity")
 	}
 
 	identityID := session.Identity.Id
