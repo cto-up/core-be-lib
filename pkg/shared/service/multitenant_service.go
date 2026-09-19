@@ -175,6 +175,10 @@ func (uh *MultitenantService) GetTenantBySubdomainCached(ctx context.Context, su
 
 // InvalidateTenant removes the cached tenant record for tenant_id.
 func (uh *MultitenantService) InvalidateTenant(tenantID string) {
+	// Broadcast first and unconditionally, mirroring provider-lib's
+	// Admin.invalidate: the other replicas need this whether or not this
+	// process has the entry cached.
+	publishTenantInvalidation(tenantID)
 	getTenantCache().invalidate(tenantID)
 }
 
@@ -186,6 +190,10 @@ func (uh *MultitenantService) InvalidateTenantByID(ctx context.Context, id uuid.
 	if err != nil {
 		return
 	}
+	// The lookup is what turns an internal id into the tenant_id the other
+	// replicas key their caches by, so the broadcast happens here rather than
+	// above it — a failed lookup stays best-effort and announces nothing.
+	publishTenantInvalidation(tenant.TenantID)
 	getTenantCache().invalidate(tenant.TenantID)
 }
 
