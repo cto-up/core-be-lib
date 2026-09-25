@@ -638,10 +638,24 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 		return
 	}
 
-	// Check if user exists globally
+	// Every outcome below answers the same body, so the response never says
+	// whether the address has an account — nor whether a mail actually left.
+	initiated := gin.H{"success": true, "message": "Verification flow initiated"}
+
+	allowed, err := claimSignupEmailSend(c, uh.store, string(req.Email))
+	if err != nil {
+		logger.Err(err).Msg("Failed to check the sign-up email throttle")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !allowed {
+		logger.Warn().Msg("Sign-up email throttled")
+		c.JSON(http.StatusOK, initiated)
+		return
+	}
+
 	globalUser, err := uh.userService.GetUserByEmailGlobal(c, string(req.Email))
 	if err != nil {
-
 		newUserReq := core.NewUser{
 			Email: string(req.Email),
 			Name:  string(req.Email), // Default name to email
@@ -654,43 +668,50 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 			return
 		}
 
-		// Send magic link
-		err = sendMagicLink(c, baseAuthClient, origin, string(req.Email))
-		if err != nil {
+		if err := sendMagicLink(c, baseAuthClient, origin, string(req.Email)); err != nil {
 			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to send magic link")
 		}
 		logger.Info().Str("email", user.Email.String).Msg("Magic link sent for new user")
-	} else {
-		// User exists globally
-		// Check if member of tenant
-		isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
-			UserID:   globalUser.Id,
-			TenantID: tenantID.(string),
-		})
+		c.JSON(http.StatusOK, initiated)
+		return
+	}
+
+	isMember, err := uh.store.IsUserMemberOfTenant(c, repository.IsUserMemberOfTenantParams{
+		UserID:   globalUser.Id,
+		TenantID: tenantID.(string),
+	})
+	if err != nil {
+		logger.Err(err).Msg("Failed to check tenant membership")
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+		return
+	}
+	if !isMember {
+		err = uh.userService.AddUserToTenant(c, baseAuthClient, tenantID.(string), globalUser.Id, []core.Role{core.USER}, "")
 		if err != nil {
-			logger.Err(err).Msg("Failed to check tenant membership")
+			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to add user to tenant during identification")
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
+	}
 
-		if !isMember {
-			// Add to tenant
-			err = uh.userService.AddUserToTenant(c, baseAuthClient, tenantID.(string), globalUser.Id, []core.Role{core.USER}, "")
-			if err != nil {
-				logger.Err(err).Str("email", string(req.Email)).Msg("Failed to add user to tenant during identification")
-				c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-				return
-			}
+	// A repeat sign-up is usually someone whose first email got lost. They
+	// have no password yet, so a link to the sign-in page would strand them.
+	activity, activityErr := baseAuthClient.GetUserActivity(c, []string{globalUser.Id})
+	if activityErr != nil {
+		logger.Err(activityErr).Msg("Failed to read identity activity; sending the access link")
+	}
+	switch signupEmailFor(globalUser.Id, activity, activityErr) {
+	case signupEmailAlreadyRegistered:
+		if err := sendAlreadyRegisteredEmail(c, baseAuthClient, origin+"/signin", string(req.Email), tenant.Name); err != nil {
+			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to send already-registered email")
 		}
-
-		// Send sign-in link
-		err = sendSigninEmail(c, origin, string(req.Email))
-		if err != nil {
-			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to send sign-in email")
+	default:
+		if err := sendMagicLink(c, baseAuthClient, origin, string(req.Email)); err != nil {
+			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to resend magic link")
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Verification flow initiated"})
+	c.JSON(http.StatusOK, initiated)
 }
 
 // CompleteSocialSignIn implements openapi.ServerInterface.

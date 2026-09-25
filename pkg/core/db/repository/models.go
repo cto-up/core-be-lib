@@ -88,6 +88,13 @@ type CoreRole struct {
 	Name      string    `json:"name"`
 }
 
+type CoreSignupEmailThrottle struct {
+	EmailHash       string    `json:"email_hash"`
+	LastSentAt      time.Time `json:"last_sent_at"`
+	WindowStartedAt time.Time `json:"window_started_at"`
+	WindowCount     int32     `json:"window_count"`
+}
+
 type CoreTenant struct {
 	ID                  uuid.UUID                       `json:"id"`
 	TenantID            string                          `json:"tenant_id"`

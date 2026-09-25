@@ -302,29 +302,3 @@ func sendMagicLink(c *gin.Context, baseAuthClient auth.AuthClient, origin, toEma
 	logger.Info().Str("email", toEmail).Msg("Magic link email sent successfully")
 	return nil
 }
-
-func sendSigninEmail(c *gin.Context, origin, toEmail string) error {
-	logger := util.GetLoggerFromCtx(c.Request.Context())
-	fromEmail := config.SystemEmailFrom()
-
-	signinURL := origin + "/signin"
-
-	templateData := struct {
-		Link string
-	}{
-		Link: signinURL,
-	}
-
-	r := emailservice.NewEmailRequest(fromEmail, []string{toEmail}, "Sign in to your account", "")
-	if err := r.ParseTemplateWithDomain(c, "email-signin.html", templateData); err != nil {
-		logger.Err(err).Msg("Failed to parse template for signin email")
-		return err
-	}
-
-	if err := r.SendEmail(); err != nil {
-		logger.Err(err).Msg("Failed to send signin email")
-		return err
-	}
-	logger.Info().Str("email", toEmail).Msg("Signin email sent successfully")
-	return nil
-}
