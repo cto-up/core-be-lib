@@ -269,12 +269,14 @@ func sendTenantAddedEmail(c *gin.Context, baseAuthClient auth.AuthClient, url, t
 	return nil
 }
 
-func sendMagicLink(c *gin.Context, baseAuthClient auth.AuthClient, origin, toEmail string) error {
+// returnPath must already have been through safeReturnPath.
+func sendMagicLink(c *gin.Context, baseAuthClient auth.AuthClient, origin, toEmail, returnPath string) error {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	fromEmail := config.SystemEmailFrom()
 
 	actionCodeSettings := &auth.ActionCodeSettings{
-		URL: origin + "/signin", // Redirect to signin after using the link
+		URL:  origin + "/signin", // Redirect to signin after using the link
+		From: returnPath,
 	}
 
 	link, err := baseAuthClient.PasswordResetLinkWithSettings(c, toEmail, actionCodeSettings)

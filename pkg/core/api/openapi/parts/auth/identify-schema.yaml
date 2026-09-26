@@ -5,3 +5,10 @@ properties:
   email:
     type: string
     format: email
+  returnTo:
+    type: string
+    maxLength: 2048
+    description: >
+      Where the emailed link lands once the password is set — an app path
+      (`/lms/courses/x`) or an absolute URL on the caller's base domain.
+      Anything else is dropped silently and the link lands on the default home.

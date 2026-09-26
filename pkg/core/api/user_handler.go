@@ -603,6 +603,11 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 		}
 	}
 
+	returnPath := ""
+	if req.ReturnTo != nil {
+		returnPath = safeReturnPath(*req.ReturnTo, origin)
+	}
+
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
@@ -668,7 +673,7 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 			return
 		}
 
-		if err := sendMagicLink(c, baseAuthClient, origin, string(req.Email)); err != nil {
+		if err := sendMagicLink(c, baseAuthClient, origin, string(req.Email), returnPath); err != nil {
 			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to send magic link")
 		}
 		logger.Info().Str("email", user.Email.String).Msg("Magic link sent for new user")
@@ -702,11 +707,15 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 	}
 	switch signupEmailFor(globalUser.Id, activity, activityErr) {
 	case signupEmailAlreadyRegistered:
-		if err := sendAlreadyRegisteredEmail(c, baseAuthClient, origin+"/signin", string(req.Email), tenant.Name); err != nil {
+		signinURL := origin + "/signin"
+		if returnPath != "" {
+			signinURL += "?from=" + url.QueryEscape(returnPath)
+		}
+		if err := sendAlreadyRegisteredEmail(c, baseAuthClient, signinURL, string(req.Email), tenant.Name); err != nil {
 			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to send already-registered email")
 		}
 	default:
-		if err := sendMagicLink(c, baseAuthClient, origin, string(req.Email)); err != nil {
+		if err := sendMagicLink(c, baseAuthClient, origin, string(req.Email), returnPath); err != nil {
 			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to resend magic link")
 		}
 	}

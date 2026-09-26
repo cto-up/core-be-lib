@@ -773,6 +773,9 @@ func (k *KratosAuthClient) PasswordResetLinkWithSettings(ctx context.Context, em
 			if settings.ReturnTo != "" {
 				frontendLink += "&return_to=" + url.QueryEscape(settings.ReturnTo)
 			}
+			if settings.From != "" {
+				frontendLink += "&from=" + url.QueryEscape(settings.From)
+			}
 			logger.Info().
 				Str("kratos_link", kratosLink).
 				Str("settings_url", settings.URL).

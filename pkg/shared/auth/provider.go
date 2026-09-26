@@ -209,6 +209,10 @@ type ActionCodeSettings struct {
 	// ReturnTo is the frontend path to redirect to after recovery is complete.
 	// When set, it is appended as &return_to=<encoded> to the recovery link.
 	ReturnTo string
+	// From is where the user lands after setting a password from the link.
+	// Appended as &from=<encoded>; unlike ReturnTo it keeps the password form.
+	// The caller must have validated it.
+	From string
 }
 
 // Token represents an authentication token

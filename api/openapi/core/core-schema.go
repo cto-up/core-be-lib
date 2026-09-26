@@ -363,6 +363,9 @@ type HealthResponseStatus string
 // Identify defines model for Identify.
 type Identify struct {
 	Email openapi_types.Email `json:"email"`
+
+	// ReturnTo Where the emailed link lands once the password is set — an app path (`/lms/courses/x`) or an absolute URL on the caller's base domain. Anything else is dropped silently and the link lands on the default home.
+	ReturnTo *string `json:"returnTo,omitempty"`
 }
 
 // LeaveDecision One answer to an impact the preview reported with severity `decision`.
