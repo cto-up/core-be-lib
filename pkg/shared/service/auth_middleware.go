@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"ctoup.com/coreapp/api/openapi/core"
+	"ctoup.com/coreapp/pkg/shared/access"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/auth/kratos"
 	"ctoup.com/coreapp/pkg/shared/util"
@@ -64,6 +65,7 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					c.Set("api_token", tokenRow)
 					c.Set("api_token_scopes", tokenRow.Scopes)
 					c.Set(auth.AUTH_USER_ID, tokenRow.CreatedBy)
+					am.setAPITokenPrincipal(c, tokenRow.TenantID.String, tokenRow.CreatedBy, tokenRow.Scopes)
 					c.Next()
 					return
 				} else {
@@ -135,11 +137,65 @@ func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *auth.Authen
 	// set above before the role-check helpers run, since they read claims off
 	// the gin context.
 	isAdmin := auth.IsAdmin(c) || auth.IsCustomerAdmin(c) || auth.IsSuperAdmin(c)
+	isolate := user.TenantAllowSignUp && !isAdmin
 	c.Set(auth.AUTH_ACCESS_SCOPE, auth.AccessScope{
 		TenantID:      user.TenantID,
 		UserID:        user.UserID,
-		IsolateByUser: user.TenantAllowSignUp && !isAdmin,
+		IsolateByUser: isolate,
 	})
+
+	// The session door's Principal (ADR 048 §B): roles from the claims, an
+	// unscoped credential (nil Caps), and a browser that can step up.
+	c.Request = c.Request.WithContext(access.WithPrincipal(c.Request.Context(), access.Principal{
+		TenantID:       user.TenantID,
+		UserID:         user.UserID,
+		Email:          user.Email,
+		Roles:          rolesFromClaims(user.Claims),
+		ActingReseller: user.IsActingReseller,
+		IsolateByUser:  isolate,
+		StepUpPossible: true,
+	}))
+}
+
+// setAPITokenPrincipal is the X-Api-Key door (hub#237). A token carries no
+// claims, so every auth.Is* gate refused it — even one an admin created. Its
+// roles are now its creator's CURRENT roles in the token's tenant, read through
+// the installed RoleResolver: an admin who is demoted takes their tokens down
+// with them. Its Caps are the token's own scopes, and it cannot step up.
+func (am *AuthMiddleware) setAPITokenPrincipal(c *gin.Context, tenantID, createdBy string, scopes []string) {
+	roles, isolate, err := access.ResolveRoles(c.Request.Context(), tenantID, createdBy)
+	if err != nil {
+		// No roles is the safe answer: the token keeps the reach it always had.
+		log.Warn().Err(err).Str("tenant_id", tenantID).Msg("api token: could not resolve the creator's roles")
+		roles = nil
+	}
+	claims := make(map[string]interface{}, len(roles))
+	for _, r := range roles {
+		claims[r] = true
+	}
+	c.Set(auth.AUTH_CLAIMS, claims)
+	if scopes == nil {
+		scopes = []string{}
+	}
+	c.Request = c.Request.WithContext(access.WithPrincipal(c.Request.Context(), access.Principal{
+		TenantID:      tenantID,
+		UserID:        createdBy,
+		Roles:         roles,
+		IsolateByUser: isolate,
+		Caps:          scopes,
+		AAL:           "aal1",
+	}))
+}
+
+// rolesFromClaims lists the tenant roles a session's claims grant.
+func rolesFromClaims(claims map[string]interface{}) []string {
+	var roles []string
+	for _, r := range []string{access.RoleSuperAdmin, access.RoleAdmin, access.RoleCustomerAdmin} {
+		if claims[r] == true {
+			roles = append(roles, r)
+		}
+	}
+	return roles
 }
 
 // checkPermissions validates role-based access control

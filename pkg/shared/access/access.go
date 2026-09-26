@@ -48,9 +48,15 @@ func ContextWithTenantAdmin(ctx context.Context, isTenantAdmin bool) context.Con
 // admin-originated by the middleware. Returns false for any context
 // that didn't go through the middleware (e.g. background jobs)
 // — safe-by-default.
+//
+// A Principal on the context answers too (ADR 048 §B): the flag is the one-bit
+// form of the same question, kept so its callers compile unchanged.
 func IsTenantAdminFromContext(ctx context.Context) bool {
-	v, ok := ctx.Value(ctxKeyTenantAdmin).(bool)
-	return ok && v
+	if v, ok := ctx.Value(ctxKeyTenantAdmin).(bool); ok && v {
+		return true
+	}
+	p, ok := PrincipalFrom(ctx)
+	return ok && p.IsTenantAdmin()
 }
 
 // TenantAdminContextMiddleware stamps the request context with the
