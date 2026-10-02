@@ -96,6 +96,7 @@ func (k *KratosAuthProvider) verifyCredentialWithTenantID(ctx context.Context, t
 	}
 
 	email, _ := token.Claims["email"].(string)
+	emailVerified, _ := token.Claims[emailVerifiedClaim].(bool)
 	claims := map[string]interface{}{}
 
 	// if customClaims containts SUPER_ADMIN
@@ -121,7 +122,7 @@ func (k *KratosAuthProvider) verifyCredentialWithTenantID(ctx context.Context, t
 	user := &auth.AuthenticatedUser{
 		UserID:            token.UID,
 		Email:             email,
-		EmailVerified:     true, // Should check verifiable_addresses if needed
+		EmailVerified:     emailVerified,
 		Claims:            claims,
 		TenantID:          tenantID,
 		TenantMemberships: []auth.TenantMembership{},
@@ -687,6 +688,10 @@ func (k *KratosAuthClient) VerifySessionCredential(ctx context.Context, cred aut
 		}
 	}
 
+	// Set after the traits so a self-service trait of the same name cannot
+	// claim a verification Kratos never recorded.
+	claims[emailVerifiedClaim] = identityEmailVerified(session.Identity)
+
 	// Extract tenant and role information from metadata_public
 	if metadataPublic, ok := session.Identity.MetadataPublic.(map[string]interface{}); ok {
 		// Debug logging
@@ -1219,6 +1224,22 @@ func (k *KratosTenantManager) AuthForTenant(ctx context.Context, tenantID string
 }
 
 // Helpers
+
+// emailVerifiedClaim carries the identity's verification state from the
+// session to the AuthenticatedUser built from it.
+const emailVerifiedClaim = "email_verified"
+
+// identityEmailVerified is true when Kratos has verified at least one of the
+// identity's verifiable addresses.
+func identityEmailVerified(ident *ory.Identity) bool {
+	for _, addr := range ident.VerifiableAddresses {
+		if addr.Verified {
+			return true
+		}
+	}
+	return false
+}
+
 func convertKratosIdentityToUserRecord(ident *ory.Identity) *auth.UserRecord {
 	traits := ident.Traits.(map[string]interface{})
 	email, _ := traits["email"].(string)
@@ -1233,7 +1254,7 @@ func convertKratosIdentityToUserRecord(ident *ory.Identity) *auth.UserRecord {
 		UID:           ident.Id,
 		Email:         email,
 		DisplayName:   name,
-		EmailVerified: true, // Should check Kratos verifiable_addresses
+		EmailVerified: identityEmailVerified(ident),
 		CreatedAt:     createdAt,
 		CustomClaims:  traits, // Map traits to claims
 	}
@@ -1287,17 +1308,10 @@ func (k *KratosAuthClient) GetUserActivity(ctx context.Context, uids []string) (
 		if ident.State != nil {
 			state = *ident.State
 		}
-		verified := false
-		for _, addr := range ident.VerifiableAddresses {
-			if addr.Verified {
-				verified = true
-				break
-			}
-		}
 		result[ident.Id] = auth.UserActivity{
 			Found:         true,
 			State:         state,
-			EmailVerified: verified,
+			EmailVerified: identityEmailVerified(&ident),
 		}
 	}
 
