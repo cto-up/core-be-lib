@@ -328,3 +328,34 @@ func TestGetFile_RangeOnAMissingObjectIs404NotEmpty206(t *testing.T) {
 		t.Errorf("status = %d, want 404", rec.Code)
 	}
 }
+
+// A stored file is uploaded by one user and opened by another, on the API's
+// own origin where the session cookie is sent. A type that can run script
+// (SVG, HTML, XML) must open as an inert document (hub#384), and no type may
+// be sniffed into one.
+func TestGetFile_ActiveContentIsSandboxed(t *testing.T) {
+	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.domain)</script></svg>`)
+	for _, name := range []string{"x.svg", "x.html", "x.xhtml", "x.xml"} {
+		rec := serve(t, newTestFileService(t, name, svg), name, nil)
+		if got := rec.Header().Get("Content-Security-Policy"); got != "sandbox" {
+			t.Errorf("%s: Content-Security-Policy = %q, want \"sandbox\" — without it the script runs on the API origin", name, got)
+		}
+		if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+			t.Errorf("%s: X-Content-Type-Options = %q, want nosniff", name, got)
+		}
+	}
+}
+
+// Passive types keep rendering everywhere: a sandbox CSP would stop Chrome's
+// PDF viewer, which refuses to run in a sandboxed document.
+func TestGetFile_PassiveContentIsNotSandboxed(t *testing.T) {
+	for _, name := range []string{"x.png", "x.pdf", "x.mp4"} {
+		rec := serve(t, newTestFileService(t, name, []byte("data")), name, nil)
+		if got := rec.Header().Get("Content-Security-Policy"); got != "" {
+			t.Errorf("%s: Content-Security-Policy = %q, want none", name, got)
+		}
+		if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+			t.Errorf("%s: X-Content-Type-Options = %q, want nosniff", name, got)
+		}
+	}
+}

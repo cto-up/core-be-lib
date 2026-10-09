@@ -400,8 +400,17 @@ func (fs *FileService) GetFile(ctx *gin.Context, filename string) error {
 
 	etag := etagFor(attrs)
 
+	contentType := fs.getContentType(filename)
 	ctx.Header("ETag", etag)
-	ctx.Header("Content-Type", fs.getContentType(filename))
+	ctx.Header("Content-Type", contentType)
+	// Stored files come from one user and open in another's browser, on the
+	// API's origin where the session cookie is sent. Nothing is sniffed into an
+	// executable type, and a type that can run script opens as an inert,
+	// origin-less document (hub#384).
+	ctx.Header("X-Content-Type-Options", "nosniff")
+	if canRunScript(contentType) {
+		ctx.Header("Content-Security-Policy", "sandbox")
+	}
 	ctx.Header("Cache-Control", "public, max-age=3600")
 	// Advertised unconditionally: a client that cannot see Accept-Ranges will
 	// not attempt a ranged request in the first place.
@@ -546,6 +555,18 @@ func resolveRange(header string, size int64) (offset, length int64, status int, 
 		}
 		return from, to - from + 1, http.StatusPartialContent, nil
 	}
+}
+
+// canRunScript reports the types a browser executes script in when opened as
+// a document. Only these get the sandbox: on a PDF it would stop Chrome's
+// viewer, which refuses to run in a sandboxed document.
+func canRunScript(contentType string) bool {
+	mediaType, _, _ := mime.ParseMediaType(contentType)
+	switch mediaType {
+	case "image/svg+xml", "text/html", "application/xhtml+xml", "text/xml", "application/xml":
+		return true
+	}
+	return false
 }
 
 // getContentType determines the MIME type based on file extension
