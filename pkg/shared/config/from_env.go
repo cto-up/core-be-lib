@@ -42,10 +42,6 @@ func FromEnv() Config {
 			Release:          os.Getenv("SENTRY_RELEASE"),
 			TracesSampleRate: os.Getenv("SENTRY_TRACES_SAMPLE_RATE"),
 		},
-		Turn: Turn{
-			PublicIP: os.Getenv("BACKEND_HOST"),
-			Port:     os.Getenv("TURN_SERVER_PORT"),
-		},
 		Storage: Storage{
 			Provider:     os.Getenv("FILE_STORAGE_PROVIDER"),
 			Bucket:       storageBucketFromEnv(),

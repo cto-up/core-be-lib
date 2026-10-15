@@ -42,7 +42,6 @@ type Config struct {
 	Kratos   Kratos
 	Seed     Seed
 	Sentry   Sentry
-	Turn     Turn
 	Storage  Storage
 }
 
@@ -76,12 +75,6 @@ type Sentry struct {
 	Environment      string
 	Release          string
 	TracesSampleRate string
-}
-
-// Turn is the STUN/TURN server for realtime media.
-type Turn struct {
-	PublicIP string
-	Port     string
 }
 
 // Storage is where uploaded files live.
@@ -263,9 +256,6 @@ func SeedSettings() Seed { return Current().Seed }
 
 // SentrySettings is the error reporter.
 func SentrySettings() Sentry { return Current().Sentry }
-
-// TurnSettings is the STUN/TURN server.
-func TurnSettings() Turn { return Current().Turn }
 
 // StorageSettings is where uploaded files live.
 func StorageSettings() Storage { return Current().Storage }
