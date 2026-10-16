@@ -58,6 +58,21 @@ func GetTenantMap() *TenantMap {
 	return tenantMapInstance
 }
 
+// forgetTenant drops everything this process caches about a tenant: its record
+// and every subdomain mapped to it, so a renamed or deleted subdomain stops
+// resolving to it.
+func forgetTenant(tenantID string) {
+	getTenantCache().invalidate(tenantID)
+	m := GetTenantMap()
+	m.Lock()
+	for subdomain, id := range m.data {
+		if id == tenantID {
+			delete(m.data, subdomain)
+		}
+	}
+	m.Unlock()
+}
+
 type MultitenantService struct {
 	store *db.Store
 }
@@ -173,13 +188,14 @@ func (uh *MultitenantService) GetTenantBySubdomainCached(ctx context.Context, su
 	return tenant, nil
 }
 
-// InvalidateTenant removes the cached tenant record for tenant_id.
+// InvalidateTenant removes the cached tenant record and subdomain mappings for
+// tenant_id, here and on every other replica.
 func (uh *MultitenantService) InvalidateTenant(tenantID string) {
 	// Broadcast first and unconditionally, mirroring provider-lib's
 	// Admin.invalidate: the other replicas need this whether or not this
 	// process has the entry cached.
 	publishTenantInvalidation(tenantID)
-	getTenantCache().invalidate(tenantID)
+	forgetTenant(tenantID)
 }
 
 // InvalidateTenantByID looks up the tenant_id for the given internal ID and
@@ -194,7 +210,7 @@ func (uh *MultitenantService) InvalidateTenantByID(ctx context.Context, id uuid.
 	// replicas key their caches by, so the broadcast happens here rather than
 	// above it — a failed lookup stays best-effort and announces nothing.
 	publishTenantInvalidation(tenant.TenantID)
-	getTenantCache().invalidate(tenant.TenantID)
+	forgetTenant(tenant.TenantID)
 }
 
 // IsActingResellerFor reports whether resellerTenantID acts as the reseller of

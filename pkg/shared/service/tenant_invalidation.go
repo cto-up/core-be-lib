@@ -96,5 +96,5 @@ func ApplyTenantInvalidation(payload []byte) {
 	if ev.TenantID == "" {
 		return
 	}
-	getTenantCache().invalidate(ev.TenantID)
+	forgetTenant(ev.TenantID)
 }
