@@ -781,11 +781,9 @@ func (k *KratosAuthClient) PasswordResetLinkWithSettings(ctx context.Context, em
 			if settings.From != "" {
 				frontendLink += "&from=" + url.QueryEscape(settings.From)
 			}
+			// Never the links themselves: they carry a live recovery token.
 			logger.Info().
-				Str("kratos_link", kratosLink).
-				Str("settings_url", settings.URL).
 				Str("base_url", baseURL).
-				Str("frontend_link", frontendLink).
 				Str("email", email).
 				Msg("Converted Kratos recovery link to frontend URL")
 			return frontendLink, nil
