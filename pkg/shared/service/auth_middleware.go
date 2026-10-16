@@ -18,6 +18,8 @@ const (
 	XApiKeyHeader = "X-Api-Key"
 )
 
+var mutatingMethods = []string{"POST", "PUT", "PATCH", "DELETE"}
+
 // AuthMiddleware combines both API token and provider-based authentication
 type AuthMiddleware struct {
 	authProvider auth.AuthProvider
@@ -74,6 +76,17 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					c.JSON(http.StatusForbidden, gin.H{
 						"status":  http.StatusForbidden,
 						"message": "API token does not belong to this tenant",
+					})
+					c.Abort()
+					return
+				}
+				// Scopes bound what a token may do whatever its creator's roles
+				// grant: only a write or admin token may change anything.
+				if util.Contains(mutatingMethods, c.Request.Method) &&
+					!util.Contains(tokenRow.Scopes, "write") && !util.Contains(tokenRow.Scopes, "admin") {
+					c.JSON(http.StatusForbidden, gin.H{
+						"status":  http.StatusForbidden,
+						"message": "API token lacks the write scope",
 					})
 					c.Abort()
 					return
@@ -221,7 +234,7 @@ func (am *AuthMiddleware) checkPermissions(c *gin.Context, user *auth.Authentica
 	// Only admin users can alter users
 	if !isSelfService &&
 		strings.HasPrefix(c.Request.URL.Path, "/api/v1/users") &&
-		util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
+		util.Contains(mutatingMethods, c.Request.Method) {
 
 		if claims[string(core.SUPERADMIN)] == true || claims[string(core.ADMIN)] == true || claims[string(core.CUSTOMERADMIN)] == true || claims[string(auth.ACTING_RESELLER)] == true {
 			return true
@@ -278,7 +291,7 @@ func (am *AuthMiddleware) checkAALRequirements(c *gin.Context) bool {
 	}
 
 	// Applies to mutating methods only
-	if !util.Contains([]string{"POST", "PUT", "PATCH", "DELETE"}, c.Request.Method) {
+	if !util.Contains(mutatingMethods, c.Request.Method) {
 		return true
 	}
 

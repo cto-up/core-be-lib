@@ -589,31 +589,3 @@ func APITokenMiddleware(clientAppService *ClientApplicationService) gin.HandlerF
 func HexEncodeTokenHash(hash []byte) string {
 	return hex.EncodeToString(hash)
 }
-
-// ValidateTokenScopes validates that a token has the required scopes
-func ValidateTokenScopes(c *gin.Context, requiredScopes []string) bool {
-	// If no required scopes, allow access
-	if len(requiredScopes) == 0 {
-		return true
-	}
-
-	// Get token scopes from context
-	tokenScopes, exists := c.Get("api_token_scopes")
-	if !exists {
-		return false
-	}
-
-	// Check if all required scopes are present
-	scopes, ok := tokenScopes.([]string)
-	if !ok {
-		return false
-	}
-
-	for _, requiredScope := range requiredScopes {
-		if !util.Contains(scopes, requiredScope) {
-			return false
-		}
-	}
-
-	return true
-}

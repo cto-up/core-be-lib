@@ -96,12 +96,19 @@ tenant-scoped.
 
 ## Exception: token authentication
 
-`GetAPITokenByHash` (the `APITokenMiddleware` path) is intentionally **not**
-tenant-scoped. An incoming token is looked up by its hash globally, and the
-tenant is then derived from the token's application and set on the context:
+`GetAPITokenByHash` is intentionally **not** tenant-scoped: an incoming
+`X-Api-Key` is looked up by its hash globally. `AuthMiddleware`
+(`pkg/shared/service/auth_middleware.go`) then holds the token to the scope it
+was issued for, and refuses it with 403 otherwise:
 
-```go
-if apiToken.TenantID.Valid {
-    c.Set(auth.AUTH_TENANT_ID_KEY, apiToken.TenantID.String)
-}
-```
+- **Tenant** — the token's application tenant must equal `AUTH_TENANT_ID_KEY`,
+  which the tenant middleware resolved from the host. A tenant's token is
+  refused on another tenant's host and on the root domain (hub#550).
+- **Global** — an empty-tenant token is accepted only where the request has
+  no tenant, i.e. on the root domain.
+- **Scopes** — a `POST`/`PUT`/`PATCH`/`DELETE` needs the `write` or `admin`
+  scope, whatever roles the token's creator holds (hub#551). A `read` token
+  only reads.
+
+Tokens never reach `/api/v1/users`, `/admin-api` or `/superadmin-api`; those
+take a session only.
