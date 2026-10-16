@@ -24,6 +24,11 @@ func TestSafeReturnPath(t *testing.T) {
 		{"same host absolute", "http://corpa.ctoup.localhost:5173/lms", origin, "http://corpa.ctoup.localhost:5173/lms"},
 		{"sibling subdomain", "https://corpb.ctoup.localhost/lms", origin, "https://corpb.ctoup.localhost/lms"},
 		{"bare base domain", "https://sparkmeee.com/x", "https://acme.sparkmeee.com", "https://sparkmeee.com/x"},
+		{"two-part suffix sibling", "https://attacker.co.uk/phish", "https://foo.example.co.uk", ""},
+		{"two-part suffix same domain", "https://bar.example.co.uk/x", "https://foo.example.co.uk", "https://bar.example.co.uk/x"},
+		{"downgrade to http", "http://othertenant.ctoup.com/x", "https://tenant.ctoup.com", ""},
+		{"https from http origin", "https://corpb.ctoup.localhost/x", origin, "https://corpb.ctoup.localhost/x"},
+		{"ip origin", "http://127.0.0.1:5173/x", "http://127.0.0.1:5173", "http://127.0.0.1:5173/x"},
 		{"absolute with no origin", "https://sparkmeee.com/x", "", ""},
 		{"too long", "/" + string(make([]byte, maxReturnPathLen)), origin, ""},
 	}
