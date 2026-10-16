@@ -60,16 +60,7 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 			token := c.GetHeader(XApiKeyHeader)
 			if token != "" {
 				tokenRow, err := am.apiToken.VerifyAPIToken(c, token)
-				if err == nil {
-					// API token is valid, store info and continue
-					c.Set("api_token", tokenRow)
-					c.Set("api_token_scopes", tokenRow.Scopes)
-					c.Set(auth.AUTH_USER_ID, tokenRow.CreatedBy)
-					am.setAPITokenPrincipal(c, tokenRow.TenantID.String, tokenRow.CreatedBy, tokenRow.Scopes)
-					c.Next()
-					return
-				} else {
-					// API token is invalid
+				if err != nil {
 					c.JSON(http.StatusForbidden, gin.H{
 						"status":  http.StatusForbidden,
 						"message": "Invalid API token",
@@ -77,6 +68,23 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					c.Abort()
 					return
 				}
+				// A token acts in the tenant it was issued for, never in the one
+				// the request's host selects; a token reaching a route with no
+				// tenant context is refused for the same reason.
+				if tokenRow.TenantID.String == "" || tokenRow.TenantID.String != c.GetString(auth.AUTH_TENANT_ID_KEY) {
+					c.JSON(http.StatusForbidden, gin.H{
+						"status":  http.StatusForbidden,
+						"message": "API token does not belong to this tenant",
+					})
+					c.Abort()
+					return
+				}
+				c.Set("api_token", tokenRow)
+				c.Set("api_token_scopes", tokenRow.Scopes)
+				c.Set(auth.AUTH_USER_ID, tokenRow.CreatedBy)
+				am.setAPITokenPrincipal(c, tokenRow.TenantID.String, tokenRow.CreatedBy, tokenRow.Scopes)
+				c.Next()
+				return
 			}
 		}
 
