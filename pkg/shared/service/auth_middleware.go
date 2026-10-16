@@ -68,10 +68,9 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 					c.Abort()
 					return
 				}
-				// A token acts in the tenant it was issued for, never in the one
-				// the request's host selects; a token reaching a route with no
-				// tenant context is refused for the same reason.
-				if tokenRow.TenantID.String == "" || tokenRow.TenantID.String != c.GetString(auth.AUTH_TENANT_ID_KEY) {
+				// A token acts only in the scope it was issued for: a tenant's
+				// token on that tenant's host, a global token on the root domain.
+				if tokenRow.TenantID.String != c.GetString(auth.AUTH_TENANT_ID_KEY) {
 					c.JSON(http.StatusForbidden, gin.H{
 						"status":  http.StatusForbidden,
 						"message": "API token does not belong to this tenant",

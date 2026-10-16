@@ -39,7 +39,7 @@ func TestAnAPITokenOnlyActsInItsOwnTenant(t *testing.T) {
 	}{
 		{"its own tenant", app.TenantID.String, http.StatusOK},
 		{"another tenant", "other-tenant", http.StatusForbidden},
-		{"no tenant context", "", http.StatusForbidden},
+		{"the root domain", "", http.StatusForbidden},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -48,5 +48,22 @@ func TestAnAPITokenOnlyActsInItsOwnTenant(t *testing.T) {
 			tokenRouter(am, tc.requestTenant).ServeHTTP(w, req)
 			require.Equal(t, tc.want, w.Code, w.Body.String())
 		})
+	}
+}
+
+func TestAGlobalAPITokenOnlyActsOnTheRootDomain(t *testing.T) {
+	svc, _, ctx := setupTestAPITokenService(t)
+	app, err := svc.CreateClientApplication(ctx, "", "global", "d", "superadmin-1")
+	require.NoError(t, err)
+	token, _, err := svc.CreateAPIToken(ctx, app.ID, "", "n", "d", 30, "superadmin-1", []string{"read"})
+	require.NoError(t, err)
+	am := &AuthMiddleware{apiToken: svc}
+
+	for requestTenant, want := range map[string]int{"": http.StatusOK, "acme": http.StatusForbidden} {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/things", nil)
+		req.Header.Set(XApiKeyHeader, token)
+		tokenRouter(am, requestTenant).ServeHTTP(w, req)
+		require.Equal(t, want, w.Code, "request tenant %q: %s", requestTenant, w.Body.String())
 	}
 }
