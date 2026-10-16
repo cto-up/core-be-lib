@@ -357,8 +357,10 @@ func (exh *TenantHandler) DeleteTenant(c *gin.Context, id uuid.UUID) {
 		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
-	exh.multiTenantService.InvalidateTenant(tenant.TenantID)
 	_, err = exh.store.DeleteTenant(c, id)
+	// After the write, or another replica re-caches the row before it is gone.
+	// Also when the write fails: the auth provider's tenant is already deleted.
+	exh.multiTenantService.InvalidateTenant(tenant.TenantID)
 	if err != nil {
 		if helpers.AbortIfReferenced(c, err,
 			"TENANT_IN_USE",
