@@ -344,7 +344,44 @@ func (k *KratosAuthClient) UpdateUser(ctx context.Context, uid string, user *aut
 		return nil, auth.ConvertKratosError(err)
 	}
 
+	if verified := user.GetEmailVerified(); verified != nil {
+		if updated, err = k.setEmailVerified(ctx, updated, *verified); err != nil {
+			return nil, err
+		}
+	}
+
 	return convertKratosIdentityToUserRecord(updated), nil
+}
+
+// setEmailVerified marks the identity's email verifiable address. Kratos keeps
+// verification on the address, not in the traits, so the identity update above
+// cannot carry it; EmailVerified on the user record is read back from here.
+func (k *KratosAuthClient) setEmailVerified(ctx context.Context, ident *ory.Identity, verified bool) (*ory.Identity, error) {
+	email, _ := ident.Traits.(map[string]interface{})["email"].(string)
+	status := "pending"
+	if verified {
+		status = "completed"
+	}
+	var patch []ory.JsonPatch
+	for i, addr := range ident.VerifiableAddresses {
+		if addr.Via != "email" || !strings.EqualFold(addr.Value, email) {
+			continue
+		}
+		patch = append(patch,
+			ory.JsonPatch{Op: "replace", Path: fmt.Sprintf("/verifiable_addresses/%d/verified", i), Value: verified},
+			ory.JsonPatch{Op: "replace", Path: fmt.Sprintf("/verifiable_addresses/%d/status", i), Value: status},
+		)
+	}
+	if len(patch) == 0 {
+		return ident, nil
+	}
+	patched, _, err := k.adminClient.IdentityAPI.PatchIdentity(ctx, ident.Id).JsonPatch(patch).Execute()
+	if err != nil {
+		logger := util.GetLoggerFromCtx(ctx)
+		logger.Err(err).Msg("Failed to set the email verifiable address")
+		return nil, auth.ConvertKratosError(err)
+	}
+	return patched, nil
 }
 
 func (k *KratosAuthClient) DeleteUser(ctx context.Context, uid string) error {

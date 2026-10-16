@@ -2,12 +2,15 @@ package kratos
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	ory "github.com/ory/kratos-client-go"
+
+	"ctoup.com/coreapp/pkg/shared/auth"
 )
 
 // hub#184: both the user record and the AuthenticatedUser of every request
@@ -72,5 +75,41 @@ func TestVerifyTokenWithTenantIDEmailVerifiedFollowsVerifiableAddresses(t *testi
 				t.Errorf("EmailVerified = %v, want %v", user.EmailVerified, tc.want)
 			}
 		})
+	}
+}
+
+// hub#555. Core's own verification link calls UpdateUser(EmailVerified(true)),
+// which only ever wrote traits and password, so once EmailVerified was read
+// from Kratos the user stayed unverified forever.
+func TestUpdateUserEmailVerifiedReachesTheVerifiableAddress(t *testing.T) {
+	verified := false
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPatch {
+			var patch []ory.JsonPatch
+			if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+				t.Errorf("decode patch: %v", err)
+			}
+			for _, op := range patch {
+				if op.Op == "replace" && op.Path == "/verifiable_addresses/0/verified" {
+					verified, _ = op.Value.(bool)
+				}
+			}
+		}
+		_, _ = w.Write([]byte(identityJSON(fmt.Sprintf(
+			`[{"value":"who@example.com","verified":%v,"via":"email","status":"sent"}]`, verified))))
+	}))
+	ctx := context.Background()
+	const uid = "9d4b7e10-0000-4000-8000-000000000002"
+
+	rec, err := client.UpdateUser(ctx, uid, (&auth.UserToUpdate{}).EmailVerified(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rec.EmailVerified {
+		t.Error("UpdateUser(EmailVerified(true)) returned an unverified user")
+	}
+	if got, _ := client.GetUser(ctx, uid); !got.EmailVerified {
+		t.Error("the identity read back is still unverified")
 	}
 }
