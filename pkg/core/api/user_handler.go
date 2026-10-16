@@ -647,16 +647,20 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 	// whether the address has an account — nor whether a mail actually left.
 	initiated := gin.H{"success": true, "message": "Verification flow initiated"}
 
-	allowed, err := claimSignupEmailSend(c, uh.store, string(req.Email))
-	if err != nil {
-		logger.Err(err).Msg("Failed to check the sign-up email throttle")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-	if !allowed {
-		logger.Warn().Msg("Sign-up email throttled")
-		c.JSON(http.StatusOK, initiated)
-		return
+	// Only the mail is throttled, and only once the account it points at
+	// exists: a step that fails must not use up the slot of the retry.
+	mayEmail := func() bool {
+		allowed, err := claimSignupEmailSend(c, uh.store, tenantID.(string), string(req.Email))
+		if err != nil {
+			logger.Err(err).Msg("Failed to check the sign-up email throttle")
+			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
+			return false
+		}
+		if !allowed {
+			logger.Warn().Msg("Sign-up email throttled")
+			c.JSON(http.StatusOK, initiated)
+		}
+		return allowed
 	}
 
 	globalUser, err := uh.userService.GetUserByEmailGlobal(c, string(req.Email))
@@ -673,6 +677,9 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 			return
 		}
 
+		if !mayEmail() {
+			return
+		}
 		if err := sendMagicLink(c, baseAuthClient, origin, string(req.Email), returnPath); err != nil {
 			logger.Err(err).Str("email", string(req.Email)).Msg("Failed to send magic link")
 		}
@@ -697,6 +704,10 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
+	}
+
+	if !mayEmail() {
+		return
 	}
 
 	// A repeat sign-up is usually someone whose first email got lost. They

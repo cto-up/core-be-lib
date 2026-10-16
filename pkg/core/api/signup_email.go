@@ -22,9 +22,11 @@ type signupEmailClaimer interface {
 	ClaimSignupEmailSend(ctx context.Context, arg repository.ClaimSignupEmailSendParams) (string, error)
 }
 
-// claimSignupEmailSend reports whether a sign-up email may go to this address now.
-func claimSignupEmailSend(ctx context.Context, q signupEmailClaimer, email string) (bool, error) {
-	sum := sha256.Sum256([]byte(email))
+// claimSignupEmailSend reports whether a sign-up email may go to this address
+// from this tenant now. Each tenant counts its own sends, so signing up on a
+// second tenant is never swallowed by the first one's cooldown.
+func claimSignupEmailSend(ctx context.Context, q signupEmailClaimer, tenantID, email string) (bool, error) {
+	sum := sha256.Sum256([]byte(tenantID + "\x00" + email))
 	_, err := q.ClaimSignupEmailSend(ctx, repository.ClaimSignupEmailSendParams{
 		EmailHash:       hex.EncodeToString(sum[:]),
 		WindowSeconds:   signupEmailWindowSeconds,

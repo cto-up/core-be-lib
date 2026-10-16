@@ -17,21 +17,25 @@ func TestClaimSignupEmailSend(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("a second send inside the cooldown is refused", func(t *testing.T) {
-		ok, err := claimSignupEmailSend(ctx, store, "cooldown@example.com")
+		ok, err := claimSignupEmailSend(ctx, store, "t1", "cooldown@example.com")
 		require.NoError(t, err)
 		assert.True(t, ok)
 
-		ok, err = claimSignupEmailSend(ctx, store, "cooldown@example.com")
+		ok, err = claimSignupEmailSend(ctx, store, "t1", "cooldown@example.com")
 		require.NoError(t, err)
 		assert.False(t, ok, "resubmitting the form at once must not send a second mail")
 
-		ok, err = claimSignupEmailSend(ctx, store, "someone-else@example.com")
+		ok, err = claimSignupEmailSend(ctx, store, "t1", "someone-else@example.com")
 		require.NoError(t, err)
 		assert.True(t, ok, "the cap is per address")
+
+		ok, err = claimSignupEmailSend(ctx, store, "t2", "cooldown@example.com")
+		require.NoError(t, err)
+		assert.True(t, ok, "the cap is per tenant: signing up on a second tenant is not swallowed")
 	})
 
 	t.Run("the cooldown lapses", func(t *testing.T) {
-		ok, err := claimSignupEmailSend(ctx, store, "lapse@example.com")
+		ok, err := claimSignupEmailSend(ctx, store, "t1", "lapse@example.com")
 		require.NoError(t, err)
 		require.True(t, ok)
 
@@ -39,7 +43,7 @@ func TestClaimSignupEmailSend(t *testing.T) {
 			`UPDATE core_signup_email_throttle SET last_sent_at = last_sent_at - interval '61 seconds'`)
 		require.NoError(t, err)
 
-		ok, err = claimSignupEmailSend(ctx, store, "lapse@example.com")
+		ok, err = claimSignupEmailSend(ctx, store, "t1", "lapse@example.com")
 		require.NoError(t, err)
 		assert.True(t, ok)
 	})
