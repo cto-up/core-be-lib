@@ -359,3 +359,27 @@ func TestGetFile_PassiveContentIsNotSandboxed(t *testing.T) {
 		}
 	}
 }
+
+// hub#553. Which XML types an extension maps to depends on the host's mime
+// tables, so the rule is asked of the media type itself.
+func TestCanRunScript_EveryXMLTypeIsSandboxed(t *testing.T) {
+	for ct, want := range map[string]bool{
+		"image/svg+xml":            true,
+		"text/html; charset=utf-8": true,
+		"application/xhtml+xml":    true,
+		"text/xml":                 true,
+		"application/xml":          true,
+		"application/xslt+xml":     true,
+		"application/rss+xml":      true,
+		"application/atom+xml":     true,
+		"application/mathml+xml":   true,
+		"application/pdf":          false,
+		"image/png":                false,
+		"application/json":         false,
+		"application/octet-stream": false,
+	} {
+		if got := canRunScript(ct); got != want {
+			t.Errorf("canRunScript(%q) = %v, want %v", ct, got, want)
+		}
+	}
+}

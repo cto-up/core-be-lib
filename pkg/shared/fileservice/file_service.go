@@ -558,15 +558,16 @@ func resolveRange(header string, size int64) (offset, length int64, status int, 
 }
 
 // canRunScript reports the types a browser executes script in when opened as
-// a document. Only these get the sandbox: on a PDF it would stop Chrome's
-// viewer, which refuses to run in a sandboxed document.
+// a document: HTML and every XML type, since any XML document can embed an
+// XHTML-namespace <script>. Only these get the sandbox: on a PDF it would stop
+// Chrome's viewer, which refuses to run in a sandboxed document.
 func canRunScript(contentType string) bool {
 	mediaType, _, _ := mime.ParseMediaType(contentType)
 	switch mediaType {
-	case "image/svg+xml", "text/html", "application/xhtml+xml", "text/xml", "application/xml":
+	case "text/html", "text/xml", "application/xml":
 		return true
 	}
-	return false
+	return strings.HasSuffix(mediaType, "+xml")
 }
 
 // getContentType determines the MIME type based on file extension
