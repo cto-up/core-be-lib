@@ -263,62 +263,69 @@ func FromJSON[T any](data []byte) T {
 	return result
 }
 
-// FromNullable converts pgtype nullable types to pointers of Go primitive types
+// FromNullable converts pgtype nullable types to pointers of Go primitive types.
+// A T the value cannot be read as yields nil, like a NULL does.
 func FromNullable[T any, P PgNullableTypes](value P) *T {
 	switch v := any(value).(type) {
 	case pgtype.UUID:
 		if v.Valid {
 			uuid, _ := uuid.FromBytes(v.Bytes[:])
-			return any(&uuid).(*T)
+			return pointerAs[T](&uuid)
 		}
 	case pgtype.Text:
 		if v.Valid {
-			return any(&v.String).(*T)
+			return pointerAs[T](&v.String)
 		}
 	case pgtype.Int4:
 		if v.Valid {
 			switch any(*new(T)).(type) {
 			case int:
 				i := int(v.Int32)
-				return any(&i).(*T)
+				return pointerAs[T](&i)
 			case int32:
-				return any(&v.Int32).(*T)
+				return pointerAs[T](&v.Int32)
 			}
 		}
 	case pgtype.Int8:
 		if v.Valid {
 			i := int64(v.Int64)
-			return any(&i).(*T)
+			return pointerAs[T](&i)
 		}
 	case pgtype.Float4:
 		if v.Valid {
 			switch any(*new(T)).(type) {
 			case float32:
-				return any(&v.Float32).(*T)
+				return pointerAs[T](&v.Float32)
 			case float64:
 				f := float64(v.Float32)
-				return any(&f).(*T)
+				return pointerAs[T](&f)
 			}
 		}
 	case pgtype.Float8:
 		if v.Valid {
 			f := float64(v.Float64)
-			return any(&f).(*T)
+			return pointerAs[T](&f)
 		}
 	case pgtype.Bool:
 		if v.Valid {
-			return any(&v.Bool).(*T)
+			return pointerAs[T](&v.Bool)
 		}
 	case pgtype.Timestamp:
 		if v.Valid {
-			return any(&v.Time).(*T)
+			return pointerAs[T](&v.Time)
 		}
 	case pgtype.Date:
 		if v.Valid {
-			return any(&v.Time).(*T)
+			return pointerAs[T](&v.Time)
 		}
 	}
 	return nil
+}
+
+// pointerAs returns p as a *T, or nil when it points at another type.
+func pointerAs[T any](p any) *T {
+	t, _ := p.(*T)
+	return t
 }
 
 // Type-specific versions for better type safety
