@@ -175,24 +175,33 @@ func RunMigrations(db *sql.DB) error {
 
 // NewTestStore creates a new test store using a Postgres test container
 func NewTestStore(t *testing.T) *coreDB.Store {
-	connPool, cleanup, err := SetupPostgresContainer()
+	store, cleanup, err := NewMigratedStore()
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to set up test container")
+		log.Fatal().Err(err).Msg("Failed to set up the test store")
 	}
-
 	// Register cleanup to be called when the test completes
 	t.Cleanup(cleanup)
+	return store
+}
+
+// NewMigratedStore starts a Postgres test container and runs every migration
+// on it. The caller runs cleanup once done with the store.
+func NewMigratedStore() (*coreDB.Store, func(), error) {
+	connPool, cleanup, err := SetupPostgresContainer()
+	if err != nil {
+		return nil, nil, fmt.Errorf("set up test container: %w", err)
+	}
 
 	db, err := connectionRepository.ConnectDB(DB_CONNECTION)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to database for migrations")
+		cleanup()
+		return nil, nil, fmt.Errorf("connect for migrations: %w", err)
 	}
 	defer db.Close()
 
 	if err := RunMigrations(db); err != nil {
-		log.Fatal().Err(err).Msg("Failed to run migrations")
+		cleanup()
+		return nil, nil, err
 	}
-
-	// Create and return the store
-	return coreDB.NewStore(connPool)
+	return coreDB.NewStore(connPool), cleanup, nil
 }
