@@ -1176,11 +1176,18 @@ func (k *KratosAuthProvider) InitializeSettingsFlow(c *gin.Context) (*ory.Settin
 		return flow, nil
 	}
 
+	// The browser flow binds its csrf_token to the browser's anti-CSRF cookie,
+	// so Kratos must see that cookie, not just the session; otherwise it mints
+	// a new one, the flow carries its token, and the browser's submit is a 403.
+	// Any cookie Kratos does set is the browser's, so it is passed back.
 	flow, resp, err := k.publicClient.FrontendAPI.CreateBrowserSettingsFlow(ctx).
-		Cookie(fmt.Sprintf("ory_kratos_session=%s", cred.Value)).Execute()
+		Cookie(c.GetHeader("Cookie")).Execute()
 	if err != nil || resp == nil || resp.StatusCode != 200 {
 		logger.Err(err).Msg("Failed to create settings flow")
 		return nil, auth.ConvertKratosError(err)
+	}
+	for _, setCookie := range resp.Header.Values("Set-Cookie") {
+		c.Writer.Header().Add("Set-Cookie", setCookie)
 	}
 	return flow, nil
 }
