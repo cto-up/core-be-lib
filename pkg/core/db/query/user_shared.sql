@@ -558,6 +558,48 @@ LIMIT 1;
 UPDATE core_users SET deletion_decisions = $2 WHERE id = $1;
 
 -- name: TouchSharedUserLastSeen :exec
+-- Any request is a sign of life, so it also withdraws a pending
+-- inactive-account warning.
 UPDATE core_users
-SET last_seen_at = NOW()
+SET last_seen_at = NOW(),
+    inactivity_warned_at = NULL
+WHERE id = $1;
+
+-- name: ListUsersToWarnOfInactivity :many
+-- Accounts quiet since the cutoff and not yet warned. A user never stamped
+-- counts from tracked_since at the earliest: last_seen_at did not exist before
+-- then, and silence we never measured is not inactivity. Super-admins and
+-- accounts already closing are left alone; so is an account with no address,
+-- since it cannot be warned and is therefore never deleted for inactivity.
+SELECT * FROM core_users
+WHERE inactivity_warned_at IS NULL
+  AND deletion_scheduled_at IS NULL
+  AND email IS NOT NULL AND email <> ''
+  AND NOT (COALESCE(roles, '{}') @> ARRAY['SUPER_ADMIN']::varchar[])
+  AND COALESCE(last_seen_at, GREATEST(created_at, @tracked_since::timestamptz)) < @cutoff::timestamptz
+ORDER BY COALESCE(last_seen_at, created_at) ASC
+LIMIT @row_limit;
+
+-- name: ListUsersDueForInactivityDeletion :many
+-- Accounts warned before warned_before and still quiet since the cutoff.
+SELECT * FROM core_users
+WHERE inactivity_warned_at IS NOT NULL
+  AND inactivity_warned_at <= @warned_before::timestamptz
+  AND deletion_scheduled_at IS NULL
+  AND NOT (COALESCE(roles, '{}') @> ARRAY['SUPER_ADMIN']::varchar[])
+  AND COALESCE(last_seen_at, GREATEST(created_at, @tracked_since::timestamptz)) < @cutoff::timestamptz
+ORDER BY inactivity_warned_at ASC
+LIMIT @row_limit;
+
+-- name: MarkInactivityWarned :execrows
+-- A claim as much as a stamp: only one sweeper replica gets the row, so only
+-- one warning is sent.
+UPDATE core_users
+SET inactivity_warned_at = NOW()
+WHERE id = $1 AND inactivity_warned_at IS NULL;
+
+-- name: ClearInactivityWarning :exec
+-- Gives the claim back when the warning could not be sent.
+UPDATE core_users
+SET inactivity_warned_at = NULL
 WHERE id = $1;

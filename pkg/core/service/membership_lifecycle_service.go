@@ -53,10 +53,11 @@ var (
 type MembershipLifecycleService struct {
 	store        *db.Store
 	authProvider auth.AuthProvider
+	warnInactive func(u repository.CoreUser, monthsInactive int, closesOn time.Time) error
 }
 
 func NewMembershipLifecycleService(store *db.Store, authProvider auth.AuthProvider) *MembershipLifecycleService {
-	return &MembershipLifecycleService{store: store, authProvider: authProvider}
+	return &MembershipLifecycleService{store: store, authProvider: authProvider, warnInactive: sendInactivityWarning}
 }
 
 // LeavePreview reports what leaving would cost. Read at dialog-open time so the
@@ -497,8 +498,9 @@ func (s *MembershipLifecycleService) PurgeDueDormantData(ctx context.Context, li
 	return done, nil
 }
 
-// StartLifecycleSweeper runs both scheduled halves of ADR 040: deletions whose
-// grace period has expired, and the dormant data of members who left long ago.
+// StartLifecycleSweeper runs the scheduled halves of ADR 040: deletions whose
+// grace period has expired, the dormant data of members who left long ago, and
+// accounts nobody has used for the configured inactivity period.
 //
 // One immediate pass at boot, then daily. Both are idempotent and bounded, so a
 // missed run costs a day of latency rather than correctness — which is why an
@@ -538,6 +540,10 @@ func (s *MembershipLifecycleService) sweepOnce(ctx context.Context) {
 		logger.Err(err).Msg("lifecycle sweep: dormancy purge failed")
 	} else if n > 0 {
 		logger.Info().Int("memberships", n).Msg("lifecycle sweep: dormant data purged")
+	}
+
+	if err := s.ProcessInactiveAccounts(ctx, time.Now()); err != nil {
+		logger.Err(err).Msg("lifecycle sweep: inactive accounts failed")
 	}
 }
 
