@@ -6,6 +6,7 @@ package core
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/oapi-codegen/runtime"
@@ -155,6 +156,27 @@ type GetAPITokenAuditLogsParams struct {
 	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
 
 	// PageSize maximum number of results to return
+	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+}
+
+// ListPersonalDataAccessParams defines parameters for ListPersonalDataAccess.
+type ListPersonalDataAccessParams struct {
+	// SubjectUserId only reads of this person's data
+	SubjectUserId *string `form:"subjectUserId,omitempty" json:"subjectUserId,omitempty"`
+
+	// ActorUserId only reads made by this staff member
+	ActorUserId *string `form:"actorUserId,omitempty" json:"actorUserId,omitempty"`
+
+	// From accessed at or after
+	From *time.Time `form:"from,omitempty" json:"from,omitempty"`
+
+	// To accessed before
+	To *time.Time `form:"to,omitempty" json:"to,omitempty"`
+
+	// Page page number
+	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize maximum number of results to return (at most 100)
 	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
@@ -679,6 +701,9 @@ type ServerInterface interface {
 
 	// (PATCH /admin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke)
 	RevokeAPIToken(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
+
+	// (GET /admin-api/v1/personal-data-access)
+	ListPersonalDataAccess(c *gin.Context, params ListPersonalDataAccessParams)
 
 	// (GET /api/v1/configs/tenant-configs)
 	ListTenantConfigs(c *gin.Context, params ListTenantConfigsParams)
@@ -1398,6 +1423,72 @@ func (siw *ServerInterfaceWrapper) RevokeAPIToken(c *gin.Context) {
 	}
 
 	siw.Handler.RevokeAPIToken(c, id, tokenId)
+}
+
+// ListPersonalDataAccess operation middleware
+func (siw *ServerInterfaceWrapper) ListPersonalDataAccess(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPersonalDataAccessParams
+
+	// ------------- Optional query parameter "subjectUserId" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "subjectUserId", c.Request.URL.Query(), &params.SubjectUserId)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter subjectUserId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "actorUserId" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "actorUserId", c.Request.URL.Query(), &params.ActorUserId)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter actorUserId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "from", c.Request.URL.Query(), &params.From)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter from: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "to", c.Request.URL.Query(), &params.To)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter to: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListPersonalDataAccess(c, params)
 }
 
 // ListTenantConfigs operation middleware
@@ -3912,6 +4003,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId", wrapper.GetAPITokenById)
 	router.GET(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId/audit", wrapper.GetAPITokenAuditLogs)
 	router.PATCH(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId/revoke", wrapper.RevokeAPIToken)
+	router.GET(options.BaseURL+"/admin-api/v1/personal-data-access", wrapper.ListPersonalDataAccess)
 	router.GET(options.BaseURL+"/api/v1/configs/tenant-configs", wrapper.ListTenantConfigs)
 	router.POST(options.BaseURL+"/api/v1/configs/tenant-configs", wrapper.AddTenantConfig)
 	router.DELETE(options.BaseURL+"/api/v1/configs/tenant-configs/:id", wrapper.DeleteTenantConfig)

@@ -80,6 +80,16 @@ type CoreMigration struct {
 	Dirty   bool  `json:"dirty"`
 }
 
+type CorePersonalDataAccessLog struct {
+	ID            uuid.UUID   `json:"id"`
+	TenantID      string      `json:"tenant_id"`
+	ActorUserID   string      `json:"actor_user_id"`
+	SubjectUserID string      `json:"subject_user_id"`
+	Resource      string      `json:"resource"`
+	ResourceID    pgtype.Text `json:"resource_id"`
+	AccessedAt    time.Time   `json:"accessed_at"`
+}
+
 type CoreRole struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    string    `json:"user_id"`

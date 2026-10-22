@@ -242,6 +242,7 @@ func initializeServerConfig(connPool *pgxpool.Pool, cors gin.HandlerFunc, additi
 		clientAppService,
 		service.NewLastSeenRecorder(coreStore),
 	)
+	service.SetPersonalDataAccessStore(coreStore)
 
 	// Configure middleware order based on provider type
 	var middlewares []core.MiddlewareFunc

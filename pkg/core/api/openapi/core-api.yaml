@@ -198,6 +198,10 @@ paths:
   /admin-api/v1/client-applications/{id}/tokens/{tokenId}/audit:
     $ref: "./parts/tokens/client-applications-id-tokens-id-audit-path.yaml"
 
+  # Personal-data access log (ADMIN & SUPER_ADMIN only)
+  /admin-api/v1/personal-data-access:
+    $ref: "./parts/admin/personal-data-access-path.yaml"
+
   ## translations
   /api/v1/translations:
     $ref: "./parts/translations/translations-path.yaml"

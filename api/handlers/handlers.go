@@ -24,6 +24,7 @@ type Handlers struct {
 	*core.MFAHandler
 	*core.TenantMembershipHandler
 	*core.MembershipLifecycleHandler
+	*core.PersonalDataAccessHandler
 }
 
 func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool auth.AuthProvider, multiTenantService *access.MultitenantService, clientAppService *access.ClientApplicationService) Handlers {
@@ -44,6 +45,7 @@ func CreateCoreHandlers(connPool *pgxpool.Pool, authClientPool auth.AuthProvider
 		// reads and the invitation answers, plus leaving and closing an account.
 		TenantMembershipHandler:    core.NewTenantMembershipHandler(store, authClientPool),
 		MembershipLifecycleHandler: core.NewMembershipLifecycleHandler(store, authClientPool),
+		PersonalDataAccessHandler:  core.NewPersonalDataAccessHandler(store),
 	}
 	return handlers
 }

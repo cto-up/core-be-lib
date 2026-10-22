@@ -535,6 +535,18 @@ type NewUser struct {
 	Silent *bool `json:"silent,omitempty"`
 }
 
+// PersonalDataAccess defines model for PersonalDataAccess.
+type PersonalDataAccess struct {
+	AccessedAt  time.Time `json:"accessedAt"`
+	ActorUserId string    `json:"actorUserId"`
+
+	// Resource what was read, as "<module>.<kind>", e.g. "aiemployee.run"
+	Resource      string  `json:"resource"`
+	ResourceId    *string `json:"resourceId"`
+	SubjectUserId string  `json:"subjectUserId"`
+	TenantId      *string `json:"tenantId,omitempty"`
+}
+
 // PublicTenantSchema defines model for PublicTenantSchema.
 type PublicTenantSchema struct {
 	// AllowPasswordSignUp Auth Provider setting to Allow password sign up (can skip)

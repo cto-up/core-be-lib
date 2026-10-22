@@ -579,6 +579,29 @@ components:
       properties:
         reason:
           type: string
+    PersonalDataAccess:
+      type: object
+      required:
+        - actorUserId
+        - subjectUserId
+        - resource
+        - accessedAt
+      properties:
+        tenantId:
+          type: string
+        actorUserId:
+          type: string
+        subjectUserId:
+          type: string
+        resource:
+          type: string
+          description: what was read, as "<module>.<kind>", e.g. "aiemployee.run"
+        resourceId:
+          type: string
+          nullable: true
+        accessedAt:
+          type: string
+          format: date-time
     APITokenAuditLog:
       type: object
       required:

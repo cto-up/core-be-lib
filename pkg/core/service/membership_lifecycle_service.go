@@ -498,9 +498,19 @@ func (s *MembershipLifecycleService) PurgeDueDormantData(ctx context.Context, li
 	return done, nil
 }
 
+// PersonalDataAccessRetentionMonths is how long a personal-data access log row
+// is kept: long enough to answer "who looked at my data this year".
+const PersonalDataAccessRetentionMonths = 12
+
+// PurgePersonalDataAccessLog deletes access-log rows past their retention.
+func (s *MembershipLifecycleService) PurgePersonalDataAccessLog(ctx context.Context, now time.Time) (int64, error) {
+	return s.store.PurgePersonalDataAccessBefore(ctx, now.AddDate(0, -PersonalDataAccessRetentionMonths, 0))
+}
+
 // StartLifecycleSweeper runs the scheduled halves of ADR 040: deletions whose
 // grace period has expired, the dormant data of members who left long ago, and
-// accounts nobody has used for the configured inactivity period.
+// accounts nobody has used for the configured inactivity period, and
+// personal-data access log rows past their retention.
 //
 // One immediate pass at boot, then daily. Both are idempotent and bounded, so a
 // missed run costs a day of latency rather than correctness — which is why an
@@ -544,6 +554,12 @@ func (s *MembershipLifecycleService) sweepOnce(ctx context.Context) {
 
 	if err := s.ProcessInactiveAccounts(ctx, time.Now()); err != nil {
 		logger.Err(err).Msg("lifecycle sweep: inactive accounts failed")
+	}
+
+	if n, err := s.PurgePersonalDataAccessLog(ctx, time.Now()); err != nil {
+		logger.Err(err).Msg("lifecycle sweep: personal-data access log purge failed")
+	} else if n > 0 {
+		logger.Info().Int64("rows", n).Msg("lifecycle sweep: personal-data access log purged")
 	}
 }
 

@@ -1,0 +1,50 @@
+get:
+  description: >
+    Lists when staff read another person's personal data. An ADMIN sees the
+    host tenant's rows; a SUPER_ADMIN on a host with no tenant sees every
+    tenant's.
+  operationId: listPersonalDataAccess
+  parameters:
+    - name: subjectUserId
+      in: query
+      description: only reads of this person's data
+      schema:
+        type: string
+    - name: actorUserId
+      in: query
+      description: only reads made by this staff member
+      schema:
+        type: string
+    - name: from
+      in: query
+      description: accessed at or after
+      schema:
+        type: string
+        format: date-time
+    - name: to
+      in: query
+      description: accessed before
+      schema:
+        type: string
+        format: date-time
+    - name: page
+      in: query
+      description: page number
+      schema:
+        type: integer
+        format: int32
+    - name: pageSize
+      in: query
+      description: maximum number of results to return (at most 100)
+      schema:
+        type: integer
+        format: int32
+  responses:
+    "200":
+      description: personal-data access log, newest first
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../../core-schema.yaml#/components/schemas/PersonalDataAccess"
