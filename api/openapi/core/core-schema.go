@@ -84,6 +84,12 @@ const (
 	Aal2 MFAStatusAal = "aal2"
 )
 
+// Defines values for PendingDeletionStage.
+const (
+	ClosureRequested PendingDeletionStage = "closure_requested"
+	InactivityWarned PendingDeletionStage = "inactivity_warned"
+)
+
 // Defines values for Role.
 const (
 	ADMIN         Role = "ADMIN"
@@ -534,6 +540,28 @@ type NewUser struct {
 	// Silent When true, suppress invitation and welcome emails (both the synchronous Kratos welcome and any asynchronous onboarding follow-up).
 	Silent *bool `json:"silent,omitempty"`
 }
+
+// PendingDeletion defines model for PendingDeletion.
+type PendingDeletion struct {
+	// DeletesOn when the account is deleted if nothing changes
+	DeletesOn   time.Time  `json:"deletesOn"`
+	Email       string     `json:"email"`
+	LastSeenAt  *time.Time `json:"lastSeenAt"`
+	Name        string     `json:"name"`
+	Reason      *string    `json:"reason"`
+	RequestedAt *time.Time `json:"requestedAt"`
+
+	// Stage closure_requested — a deletion is scheduled (by the holder, or by the inactivity rule when reason is "inactivity"); inactivity_warned — warned, closed unless they sign in.
+	Stage PendingDeletionStage `json:"stage"`
+
+	// Tenants the account's organizations — every one for a SUPER_ADMIN on a tenant-less host, else only the host tenant
+	Tenants  []string   `json:"tenants"`
+	UserId   string     `json:"userId"`
+	WarnedAt *time.Time `json:"warnedAt"`
+}
+
+// PendingDeletionStage closure_requested — a deletion is scheduled (by the holder, or by the inactivity rule when reason is "inactivity"); inactivity_warned — warned, closed unless they sign in.
+type PendingDeletionStage string
 
 // PersonalDataAccess defines model for PersonalDataAccess.
 type PersonalDataAccess struct {

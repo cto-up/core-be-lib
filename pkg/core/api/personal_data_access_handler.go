@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const maxPersonalDataAccessPageSize = 100
+const maxAdminPageSize = 100
 
 type PersonalDataAccessHandler struct {
 	store *db.Store
@@ -35,22 +35,15 @@ func (h *PersonalDataAccessHandler) ListPersonalDataAccess(c *gin.Context, param
 		return
 	}
 
-	page, pageSize := int32(1), int32(20)
-	if params.Page != nil && *params.Page > 0 {
-		page = *params.Page
-	}
-	if params.PageSize != nil && *params.PageSize > 0 {
-		pageSize = min(*params.PageSize, maxPersonalDataAccessPageSize)
-	}
-
+	limit, offset := adminPage(params.Page, params.PageSize)
 	rows, err := h.store.ListPersonalDataAccess(c, repository.ListPersonalDataAccessParams{
 		TenantID:      pgtype.Text{String: tenantID, Valid: tenantID != ""},
 		SubjectUserID: util.ToNullableText(params.SubjectUserId),
 		ActorUserID:   util.ToNullableText(params.ActorUserId),
 		AccessedFrom:  util.ToNullableTimestamptz(params.From),
 		AccessedTo:    util.ToNullableTimestamptz(params.To),
-		RowLimit:      pageSize,
-		RowOffset:     (page - 1) * pageSize,
+		RowLimit:      limit,
+		RowOffset:     offset,
 	})
 	if err != nil {
 		logger.Err(err).Msg("Failed to list personal-data access")
@@ -74,4 +67,17 @@ func (h *PersonalDataAccessHandler) ListPersonalDataAccess(c *gin.Context, param
 		}
 	}
 	c.JSON(http.StatusOK, out)
+}
+
+// adminPage turns the admin lists' page/pageSize into a limit and offset:
+// 20 per page by default, at most maxAdminPageSize.
+func adminPage(page, pageSize *int32) (limit, offset int32) {
+	p, size := int32(1), int32(20)
+	if page != nil && *page > 0 {
+		p = *page
+	}
+	if pageSize != nil && *pageSize > 0 {
+		size = min(*pageSize, maxAdminPageSize)
+	}
+	return size, (p - 1) * size
 }

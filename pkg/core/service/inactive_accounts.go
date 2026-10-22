@@ -30,6 +30,10 @@ const (
 	// this rule rather than by its owner.
 	InactivityDeletionReason = "inactivity"
 
+	// InactivityWarningMonths is how long before closing an account the
+	// warning is sent; a still-quiet account is closed that long after it.
+	InactivityWarningMonths = 1
+
 	inactivityWarningTemplate = "account-inactive-warning.html"
 )
 
@@ -54,7 +58,7 @@ func (s *MembershipLifecycleService) ProcessInactiveAccounts(ctx context.Context
 	}
 
 	due, err := s.store.ListUsersDueForInactivityDeletion(ctx, repository.ListUsersDueForInactivityDeletionParams{
-		WarnedBefore: now.AddDate(0, -1, 0),
+		WarnedBefore: now.AddDate(0, -InactivityWarningMonths, 0),
 		TrackedSince: lastSeenTrackedSince,
 		Cutoff:       now.AddDate(0, -months, 0),
 		RowLimit:     sweepPage,
@@ -77,7 +81,7 @@ func (s *MembershipLifecycleService) ProcessInactiveAccounts(ctx context.Context
 
 	toWarn, err := s.store.ListUsersToWarnOfInactivity(ctx, repository.ListUsersToWarnOfInactivityParams{
 		TrackedSince: lastSeenTrackedSince,
-		Cutoff:       now.AddDate(0, -(months - 1), 0),
+		Cutoff:       now.AddDate(0, -(months - InactivityWarningMonths), 0),
 		RowLimit:     sweepPage,
 	})
 	if err != nil {
@@ -94,10 +98,10 @@ func (s *MembershipLifecycleService) ProcessInactiveAccounts(ctx context.Context
 			continue // another replica took it
 		}
 		closesOn := lastActivity(u).AddDate(0, months, 0)
-		if earliest := now.AddDate(0, 1, 0); closesOn.Before(earliest) {
+		if earliest := now.AddDate(0, InactivityWarningMonths, 0); closesOn.Before(earliest) {
 			closesOn = earliest
 		}
-		if err := s.warnInactive(u, months-1, closesOn); err != nil {
+		if err := s.warnInactive(u, months-InactivityWarningMonths, closesOn); err != nil {
 			logger.Err(err).Str("user_id", u.ID).Msg("inactivity: warning not sent, will retry on the next run")
 			if err := s.store.ClearInactivityWarning(ctx, u.ID); err != nil {
 				logger.Err(err).Str("user_id", u.ID).Msg("inactivity: could not withdraw the unsent warning")
@@ -122,9 +126,9 @@ func (s *MembershipLifecycleService) inactiveAccountMonths(ctx context.Context) 
 		return 0, err
 	}
 	months, err := strconv.Atoi(strings.TrimSpace(cfg.Value.String))
-	// One month would warn and close in the same breath.
-	if err != nil || months < 0 || months == 1 {
-		return 0, fmt.Errorf("%s = %q: want 0 or a number of months of at least 2", InactiveAccountMonthsConfig, cfg.Value.String)
+	// A period no longer than the warning would warn and close in the same breath.
+	if err != nil || months < 0 || (months > 0 && months <= InactivityWarningMonths) {
+		return 0, fmt.Errorf("%s = %q: want 0 or a number of months above %d", InactiveAccountMonthsConfig, cfg.Value.String, InactivityWarningMonths)
 	}
 	return months, nil
 }

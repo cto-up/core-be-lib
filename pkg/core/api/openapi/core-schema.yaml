@@ -602,6 +602,55 @@ components:
         accessedAt:
           type: string
           format: date-time
+    PendingDeletion:
+      type: object
+      required:
+        - userId
+        - email
+        - name
+        - stage
+        - deletesOn
+        - tenants
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        stage:
+          type: string
+          enum: [closure_requested, inactivity_warned]
+          description: >
+            closure_requested — a deletion is scheduled (by the holder, or by
+            the inactivity rule when reason is "inactivity");
+            inactivity_warned — warned, closed unless they sign in.
+        reason:
+          type: string
+          nullable: true
+        requestedAt:
+          type: string
+          format: date-time
+          nullable: true
+        warnedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSeenAt:
+          type: string
+          format: date-time
+          nullable: true
+        deletesOn:
+          type: string
+          format: date-time
+          description: when the account is deleted if nothing changes
+        tenants:
+          type: array
+          description: >
+            the account's organizations — every one for a SUPER_ADMIN on a
+            tenant-less host, else only the host tenant
+          items:
+            type: string
     APITokenAuditLog:
       type: object
       required:

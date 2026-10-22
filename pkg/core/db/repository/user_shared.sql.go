@@ -947,6 +947,103 @@ func (q *Queries) ListMembershipsDueForDormancyPurge(ctx context.Context, arg Li
 	return items, nil
 }
 
+const listPendingDeletions = `-- name: ListPendingDeletions :many
+SELECT
+    u.id,
+    u.email,
+    u.profile,
+    u.deletion_requested_at,
+    u.deletion_scheduled_at,
+    u.deletion_reason,
+    u.inactivity_warned_at,
+    u.last_seen_at,
+    COALESCE(u.deletion_scheduled_at, u.inactivity_warned_at + $1::interval)::timestamptz AS deletes_on,
+    ARRAY(
+        SELECT t.name
+        FROM core_user_tenant_memberships m
+        JOIN core_tenants t ON t.tenant_id = m.tenant_id
+        WHERE m.user_id = u.id
+          AND m.status = 'active'
+          AND ($2::text IS NULL OR m.tenant_id = $2::text)
+        ORDER BY t.name
+    )::text[] AS tenants
+FROM core_users u
+WHERE (u.deletion_scheduled_at IS NOT NULL OR u.inactivity_warned_at IS NOT NULL)
+  AND (
+    $2::text IS NULL
+    OR EXISTS (
+        SELECT 1 FROM core_user_tenant_memberships m
+        WHERE m.user_id = u.id
+          AND m.tenant_id = $2::text
+          AND m.status = 'active'
+    )
+  )
+ORDER BY deletes_on ASC, u.id
+LIMIT $4
+OFFSET $3
+`
+
+type ListPendingDeletionsParams struct {
+	InactivityDeletesAfter pgtype.Interval `json:"inactivity_deletes_after"`
+	TenantID               pgtype.Text     `json:"tenant_id"`
+	RowOffset              int32           `json:"row_offset"`
+	RowLimit               int32           `json:"row_limit"`
+}
+
+type ListPendingDeletionsRow struct {
+	ID                  string                `json:"id"`
+	Email               pgtype.Text           `json:"email"`
+	Profile             subentity.UserProfile `json:"profile"`
+	DeletionRequestedAt pgtype.Timestamptz    `json:"deletion_requested_at"`
+	DeletionScheduledAt pgtype.Timestamptz    `json:"deletion_scheduled_at"`
+	DeletionReason      pgtype.Text           `json:"deletion_reason"`
+	InactivityWarnedAt  pgtype.Timestamptz    `json:"inactivity_warned_at"`
+	LastSeenAt          pgtype.Timestamptz    `json:"last_seen_at"`
+	DeletesOn           time.Time             `json:"deletes_on"`
+	Tenants             []string              `json:"tenants"`
+}
+
+// Accounts with a deletion ahead of them: a closure already scheduled, or an
+// inactivity warning that will become one. deletes_on is when the row goes:
+// the schedule, or warned_at + inactivity_deletes_after (the warning period
+// plus the grace). A NULL tenant_id lists every tenant; tenants are then the
+// names of every active membership, else only the host tenant's.
+func (q *Queries) ListPendingDeletions(ctx context.Context, arg ListPendingDeletionsParams) ([]ListPendingDeletionsRow, error) {
+	rows, err := q.db.Query(ctx, listPendingDeletions,
+		arg.InactivityDeletesAfter,
+		arg.TenantID,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingDeletionsRow{}
+	for rows.Next() {
+		var i ListPendingDeletionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Profile,
+			&i.DeletionRequestedAt,
+			&i.DeletionScheduledAt,
+			&i.DeletionReason,
+			&i.InactivityWarnedAt,
+			&i.LastSeenAt,
+			&i.DeletesOn,
+			&i.Tenants,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPendingInvitations = `-- name: ListPendingInvitations :many
 SELECT 
     utm.id, utm.user_id, utm.tenant_id, utm.status, utm.invited_by, utm.invited_at, utm.joined_at, utm.created_at, utm.updated_at, utm.roles, utm.feature_licenses, utm.dormant_purged_at,

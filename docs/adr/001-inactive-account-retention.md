@@ -43,3 +43,8 @@ A third step of the lifecycle sweeper, `MembershipLifecycleService.ProcessInacti
   closed for inactivity.
 - The warning states the closing date: N months after the last activity, but
   never less than a month after the email.
+- Admins see what is coming (gordon#96): `GET /admin-api/v1/pending-deletions`
+  lists the host tenant's members with a closure scheduled or an inactivity
+  warning outstanding (every account for a SUPER_ADMIN on a tenant-less host),
+  soonest first. A warned account's `deletesOn` is `inactivity_warned_at` +
+  `InactivityWarningMonths` + `DeletionGrace` — the constants the sweeper uses.

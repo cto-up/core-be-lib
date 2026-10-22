@@ -202,6 +202,10 @@ paths:
   /admin-api/v1/personal-data-access:
     $ref: "./parts/admin/personal-data-access-path.yaml"
 
+  # Accounts pending deletion (ADMIN & SUPER_ADMIN only)
+  /admin-api/v1/pending-deletions:
+    $ref: "./parts/admin/pending-deletions-path.yaml"
+
   ## translations
   /api/v1/translations:
     $ref: "./parts/translations/translations-path.yaml"

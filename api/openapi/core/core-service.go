@@ -159,6 +159,15 @@ type GetAPITokenAuditLogsParams struct {
 	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// ListPendingDeletionsParams defines parameters for ListPendingDeletions.
+type ListPendingDeletionsParams struct {
+	// Page page number
+	Page *int32 `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize maximum number of results to return (at most 100)
+	PageSize *int32 `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+}
+
 // ListPersonalDataAccessParams defines parameters for ListPersonalDataAccess.
 type ListPersonalDataAccessParams struct {
 	// SubjectUserId only reads of this person's data
@@ -701,6 +710,9 @@ type ServerInterface interface {
 
 	// (PATCH /admin-api/v1/client-applications/{id}/tokens/{tokenId}/revoke)
 	RevokeAPIToken(c *gin.Context, id openapi_types.UUID, tokenId openapi_types.UUID)
+
+	// (GET /admin-api/v1/pending-deletions)
+	ListPendingDeletions(c *gin.Context, params ListPendingDeletionsParams)
 
 	// (GET /admin-api/v1/personal-data-access)
 	ListPersonalDataAccess(c *gin.Context, params ListPersonalDataAccessParams)
@@ -1423,6 +1435,40 @@ func (siw *ServerInterfaceWrapper) RevokeAPIToken(c *gin.Context) {
 	}
 
 	siw.Handler.RevokeAPIToken(c, id, tokenId)
+}
+
+// ListPendingDeletions operation middleware
+func (siw *ServerInterfaceWrapper) ListPendingDeletions(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPendingDeletionsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListPendingDeletions(c, params)
 }
 
 // ListPersonalDataAccess operation middleware
@@ -4003,6 +4049,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId", wrapper.GetAPITokenById)
 	router.GET(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId/audit", wrapper.GetAPITokenAuditLogs)
 	router.PATCH(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId/revoke", wrapper.RevokeAPIToken)
+	router.GET(options.BaseURL+"/admin-api/v1/pending-deletions", wrapper.ListPendingDeletions)
 	router.GET(options.BaseURL+"/admin-api/v1/personal-data-access", wrapper.ListPersonalDataAccess)
 	router.GET(options.BaseURL+"/api/v1/configs/tenant-configs", wrapper.ListTenantConfigs)
 	router.POST(options.BaseURL+"/api/v1/configs/tenant-configs", wrapper.AddTenantConfig)

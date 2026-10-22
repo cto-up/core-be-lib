@@ -1,0 +1,29 @@
+get:
+  description: >
+    Lists the accounts a deletion is ahead of: a closure their holder asked
+    for, or an inactivity warning that will become one unless they sign in.
+    Soonest first. An ADMIN sees the host tenant's members; a SUPER_ADMIN on a
+    host with no tenant sees every tenant's.
+  operationId: listPendingDeletions
+  parameters:
+    - name: page
+      in: query
+      description: page number
+      schema:
+        type: integer
+        format: int32
+    - name: pageSize
+      in: query
+      description: maximum number of results to return (at most 100)
+      schema:
+        type: integer
+        format: int32
+  responses:
+    "200":
+      description: accounts pending deletion, soonest first
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../../core-schema.yaml#/components/schemas/PendingDeletion"

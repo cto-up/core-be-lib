@@ -603,3 +603,43 @@ WHERE id = $1 AND inactivity_warned_at IS NULL;
 UPDATE core_users
 SET inactivity_warned_at = NULL
 WHERE id = $1;
+
+-- name: ListPendingDeletions :many
+-- Accounts with a deletion ahead of them: a closure already scheduled, or an
+-- inactivity warning that will become one. deletes_on is when the row goes:
+-- the schedule, or warned_at + inactivity_deletes_after (the warning period
+-- plus the grace). A NULL tenant_id lists every tenant; tenants are then the
+-- names of every active membership, else only the host tenant's.
+SELECT
+    u.id,
+    u.email,
+    u.profile,
+    u.deletion_requested_at,
+    u.deletion_scheduled_at,
+    u.deletion_reason,
+    u.inactivity_warned_at,
+    u.last_seen_at,
+    COALESCE(u.deletion_scheduled_at, u.inactivity_warned_at + @inactivity_deletes_after::interval)::timestamptz AS deletes_on,
+    ARRAY(
+        SELECT t.name
+        FROM core_user_tenant_memberships m
+        JOIN core_tenants t ON t.tenant_id = m.tenant_id
+        WHERE m.user_id = u.id
+          AND m.status = 'active'
+          AND (sqlc.narg(tenant_id)::text IS NULL OR m.tenant_id = sqlc.narg(tenant_id)::text)
+        ORDER BY t.name
+    )::text[] AS tenants
+FROM core_users u
+WHERE (u.deletion_scheduled_at IS NOT NULL OR u.inactivity_warned_at IS NOT NULL)
+  AND (
+    sqlc.narg(tenant_id)::text IS NULL
+    OR EXISTS (
+        SELECT 1 FROM core_user_tenant_memberships m
+        WHERE m.user_id = u.id
+          AND m.tenant_id = sqlc.narg(tenant_id)::text
+          AND m.status = 'active'
+    )
+  )
+ORDER BY deletes_on ASC, u.id
+LIMIT @row_limit
+OFFSET @row_offset;
