@@ -570,6 +570,12 @@ type CreateAPITokenJSONRequestBody = NewAPIToken
 // RevokeAPITokenJSONRequestBody defines body for RevokeAPIToken for application/json ContentType.
 type RevokeAPITokenJSONRequestBody = APITokenRevoke
 
+// ScheduleMemberAccountDeletionJSONRequestBody defines body for ScheduleMemberAccountDeletion for application/json ContentType.
+type ScheduleMemberAccountDeletionJSONRequestBody = MemberAccountDeletionRequest
+
+// LeaveTenantForMemberJSONRequestBody defines body for LeaveTenantForMember for application/json ContentType.
+type LeaveTenantForMemberJSONRequestBody = LeaveTenantRequest
+
 // AddTenantConfigJSONRequestBody defines body for AddTenantConfig for application/json ContentType.
 type AddTenantConfigJSONRequestBody AddTenantConfigJSONBody
 
@@ -663,6 +669,12 @@ type AddUserFromSuperAdminJSONRequestBody = NewUser
 // UpdateUserFromSuperAdminJSONRequestBody defines body for UpdateUserFromSuperAdmin for application/json ContentType.
 type UpdateUserFromSuperAdminJSONRequestBody = User
 
+// ScheduleMemberAccountDeletionFromSuperAdminJSONRequestBody defines body for ScheduleMemberAccountDeletionFromSuperAdmin for application/json ContentType.
+type ScheduleMemberAccountDeletionFromSuperAdminJSONRequestBody = MemberAccountDeletionRequest
+
+// LeaveTenantForMemberFromSuperAdminJSONRequestBody defines body for LeaveTenantForMemberFromSuperAdmin for application/json ContentType.
+type LeaveTenantForMemberFromSuperAdminJSONRequestBody = LeaveTenantRequest
+
 // AddUserMembershipFromSuperAdminJSONRequestBody defines body for AddUserMembershipFromSuperAdmin for application/json ContentType.
 type AddUserMembershipFromSuperAdminJSONRequestBody AddUserMembershipFromSuperAdminJSONBody
 
@@ -716,6 +728,18 @@ type ServerInterface interface {
 
 	// (GET /admin-api/v1/personal-data-access)
 	ListPersonalDataAccess(c *gin.Context, params ListPersonalDataAccessParams)
+	// Close a member's account on their behalf
+	// (POST /admin-api/v1/users/{userid}/deletion)
+	ScheduleMemberAccountDeletion(c *gin.Context, userid string)
+	// Export a member's data on their behalf
+	// (GET /admin-api/v1/users/{userid}/export)
+	ExportMemberData(c *gin.Context, userid string)
+	// Remove a member from the organization through the leave lifecycle
+	// (POST /admin-api/v1/users/{userid}/leave)
+	LeaveTenantForMember(c *gin.Context, userid string)
+	// What removing a member from the organization would cost them
+	// (GET /admin-api/v1/users/{userid}/leave-preview)
+	GetMemberLeavePreview(c *gin.Context, userid string)
 
 	// (GET /api/v1/configs/tenant-configs)
 	ListTenantConfigs(c *gin.Context, params ListTenantConfigsParams)
@@ -977,9 +1001,21 @@ type ServerInterface interface {
 
 	// (PUT /superadmin-api/v1/tenants/{tenantid}/users/{userid})
 	UpdateUserFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
+	// Close a member's account on their behalf
+	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/deletion)
+	ScheduleMemberAccountDeletionFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
+	// Export a member's data on their behalf
+	// (GET /superadmin-api/v1/tenants/{tenantid}/users/{userid}/export)
+	ExportMemberDataFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
 
 	// (DELETE /superadmin-api/v1/tenants/{tenantid}/users/{userid}/hard-delete)
 	HardDeleteUserFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
+	// Remove a member from the organization through the leave lifecycle
+	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/leave)
+	LeaveTenantForMemberFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
+	// What removing a member from the organization would cost them
+	// (GET /superadmin-api/v1/tenants/{tenantid}/users/{userid}/leave-preview)
+	GetMemberLeavePreviewFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
 
 	// (POST /superadmin-api/v1/tenants/{tenantid}/users/{userid}/membership)
 	AddUserMembershipFromSuperAdmin(c *gin.Context, tenantid openapi_types.UUID, userid string)
@@ -1535,6 +1571,102 @@ func (siw *ServerInterfaceWrapper) ListPersonalDataAccess(c *gin.Context) {
 	}
 
 	siw.Handler.ListPersonalDataAccess(c, params)
+}
+
+// ScheduleMemberAccountDeletion operation middleware
+func (siw *ServerInterfaceWrapper) ScheduleMemberAccountDeletion(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ScheduleMemberAccountDeletion(c, userid)
+}
+
+// ExportMemberData operation middleware
+func (siw *ServerInterfaceWrapper) ExportMemberData(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ExportMemberData(c, userid)
+}
+
+// LeaveTenantForMember operation middleware
+func (siw *ServerInterfaceWrapper) LeaveTenantForMember(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.LeaveTenantForMember(c, userid)
+}
+
+// GetMemberLeavePreview operation middleware
+func (siw *ServerInterfaceWrapper) GetMemberLeavePreview(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMemberLeavePreview(c, userid)
 }
 
 // ListTenantConfigs operation middleware
@@ -3728,6 +3860,72 @@ func (siw *ServerInterfaceWrapper) UpdateUserFromSuperAdmin(c *gin.Context) {
 	siw.Handler.UpdateUserFromSuperAdmin(c, tenantid, userid)
 }
 
+// ScheduleMemberAccountDeletionFromSuperAdmin operation middleware
+func (siw *ServerInterfaceWrapper) ScheduleMemberAccountDeletionFromSuperAdmin(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ScheduleMemberAccountDeletionFromSuperAdmin(c, tenantid, userid)
+}
+
+// ExportMemberDataFromSuperAdmin operation middleware
+func (siw *ServerInterfaceWrapper) ExportMemberDataFromSuperAdmin(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ExportMemberDataFromSuperAdmin(c, tenantid, userid)
+}
+
 // HardDeleteUserFromSuperAdmin operation middleware
 func (siw *ServerInterfaceWrapper) HardDeleteUserFromSuperAdmin(c *gin.Context) {
 
@@ -3759,6 +3957,72 @@ func (siw *ServerInterfaceWrapper) HardDeleteUserFromSuperAdmin(c *gin.Context) 
 	}
 
 	siw.Handler.HardDeleteUserFromSuperAdmin(c, tenantid, userid)
+}
+
+// LeaveTenantForMemberFromSuperAdmin operation middleware
+func (siw *ServerInterfaceWrapper) LeaveTenantForMemberFromSuperAdmin(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.LeaveTenantForMemberFromSuperAdmin(c, tenantid, userid)
+}
+
+// GetMemberLeavePreviewFromSuperAdmin operation middleware
+func (siw *ServerInterfaceWrapper) GetMemberLeavePreviewFromSuperAdmin(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "tenantid" -------------
+	var tenantid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tenantid", c.Param("tenantid"), &tenantid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tenantid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "userid" -------------
+	var userid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userid", c.Param("userid"), &userid, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter userid: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMemberLeavePreviewFromSuperAdmin(c, tenantid, userid)
 }
 
 // AddUserMembershipFromSuperAdmin operation middleware
@@ -4051,6 +4315,10 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.PATCH(options.BaseURL+"/admin-api/v1/client-applications/:id/tokens/:tokenId/revoke", wrapper.RevokeAPIToken)
 	router.GET(options.BaseURL+"/admin-api/v1/pending-deletions", wrapper.ListPendingDeletions)
 	router.GET(options.BaseURL+"/admin-api/v1/personal-data-access", wrapper.ListPersonalDataAccess)
+	router.POST(options.BaseURL+"/admin-api/v1/users/:userid/deletion", wrapper.ScheduleMemberAccountDeletion)
+	router.GET(options.BaseURL+"/admin-api/v1/users/:userid/export", wrapper.ExportMemberData)
+	router.POST(options.BaseURL+"/admin-api/v1/users/:userid/leave", wrapper.LeaveTenantForMember)
+	router.GET(options.BaseURL+"/admin-api/v1/users/:userid/leave-preview", wrapper.GetMemberLeavePreview)
 	router.GET(options.BaseURL+"/api/v1/configs/tenant-configs", wrapper.ListTenantConfigs)
 	router.POST(options.BaseURL+"/api/v1/configs/tenant-configs", wrapper.AddTenantConfig)
 	router.DELETE(options.BaseURL+"/api/v1/configs/tenant-configs/:id", wrapper.DeleteTenantConfig)
@@ -4138,7 +4406,11 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.DeleteUserFromSuperAdmin)
 	router.GET(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.GetUserByIDFromSuperAdmin)
 	router.PUT(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid", wrapper.UpdateUserFromSuperAdmin)
+	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/deletion", wrapper.ScheduleMemberAccountDeletionFromSuperAdmin)
+	router.GET(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/export", wrapper.ExportMemberDataFromSuperAdmin)
 	router.DELETE(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/hard-delete", wrapper.HardDeleteUserFromSuperAdmin)
+	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/leave", wrapper.LeaveTenantForMemberFromSuperAdmin)
+	router.GET(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/leave-preview", wrapper.GetMemberLeavePreviewFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/membership", wrapper.AddUserMembershipFromSuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/password-reset-request", wrapper.ResetPasswordRequestBySuperAdmin)
 	router.POST(options.BaseURL+"/superadmin-api/v1/tenants/:tenantid/users/:userid/reactivate", wrapper.ReactivateUserFromSuperAdmin)

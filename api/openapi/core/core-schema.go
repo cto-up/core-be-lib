@@ -84,6 +84,12 @@ const (
 	Aal2 MFAStatusAal = "aal2"
 )
 
+// Defines values for MemberActionRefusalReason.
+const (
+	DeletionAlreadyScheduled MemberActionRefusalReason = "deletion_already_scheduled"
+	MemberOfOtherTenants     MemberActionRefusalReason = "member_of_other_tenants"
+)
+
 // Defines values for PendingDeletionStage.
 const (
 	ClosureRequested PendingDeletionStage = "closure_requested"
@@ -464,6 +470,21 @@ type MFAStatus struct {
 
 // MFAStatusAal Current Authenticator Assurance Level
 type MFAStatusAal string
+
+// MemberAccountDeletionRequest defines model for MemberAccountDeletionRequest.
+type MemberAccountDeletionRequest struct {
+	// Reason Why the administrator closes the account. Stored after "closed by an administrator" and shown in the pending-deletions list.
+	Reason *string `json:"reason,omitempty"`
+}
+
+// MemberActionRefusal Why an action on a member was refused. `reason` is stable, for the client to word in the reader's language; `message` is an English fallback. Neither names the member's other organizations.
+type MemberActionRefusal struct {
+	Message string                    `json:"message"`
+	Reason  MemberActionRefusalReason `json:"reason"`
+}
+
+// MemberActionRefusalReason defines model for MemberActionRefusal.Reason.
+type MemberActionRefusalReason string
 
 // NewAPIToken defines model for NewAPIToken.
 type NewAPIToken struct {

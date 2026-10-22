@@ -1,0 +1,55 @@
+post:
+  summary: Close a member's account on their behalf
+  description: >
+    Schedules the deletion of the member's whole account after the usual
+    grace period, with the reason "closed by an administrator". Nothing is
+    destroyed now: the member is emailed the date and can keep the account
+    from their Organizations page. The tenant is the one named in the path.
+  operationId: scheduleMemberAccountDeletionFromSuperAdmin
+  parameters:
+    - name: tenantid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: userid
+      in: path
+      required: true
+      schema:
+        type: string
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          $ref: "../../core-schema.yaml#/components/schemas/MemberAccountDeletionRequest"
+  responses:
+    "200":
+      description: Deletion scheduled
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/AccountDeletion"
+    "403":
+      description: The caller acted on themselves, or on somebody who outranks them
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "404":
+      description: The user is not an active member of this tenant
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "409":
+      description: >
+        Refused: `member_of_other_tenants` when a tenant ADMIN (not a
+        SUPER_ADMIN) acts on somebody who also belongs to another active
+        organization; `deletion_already_scheduled` when a closure is already
+        pending.
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/MemberActionRefusal"

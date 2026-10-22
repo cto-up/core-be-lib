@@ -259,6 +259,28 @@ components:
         reason:
           type: string
           maxLength: 500
+    MemberAccountDeletionRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          description: >
+            Why the administrator closes the account. Stored after "closed by an
+            administrator" and shown in the pending-deletions list.
+    MemberActionRefusal:
+      type: object
+      description: >
+        Why an action on a member was refused. `reason` is stable, for the
+        client to word in the reader's language; `message` is an English
+        fallback. Neither names the member's other organizations.
+      required: [reason, message]
+      properties:
+        reason:
+          type: string
+          enum: [member_of_other_tenants, deletion_already_scheduled]
+        message:
+          type: string
     UserDataExport:
       type: object
       description: >

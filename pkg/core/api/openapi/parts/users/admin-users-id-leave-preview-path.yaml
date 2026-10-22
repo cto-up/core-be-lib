@@ -1,0 +1,31 @@
+get:
+  summary: What removing a member from the organization would cost them
+  description: >
+    The member's leave preview for this tenant, exactly as they would see it
+    at GET /api/v1/users/me/leave-preview. The tenant is the request's host, like every /admin-api call.
+  operationId: getMemberLeavePreview
+  parameters:
+    - name: userid
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    "200":
+      description: Leave preview
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/LeaveTenantPreview"
+    "403":
+      description: The caller acted on themselves, or on somebody who outranks them
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "404":
+      description: The user is not an active member of this tenant
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"

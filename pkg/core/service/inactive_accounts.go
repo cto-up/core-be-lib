@@ -35,6 +35,8 @@ const (
 	InactivityWarningMonths = 1
 
 	inactivityWarningTemplate = "account-inactive-warning.html"
+
+	adminClosureTemplate = "account-closure-scheduled-by-admin.html"
 )
 
 // lastSeenTrackedSince is when core_users.last_seen_at started being stamped
@@ -152,6 +154,23 @@ func sendInactivityWarning(u repository.CoreUser, monthsInactive int, closesOn t
 		ClosesOn       string
 	}{u.Profile.Name, monthsInactive, closesOn.Format("2 January 2006")}
 	if err := r.ParseTemplate(filepath.Join("templates", inactivityWarningTemplate), data); err != nil {
+		return err
+	}
+	return r.SendEmail()
+}
+
+type adminClosureData struct {
+	Name         string
+	Organization string
+	DeletesOn    string
+	KeepURL      string
+}
+
+func sendAdminClosureNotice(u repository.CoreUser, closure AdminClosure, deletesOn time.Time) error {
+	r := emailservice.NewEmailRequest(systemEmailFrom(), []string{u.Email.String},
+		"An administrator closed your account", "")
+	data := adminClosureData{u.Profile.Name, closure.TenantName, deletesOn.Format("2 January 2006"), closure.KeepURL}
+	if err := r.ParseTemplate(filepath.Join("templates", adminClosureTemplate), data); err != nil {
 		return err
 	}
 	return r.SendEmail()

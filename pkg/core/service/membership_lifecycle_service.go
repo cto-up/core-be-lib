@@ -51,13 +51,19 @@ var (
 // and the erasures all come from modules that registered a UserDataContributor,
 // because core has never heard of an enrollment (ADR 040 §10).
 type MembershipLifecycleService struct {
-	store        *db.Store
-	authProvider auth.AuthProvider
-	warnInactive func(u repository.CoreUser, monthsInactive int, closesOn time.Time) error
+	store              *db.Store
+	authProvider       auth.AuthProvider
+	warnInactive       func(u repository.CoreUser, monthsInactive int, closesOn time.Time) error
+	notifyAdminClosure func(u repository.CoreUser, closure AdminClosure, deletesOn time.Time) error
 }
 
 func NewMembershipLifecycleService(store *db.Store, authProvider auth.AuthProvider) *MembershipLifecycleService {
-	return &MembershipLifecycleService{store: store, authProvider: authProvider, warnInactive: sendInactivityWarning}
+	return &MembershipLifecycleService{
+		store:              store,
+		authProvider:       authProvider,
+		warnInactive:       sendInactivityWarning,
+		notifyAdminClosure: sendAdminClosureNotice,
+	}
 }
 
 // LeavePreview reports what leaving would cost. Read at dialog-open time so the
@@ -201,8 +207,6 @@ func (s *MembershipLifecycleService) ClosurePreview(ctx context.Context, userID 
 // deletion. Nothing is destroyed here: the grace period is what makes an account
 // takeover non-destructive and a change of mind cheap.
 func (s *MembershipLifecycleService) ScheduleDeletion(ctx context.Context, userID string, req core.AccountDeletionRequest) (core.AccountDeletion, error) {
-	logger := util.GetLoggerFromCtx(ctx)
-
 	user, err := s.store.GetSharedUserByID(ctx, userID)
 	if err != nil {
 		return core.AccountDeletion{}, err
@@ -217,11 +221,63 @@ func (s *MembershipLifecycleService) ScheduleDeletion(ctx context.Context, userI
 		return core.AccountDeletion{}, ErrConfirmEmailMismatch
 	}
 
-	scheduledFor := time.Now().Add(DeletionGrace)
 	reason := pgtype.Text{}
 	if req.Reason != nil && *req.Reason != "" {
 		reason = pgtype.Text{String: *req.Reason, Valid: true}
 	}
+	decisions := []core.TenantLeaveDecision{}
+	if req.Decisions != nil {
+		decisions = *req.Decisions
+	}
+	return s.schedule(ctx, user, reason, decisions)
+}
+
+// AdminClosureReason is the deletion_reason of an account an administrator
+// closed for its holder.
+const AdminClosureReason = "closed by an administrator"
+
+// AdminClosure is what the holder is told when an administrator closes their
+// account: which organization acted, and where to keep the account.
+type AdminClosure struct {
+	Reason     string
+	TenantName string
+	KeepURL    string
+}
+
+// ScheduleDeletionByAdmin is ScheduleDeletion performed for the holder: no
+// typed confirmation (it is the administrator's, not the holder's), and the
+// holder is emailed the date so they can keep the account the usual way.
+func (s *MembershipLifecycleService) ScheduleDeletionByAdmin(ctx context.Context, userID string, closure AdminClosure) (core.AccountDeletion, error) {
+	logger := util.GetLoggerFromCtx(ctx)
+
+	user, err := s.store.GetSharedUserByID(ctx, userID)
+	if err != nil {
+		return core.AccountDeletion{}, err
+	}
+	if user.DeletionScheduledAt.Valid {
+		return deletionStatusOf(user, s.countMemberships(ctx, userID)), ErrDeletionScheduled
+	}
+
+	reason := AdminClosureReason
+	if r := strings.TrimSpace(closure.Reason); r != "" {
+		reason += ": " + r
+	}
+	status, err := s.schedule(ctx, user, pgtype.Text{String: reason, Valid: true}, []core.TenantLeaveDecision{})
+	if err != nil {
+		return status, err
+	}
+	// The closure stands without the email: the pending-deletions list shows it
+	// and signing in shows the holder the way back.
+	if err := s.notifyAdminClosure(user, closure, *status.ScheduledFor); err != nil {
+		logger.Err(err).Str("user_id", userID).Msg("close account by admin: notice not sent")
+	}
+	return status, nil
+}
+
+func (s *MembershipLifecycleService) schedule(ctx context.Context, user repository.CoreUser, reason pgtype.Text, decisions []core.TenantLeaveDecision) (core.AccountDeletion, error) {
+	logger := util.GetLoggerFromCtx(ctx)
+	userID := user.ID
+	scheduledFor := time.Now().Add(DeletionGrace)
 
 	// Memberships are deliberately NOT ended here, and no session is revoked.
 	//
@@ -246,10 +302,6 @@ func (s *MembershipLifecycleService) ScheduleDeletion(ctx context.Context, userI
 
 	// Recorded, not applied. Applying now would transfer somebody's courses away
 	// during a window whose whole point is that they can change their mind.
-	decisions := []core.TenantLeaveDecision{}
-	if req.Decisions != nil {
-		decisions = *req.Decisions
-	}
 	encoded, encodeErr := json.Marshal(decisions)
 	if encodeErr != nil {
 		return core.AccountDeletion{}, encodeErr

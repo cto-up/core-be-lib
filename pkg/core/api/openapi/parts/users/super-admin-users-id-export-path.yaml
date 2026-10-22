@@ -1,0 +1,49 @@
+get:
+  summary: Export a member's data on their behalf
+  description: >
+    The same document as GET /api/v1/users/me/export, for a member of the
+    tenant. The tenant is the one named in the path. Recorded in the personal-data access log as
+    `core.user_export`. Never oneself (use /users/me/export) and never
+    somebody who outranks the caller.
+  operationId: exportMemberDataFromSuperAdmin
+  parameters:
+    - name: tenantid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: userid
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    "200":
+      description: Export document
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/UserDataExport"
+    "403":
+      description: The caller acted on themselves, or on somebody who outranks them
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "404":
+      description: The user is not an active member of this tenant
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/ErrorSchema"
+    "409":
+      description: >
+        Refused: `member_of_other_tenants` when a tenant ADMIN (not a
+        SUPER_ADMIN) acts on somebody who also belongs to another active
+        organization — their data there is not this tenant's to export or
+        close.
+      content:
+        application/json:
+          schema:
+            $ref: "../../core-schema.yaml#/components/schemas/MemberActionRefusal"

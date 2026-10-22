@@ -206,6 +206,25 @@ paths:
   /admin-api/v1/pending-deletions:
     $ref: "./parts/admin/pending-deletions-path.yaml"
 
+  # A member's data-protection rights, exercised by an admin on their behalf
+  # (ADMIN & SUPER_ADMIN; the super-admin twins name the tenant)
+  /admin-api/v1/users/{userid}/export:
+    $ref: "./parts/users/admin-users-id-export-path.yaml"
+  /admin-api/v1/users/{userid}/leave-preview:
+    $ref: "./parts/users/admin-users-id-leave-preview-path.yaml"
+  /admin-api/v1/users/{userid}/leave:
+    $ref: "./parts/users/admin-users-id-leave-path.yaml"
+  /admin-api/v1/users/{userid}/deletion:
+    $ref: "./parts/users/admin-users-id-deletion-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/export:
+    $ref: "./parts/users/super-admin-users-id-export-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/leave-preview:
+    $ref: "./parts/users/super-admin-users-id-leave-preview-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/leave:
+    $ref: "./parts/users/super-admin-users-id-leave-path.yaml"
+  /superadmin-api/v1/tenants/{tenantid}/users/{userid}/deletion:
+    $ref: "./parts/users/super-admin-users-id-deletion-path.yaml"
+
   ## translations
   /api/v1/translations:
     $ref: "./parts/translations/translations-path.yaml"
