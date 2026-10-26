@@ -147,8 +147,9 @@ func (exh *TenantConfigHandler) ListTenantConfigs(c *gin.Context, params core.Li
 		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
 		return
 	}
+	// A tenant's configs are a small, bounded set; the admin page lists them all.
 	pagingRequest := helpers.PagingRequest{
-		MaxPageSize:     50,
+		MaxPageSize:     1000,
 		DefaultPage:     1,
 		DefaultPageSize: 10,
 		DefaultSortBy:   "name",
