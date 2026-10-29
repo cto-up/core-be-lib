@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"ctoup.com/coreapp/pkg/shared/auth"
+	util "ctoup.com/coreapp/pkg/shared/util"
 	ory "github.com/ory/kratos-client-go"
 )
 
@@ -117,8 +118,14 @@ func (k *KratosAuthClient) CreateUserWithTenant(ctx context.Context, user *auth.
 
 	err = k.SetTenantMetadata(ctx, record.UID, metadata)
 	if err != nil {
-		// Rollback: delete the created user
-		_ = k.DeleteUser(ctx, record.UID)
+		// Rollback: delete the created user. The metadata failure travels to
+		// the caller; a rollback that also fails would leave an identity in
+		// Kratos that nothing owns, so it is logged, not dropped.
+		if derr := k.DeleteUser(ctx, record.UID); derr != nil {
+			logger := util.GetLoggerFromCtx(ctx)
+			logger.Err(derr).Str("identity_id", record.UID).
+				Msg("kratos: could not roll back the identity after a failed tenant metadata write; it is orphaned")
+		}
 		return nil, fmt.Errorf("failed to set tenant metadata: %w", err)
 	}
 
