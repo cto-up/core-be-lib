@@ -130,3 +130,39 @@ func TestIdentifyUser_ASecondTenantIsNotSwallowedByTheFirstsCooldown(t *testing.
 	require.Equal(t, http.StatusOK, identify(uh, "tenantb", "both@example.com"))
 	require.Equal(t, 2, mailer.mails, "a resubmission inside the cooldown is still throttled")
 }
+
+type signupUsersWithCallback struct {
+	*signupUsers
+	signedUp int
+}
+
+func (u *signupUsersWithCallback) GetUserSignedUpCallback() access.UserSignedUpCallback {
+	return func(context.Context, string, repository.CoreUser) { u.signedUp++ }
+}
+
+// A welcome mail that failed after the account was created answered 500: the
+// retry took the "already a member" path and the signed-up callback (initial
+// credits) never ran. The account is now reported created, the callback runs,
+// and the mail failure comes back with its cause.
+func TestSignup_AFailedWelcomeMailStillCompletesTheSignUp(t *testing.T) {
+	store := testutils.NewTestStore(t)
+	signupTenant(t, store, "mailfail")
+	users := &signupUsersWithCallback{signupUsers: &signupUsers{}}
+	uh := &UserHandler{store: store, authProvider: signupProvider{client: &signupMailer{}}, userService: users}
+
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/public-api/v1/signup",
+		strings.NewReader(`{"email":"new@example.com","name":"New"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Request.Header.Set("Origin", "http://mailfail.ctoup.localhost:5173")
+	c.Request.Host = "mailfail.ctoup.localhost:5173"
+	c.Set(auth.AUTH_TENANT_ID_KEY, "mailfail")
+	uh.Signup(c)
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	require.Equal(t, 1, users.signedUp, "the signed-up callback must run even when the mail fails")
+	require.Contains(t, w.Body.String(), `"email_sent":false`)
+	require.Contains(t, w.Body.String(), `"email_error":"no mail in tests"`)
+}

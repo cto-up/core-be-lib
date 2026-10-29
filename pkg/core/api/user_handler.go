@@ -366,10 +366,11 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 			// Case 3: already a member. Don't leak this via the response, but
 			// send an email to the real owner so a confused/legit user gets a
 			// helpful nudge (sign in or reset password).
-			if err := sendAlreadyRegisteredEmail(c, baseAuthClient, welcomeURL, req.Email, tenant.Name); err != nil {
-				logger.Err(err).Msg("Failed to send already-registered email")
+			mailErr := sendAlreadyRegisteredEmail(c, baseAuthClient, welcomeURL, req.Email, tenant.Name)
+			if mailErr != nil {
+				logger.Err(mailErr).Msg("Failed to send already-registered email")
 			}
-			c.JSON(http.StatusOK, existingUser)
+			c.JSON(http.StatusOK, userWithEmail{User: *existingUser, emailOutcome: emailOutcomeOf(mailErr)})
 			return
 		}
 
@@ -380,10 +381,11 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 			return
 		}
-		if err := sendTenantAddedEmail(c, baseAuthClient, welcomeURL, req.Email, tenant.Name); err != nil {
-			logger.Err(err).Msg("Failed to send tenant added email")
+		mailErr := sendTenantAddedEmail(c, baseAuthClient, welcomeURL, req.Email, tenant.Name)
+		if mailErr != nil {
+			logger.Err(mailErr).Msg("Failed to send tenant added email")
 		}
-		c.JSON(http.StatusOK, existingUser)
+		c.JSON(http.StatusOK, userWithEmail{User: *existingUser, emailOutcome: emailOutcomeOf(mailErr)})
 		return
 	}
 
@@ -417,18 +419,19 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 		}
 	}
 
-	if err := sendWelcomeEmail(c, baseAuthClient, welcomeURL, req.Email); err != nil {
-		logger.Err(err).Msg("Failed to send welcome email")
-		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
-		return
-	}
-
-	// Call the optional signed-up callback (e.g. provision default credits)
+	// The account exists from here on, so everything owed to a new account runs
+	// before the mail: a failed mail answered 500 used to send the retry down the
+	// "already a member" path, and the callback (initial credits) never ran.
 	if cb := uh.userService.GetUserSignedUpCallback(); cb != nil {
 		cb(c, tenantID.(string), user)
 	}
 
-	c.JSON(http.StatusCreated, user)
+	mailErr := sendWelcomeEmail(c, baseAuthClient, welcomeURL, req.Email)
+	if mailErr != nil {
+		logger.Err(mailErr).Msg("Failed to send welcome email; the account exists")
+	}
+
+	c.JSON(http.StatusCreated, signupResponse{CoreUser: user, emailOutcome: emailOutcomeOf(mailErr)})
 }
 
 // VerifyEmail handles email verification using token

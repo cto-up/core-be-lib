@@ -1,6 +1,8 @@
 package core
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 
 	"ctoup.com/coreapp/api/helpers"
@@ -387,19 +389,25 @@ func (o *userOps) addUserMembership(c *gin.Context, scope TenantScope, userID st
 		return
 	}
 
-	// The notification is best-effort: the membership exists either way, and
-	// failing the request would leave the caller unable to tell whether it did.
-	if target.name != "" {
+	// The membership exists either way, so a failed notification does not fail
+	// the request; it is reported beside the user instead.
+	var mailErr error
+	if target.name == "" {
+		mailErr = errors.New("neither a tenant name nor a subdomain was available for the mail, so no notification was sent")
+	} else {
 		// A sign-in link for the tenant they were just added to, which is what
 		// the /admin-api path sent; the super-admin path sent the tenant root,
 		// where an unauthenticated visitor lands on a sign-in page anyway.
 		url, err := getResetPasswordURL(c, target.subdomain)
 		if err != nil {
-			logger.Err(err).Msg("Failed to get URL for notification")
+			mailErr = fmt.Errorf("build the sign-in link for the notification: %w", err)
 		} else if err := sendTenantAddedEmail(c, client, url, user.Email, target.name); err != nil {
-			logger.Err(err).Msg("Failed to send tenant added notification")
+			mailErr = fmt.Errorf("send tenant added notification: %w", err)
+		}
+		if mailErr != nil {
+			logger.Err(mailErr).Msg("Member added but not notified")
 		}
 	}
 
-	c.JSON(http.StatusCreated, user)
+	c.JSON(http.StatusCreated, userWithEmail{User: user, emailOutcome: emailOutcomeOf(mailErr)})
 }
