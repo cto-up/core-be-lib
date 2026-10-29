@@ -437,10 +437,11 @@ func (s *MembershipLifecycleService) executeDeletion(ctx context.Context, userID
 	logger := util.GetLoggerFromCtx(ctx)
 
 	// What the person asked for, replayed per tenant before anything is erased.
-	// Nothing here is required: a closure answered with silence — or one made
-	// before this existed — falls through to each module's own policy.
+	// A closure answered with silence — or one made before this existed — falls
+	// through to each module's own policy; an answer that fails holds the
+	// deletion instead.
 	if err := s.applyStoredDecisions(ctx, userID); err != nil {
-		return err
+		return fmt.Errorf("apply stored decisions: %w", err)
 	}
 
 	// Modules first: they anonymize or delete rows that reference the user id,
@@ -475,22 +476,28 @@ func (s *MembershipLifecycleService) executeDeletion(ctx context.Context, userID
 // applyStoredDecisions replays the answers given at closing time, grouped by the
 // tenant each one was about.
 func (s *MembershipLifecycleService) applyStoredDecisions(ctx context.Context, userID string) error {
-	logger := util.GetLoggerFromCtx(ctx)
-
 	user, err := s.store.GetSharedUserByID(ctx, userID)
 	if err != nil {
-		return err
+		return fmt.Errorf("load stored deletion decisions: %w", err)
 	}
-	if len(user.DeletionDecisions) == 0 {
+	return replayDeletionDecisions(ctx, userID, user.DeletionDecisions, sharedservice.UserDataContributors())
+}
+
+// replayDeletionDecisions applies every stored answer and fails if any of them
+// could not be applied. The erase that follows is the module default — for
+// authored courses that means deleting what the person asked to hand over — so
+// a failed transfer must stop the deletion, not fall through to it. The sweep
+// retries the account on its next run; contributors' decisions are idempotent.
+func replayDeletionDecisions(ctx context.Context, userID string, raw []byte, contributors []sharedservice.UserDataContributor) error {
+	if len(raw) == 0 {
 		return nil
 	}
 
 	var stored []core.TenantLeaveDecision
-	if err := json.Unmarshal(user.DeletionDecisions, &stored); err != nil {
-		// Unreadable answers must not stop the deletion the person asked for;
-		// the policy fallback still runs.
-		logger.Err(err).Str("user_id", userID).Msg("deletion: stored decisions unreadable, falling back to policy")
-		return nil
+	if err := json.Unmarshal(raw, &stored); err != nil {
+		// Unreadable answers might have asked for a transfer; erasing anyway
+		// could destroy what the person wanted kept.
+		return fmt.Errorf("stored deletion decisions of user %s are unreadable, deletion held: %w", userID, err)
 	}
 
 	byTenant := map[string][]core.LeaveDecision{}
@@ -500,15 +507,17 @@ func (s *MembershipLifecycleService) applyStoredDecisions(ctx context.Context, u
 		})
 	}
 
+	// Every tenant is still attempted so one run reports every failure at once.
+	var failures []error
 	for tenantID, decisions := range byTenant {
-		for _, c := range sharedservice.UserDataContributors() {
+		for _, c := range contributors {
 			if err := c.ApplyLeaveDecisions(ctx, userID, tenantID, decisions); err != nil {
-				// One tenant's answer failing must not strand the others, nor
-				// block the deletion — the policy backstop covers what is left.
-				logger.Err(err).Str("contributor", c.Name()).Str("tenant_id", tenantID).
-					Msg("deletion: stored decision failed, falling back to policy for this tenant")
+				failures = append(failures, fmt.Errorf("contributor %s, tenant %s: %w", c.Name(), tenantID, err))
 			}
 		}
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf("stored deletion decisions failed, deletion held so nothing is erased in their place: %w", errors.Join(failures...))
 	}
 	return nil
 }
