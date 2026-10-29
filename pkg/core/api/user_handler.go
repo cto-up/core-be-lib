@@ -305,7 +305,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 
@@ -439,7 +439,7 @@ func (uh *UserHandler) VerifyEmail(c *gin.Context) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 	var req struct {
@@ -564,7 +564,7 @@ func (uh *UserHandler) GetUserByEmail(c *gin.Context, email string) {
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 
@@ -614,7 +614,7 @@ func (uh *UserHandler) IdentifyUser(c *gin.Context) {
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 

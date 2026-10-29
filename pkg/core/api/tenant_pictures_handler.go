@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,7 +26,7 @@ func (s *TenantHandler) getTenantPicture(c *gin.Context, pictureType string) {
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 
@@ -44,7 +43,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 	if !auth.HasAdminPrivileges(c) {
@@ -64,7 +63,7 @@ func (s *TenantHandler) uploadTenantPicture(c *gin.Context, pictureType string) 
 	// Check if the file is a webp
 	if !strings.HasSuffix(strings.ToLower(file.Filename), ".webp") {
 		logger.Error().Str("tenantID", tenantID.(string)).Str("pictureType", pictureType).Msg("Invalid file format. Only webp files are allowed")
-		c.JSON(http.StatusBadRequest, errors.New("only webp files are allowed"))
+		c.JSON(http.StatusBadRequest, helpers.ErrorStringResponse("only webp files are allowed"))
 		return
 	}
 

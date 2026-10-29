@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"net/http"
 
 	"ctoup.com/coreapp/pkg/core/db"
@@ -24,7 +23,7 @@ func (h *TranslationHandler) CreateTranslation(c *gin.Context) {
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 
@@ -56,7 +55,7 @@ func (h *TranslationHandler) DeleteTranslation(c *gin.Context, id types.UUID) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 
@@ -79,7 +78,7 @@ func (h *TranslationHandler) GetTranslationByID(c *gin.Context, id types.UUID, p
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 
@@ -103,7 +102,7 @@ func (h *TranslationHandler) GetTranslation(c *gin.Context, params api.GetTransl
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 
@@ -134,7 +133,7 @@ func (h *TranslationHandler) ListTranslations(c *gin.Context, params api.ListTra
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 
@@ -184,7 +183,7 @@ func (h *TranslationHandler) UpdateTranslation(c *gin.Context, id types.UUID) {
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 

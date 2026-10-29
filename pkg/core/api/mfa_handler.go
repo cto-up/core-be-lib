@@ -3,6 +3,7 @@ package core
 import (
 	"net/http"
 
+	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/auth/kratos"
 	"ctoup.com/coreapp/pkg/shared/util"
@@ -44,13 +45,13 @@ func (h *MFAHandler) GetMFAStatus(c *gin.Context) {
 		if authErr, ok := err.(*auth.AuthError); ok {
 			if authErr.Code == "unauthorized" {
 				logger.Err(err).Msg("User is not authorized to access MFA status")
-				c.JSON(http.StatusUnauthorized, err)
+				c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 				return
 			}
 		}
 
 		logger.Err(err).Msg("Failed to get MFA status")
-		c.JSON(http.StatusInternalServerError, err)
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
@@ -79,12 +80,12 @@ func (h *MFAHandler) InitializeSettingsFlow(c *gin.Context) {
 		// Check error type
 		if authErr, ok := err.(*auth.AuthError); ok {
 			if authErr.Code == "unauthorized" {
-				c.JSON(http.StatusUnauthorized, err)
+				c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 				return
 			}
 		}
 
-		c.JSON(http.StatusInternalServerError, err)
+		c.JSON(http.StatusInternalServerError, helpers.ErrorResponse(err))
 		return
 	}
 
@@ -113,7 +114,7 @@ func (h *MFAHandler) DisableWebAuthn(c *gin.Context) {
 		// Check error type
 		if authErr, ok := err.(*auth.AuthError); ok {
 			if authErr.Code == "unauthorized" {
-				c.JSON(http.StatusUnauthorized, err)
+				c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(err))
 				return
 			}
 		}

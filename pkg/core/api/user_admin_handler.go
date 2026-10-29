@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -111,7 +110,7 @@ func (uh *UserAdminHandler) ResetPasswordRequestByAdmin(c *gin.Context, userID s
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 	var req struct {
@@ -196,7 +195,7 @@ func (uh *UserAdminHandler) ImportUsersFromAdmin(c *gin.Context) {
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 

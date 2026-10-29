@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"net/http"
 
 	"ctoup.com/coreapp/api/helpers"
@@ -39,7 +38,7 @@ func (s *TenantHandler) GetTenantProfile(ctx *gin.Context) {
 func (s *TenantHandler) UpdateTenantProfile(ctx *gin.Context) {
 	tenantID, exists := ctx.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
-		ctx.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		ctx.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 

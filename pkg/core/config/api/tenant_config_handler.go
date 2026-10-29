@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"net/http"
 
 	"ctoup.com/coreapp/api/helpers"
@@ -28,7 +27,7 @@ func (exh *TenantConfigHandler) AddTenantConfig(c *gin.Context) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 	var req core.AddTenantConfigJSONRequestBody
@@ -64,7 +63,7 @@ func (exh *TenantConfigHandler) UpdateTenantConfig(c *gin.Context, id uuid.UUID)
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 	var req core.UpdateTenantConfigJSONBody
@@ -94,7 +93,7 @@ func (exh *TenantConfigHandler) DeleteTenantConfig(c *gin.Context, id uuid.UUID)
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 	_, err := exh.store.DeleteTenantConfig(c, repository.DeleteTenantConfigParams{
@@ -120,7 +119,7 @@ func (exh *TenantConfigHandler) GetTenantConfigByID(c *gin.Context, id uuid.UUID
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
 		logger.Error().Msg("TenantID not found")
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 	tenantConfig, err := exh.store.GetTenantConfigByID(c, repository.GetTenantConfigByIDParams{
@@ -144,7 +143,7 @@ func (exh *TenantConfigHandler) ListTenantConfigs(c *gin.Context, params core.Li
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	tenantID, exists := c.Get(auth.AUTH_TENANT_ID_KEY)
 	if !exists {
-		c.JSON(http.StatusInternalServerError, errors.New("TenantID not found"))
+		c.JSON(http.StatusInternalServerError, helpers.ErrorStringResponse("TenantID not found"))
 		return
 	}
 	// A tenant's configs are a small, bounded set; the admin page lists them all.
