@@ -959,12 +959,24 @@ type UserActionSchemaName string
 
 // UserDataExport Assembled by core from what it owns, plus one section per registered data contributor. Core cannot enumerate module data — `modules` is deliberately open, and its keys are the contributors that answered, which is also how a reader sees what the export covered.
 type UserDataExport struct {
-	ExportedAt  time.Time          `json:"exportedAt"`
-	Memberships []TenantMembership `json:"memberships"`
+	ExportedAt time.Time `json:"exportedAt"`
+
+	// FailedSections Contributors whose section could not be read for this export, with the reason. Present only when at least one failed: the export is then incomplete and says so, rather than silently missing a module.
+	FailedSections *[]UserDataExportFailure `json:"failedSections,omitempty"`
+	Memberships    []TenantMembership       `json:"memberships"`
 
 	// Modules Keyed by contributor name (`lms`, `aiemployee`, …). The shape of each value is the contributing module's business, not core's.
 	Modules map[string]interface{} `json:"modules"`
 	User    User                   `json:"user"`
+}
+
+// UserDataExportFailure defines model for UserDataExportFailure.
+type UserDataExportFailure struct {
+	// Error Why its section could not be read.
+	Error string `json:"error"`
+
+	// Name The contributor whose section is missing, e.g. `lms`.
+	Name string `json:"name"`
 }
 
 // UserProfileSchema defines model for UserProfileSchema.

@@ -305,6 +305,24 @@ components:
           description: >
             Keyed by contributor name (`lms`, `aiemployee`, …). The shape of each
             value is the contributing module's business, not core's.
+        failedSections:
+          type: array
+          description: >
+            Contributors whose section could not be read for this export, with
+            the reason. Present only when at least one failed: the export is then
+            incomplete and says so, rather than silently missing a module.
+          items:
+            $ref: "#/components/schemas/UserDataExportFailure"
+    UserDataExportFailure:
+      type: object
+      required: [name, error]
+      properties:
+        name:
+          type: string
+          description: The contributor whose section is missing, e.g. `lms`.
+        error:
+          type: string
+          description: Why its section could not be read.
     NewSignUp:
       type: object
       required:

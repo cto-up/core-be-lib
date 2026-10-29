@@ -67,3 +67,31 @@ func TestReplayDeletionDecisions_EveryTenantIsAttemptedAndSuccessPasses(t *testi
 
 	require.NoError(t, replayDeletionDecisions(context.Background(), "u1", nil, []sharedservice.UserDataContributor{lms}))
 }
+
+type exportContributor struct {
+	sharedservice.UserDataContributor
+	name string
+	fail error
+}
+
+func (c *exportContributor) Name() string { return c.name }
+func (c *exportContributor) Export(context.Context, string) (any, error) {
+	if c.fail != nil {
+		return nil, c.fail
+	}
+	return map[string]int{"enrollments": 2}, nil
+}
+
+// A failed section used to be dropped and the export returned as if complete.
+func TestExportSections_AFailedSectionIsNamedWithItsCause(t *testing.T) {
+	modules, failed := exportSections(context.Background(), "u1", []sharedservice.UserDataContributor{
+		&exportContributor{name: "lms"},
+		&exportContributor{name: "aiemployee", fail: errors.New("relation aiem_runs does not exist")},
+	})
+
+	assert.Contains(t, modules, "lms")
+	assert.NotContains(t, modules, "aiemployee")
+	require.Len(t, failed, 1)
+	assert.Equal(t, "aiemployee", failed[0].Name)
+	assert.Equal(t, "relation aiem_runs does not exist", failed[0].Error)
+}

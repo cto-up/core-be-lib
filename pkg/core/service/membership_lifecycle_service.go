@@ -333,7 +333,6 @@ func (s *MembershipLifecycleService) CancelDeletion(ctx context.Context, userID 
 
 // Export assembles what core owns plus one section per registered contributor.
 func (s *MembershipLifecycleService) Export(ctx context.Context, userID string) (core.UserDataExport, error) {
-	logger := util.GetLoggerFromCtx(ctx)
 
 	user, err := s.store.GetSharedUserByID(ctx, userID)
 	if err != nil {
@@ -344,18 +343,7 @@ func (s *MembershipLifecycleService) Export(ctx context.Context, userID string) 
 		return core.UserDataExport{}, err
 	}
 
-	modules := map[string]interface{}{}
-	for _, c := range sharedservice.UserDataContributors() {
-		section, err := c.Export(ctx, userID)
-		if err != nil {
-			// Loud, and the section is omitted rather than silently empty —
-			// an export that quietly drops a module is a false statement about
-			// what we hold.
-			logger.Err(err).Str("contributor", c.Name()).Msg("export: contributor failed")
-			continue
-		}
-		modules[c.Name()] = section
-	}
+	modules, failed := exportSections(ctx, userID, sharedservice.UserDataContributors())
 
 	out := core.UserDataExport{
 		ExportedAt: time.Now(),
@@ -369,7 +357,29 @@ func (s *MembershipLifecycleService) Export(ctx context.Context, userID string) 
 		Memberships: toTenantMemberships(memberships),
 		Modules:     modules,
 	}
+	if len(failed) > 0 {
+		out.FailedSections = &failed
+	}
 	return out, nil
+}
+
+// exportSections asks every contributor for its section. A failed section is
+// logged and named in the returned failures with its cause: an export that
+// quietly drops a module is a false statement about what we hold.
+func exportSections(ctx context.Context, userID string, contributors []sharedservice.UserDataContributor) (map[string]interface{}, []core.UserDataExportFailure) {
+	logger := util.GetLoggerFromCtx(ctx)
+	modules := map[string]interface{}{}
+	var failed []core.UserDataExportFailure
+	for _, c := range contributors {
+		section, err := c.Export(ctx, userID)
+		if err != nil {
+			logger.Err(err).Str("contributor", c.Name()).Msg("export: contributor failed, section reported as failed")
+			failed = append(failed, core.UserDataExportFailure{Name: c.Name(), Error: err.Error()})
+			continue
+		}
+		modules[c.Name()] = section
+	}
+	return modules, failed
 }
 
 // toTenantMemberships converts the sqlc rows to the wire type. The wire is
