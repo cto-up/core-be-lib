@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -48,6 +49,25 @@ func TestAnAdminsAPITokenPassesARoleGate(t *testing.T) {
 	}
 	if !p.Can("read") || p.Can("propose") {
 		t.Error("the token's own scopes are its caps")
+	}
+}
+
+func TestAFailedRoleReadIsNotNoRoles(t *testing.T) {
+	access.InstallRoleResolver(func(context.Context, string, string) ([]string, bool, error) {
+		return nil, false, errors.New("db down")
+	})
+	t.Cleanup(func() { access.InstallRoleResolver(nil) })
+
+	c := testCtx()
+	err := (&AuthMiddleware{}).setAPITokenPrincipal(c, "t1", "admin-1", nil)
+	if err == nil {
+		t.Fatal("a failed role read was swallowed as \"no roles\"")
+	}
+	if !strings.Contains(err.Error(), "db down") {
+		t.Errorf("the cause did not travel: %v", err)
+	}
+	if _, ok := access.PrincipalFrom(c.Request.Context()); ok {
+		t.Error("a failed role read must not mint a principal")
 	}
 }
 

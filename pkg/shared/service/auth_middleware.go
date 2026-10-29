@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -94,7 +95,17 @@ func (am *AuthMiddleware) MiddlewareFunc() gin.HandlerFunc {
 				c.Set("api_token", tokenRow)
 				c.Set("api_token_scopes", tokenRow.Scopes)
 				c.Set(auth.AUTH_USER_ID, tokenRow.CreatedBy)
-				am.setAPITokenPrincipal(c, tokenRow.TenantID.String, tokenRow.CreatedBy, tokenRow.Scopes)
+				if err := am.setAPITokenPrincipal(c, tokenRow.TenantID.String, tokenRow.CreatedBy, tokenRow.Scopes); err != nil {
+					// Not a refusal: the token is valid and its roles are
+					// unknown, so the caller should retry, not rotate the token.
+					log.Err(err).Str("tenant_id", tokenRow.TenantID.String).Msg("api token: could not resolve the creator's roles")
+					c.JSON(http.StatusServiceUnavailable, gin.H{
+						"status":  http.StatusServiceUnavailable,
+						"message": err.Error(),
+					})
+					c.Abort()
+					return
+				}
 				c.Next()
 				return
 			}
@@ -182,12 +193,13 @@ func (am *AuthMiddleware) setAuthenticatedUser(c *gin.Context, user *auth.Authen
 // roles are now its creator's CURRENT roles in the token's tenant, read through
 // the installed RoleResolver: an admin who is demoted takes their tokens down
 // with them. Its Caps are the token's own scopes, and it cannot step up.
-func (am *AuthMiddleware) setAPITokenPrincipal(c *gin.Context, tenantID, createdBy string, scopes []string) {
+//
+// A failed role read is returned rather than treated as "no roles": answering
+// 403 for a database outage tells the caller its token is wrong.
+func (am *AuthMiddleware) setAPITokenPrincipal(c *gin.Context, tenantID, createdBy string, scopes []string) error {
 	roles, isolate, err := access.ResolveRoles(c.Request.Context(), tenantID, createdBy)
 	if err != nil {
-		// No roles is the safe answer: the token keeps the reach it always had.
-		log.Warn().Err(err).Str("tenant_id", tenantID).Msg("api token: could not resolve the creator's roles")
-		roles = nil
+		return fmt.Errorf("could not resolve the API token creator's roles: %w", err)
 	}
 	claims := make(map[string]interface{}, len(roles))
 	for _, r := range roles {
@@ -205,6 +217,7 @@ func (am *AuthMiddleware) setAPITokenPrincipal(c *gin.Context, tenantID, created
 		Caps:          scopes,
 		AAL:           "aal1",
 	}))
+	return nil
 }
 
 // rolesFromClaims lists the tenant roles a session's claims grant.
