@@ -2,11 +2,13 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"ctoup.com/coreapp/api/helpers"
 	"ctoup.com/coreapp/api/openapi/core"
 	"ctoup.com/coreapp/pkg/core/db"
+	"ctoup.com/coreapp/pkg/core/db/repository"
 	"ctoup.com/coreapp/pkg/core/service"
 	"ctoup.com/coreapp/pkg/shared/auth"
 	"ctoup.com/coreapp/pkg/shared/util"
@@ -134,7 +136,7 @@ func (h *TenantMembershipHandler) ListUserTenants(c *gin.Context) {
 
 	userID := c.GetString(auth.AUTH_USER_ID)
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
+		c.JSON(http.StatusUnauthorized, helpers.ErrorStringResponse("no authenticated user on the request"))
 		return
 	}
 
@@ -154,7 +156,7 @@ func (h *TenantMembershipHandler) ListPendingInvitations(c *gin.Context) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	userID := c.GetString(auth.AUTH_USER_ID)
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
+		c.JSON(http.StatusUnauthorized, helpers.ErrorStringResponse("no authenticated user on the request"))
 		return
 	}
 
@@ -174,7 +176,7 @@ func (h *TenantMembershipHandler) AcceptTenantInvitation(c *gin.Context) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	userID := c.GetString(auth.AUTH_USER_ID)
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
+		c.JSON(http.StatusUnauthorized, helpers.ErrorStringResponse("no authenticated user on the request"))
 		return
 	}
 
@@ -199,7 +201,7 @@ func (h *TenantMembershipHandler) RejectTenantInvitation(c *gin.Context) {
 	logger := util.GetLoggerFromCtx(c.Request.Context())
 	userID := c.GetString(auth.AUTH_USER_ID)
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
+		c.JSON(http.StatusUnauthorized, helpers.ErrorStringResponse("no authenticated user on the request"))
 		return
 	}
 
@@ -252,7 +254,7 @@ func (h *TenantMembershipHandler) InviteUserToTenant(c *gin.Context) {
 
 	inviterID := c.GetString(auth.AUTH_USER_ID)
 	if inviterID == "" {
-		c.JSON(http.StatusUnauthorized, helpers.ErrorResponse(nil))
+		c.JSON(http.StatusUnauthorized, helpers.ErrorStringResponse("no authenticated user on the request"))
 		return
 	}
 
@@ -274,14 +276,24 @@ func (h *TenantMembershipHandler) InviteUserToTenant(c *gin.Context) {
 		logger.Warn().Err(urlErr).Msg("Could not build the invitation URL; inviting without an email link")
 	}
 
-	m, err := h.membershipService.InviteUser(c.Request.Context(), req.Email, tenantID, toRoles(req.Roles), inviterID, acceptURL)
+	m, email, err := h.membershipService.InviteUserReportingEmail(c.Request.Context(), req.Email, tenantID, toRoles(req.Roles), inviterID, acceptURL)
 	if err != nil {
 		logger.Err(err).Str("tenant_id", tenantID).Msg("Failed to invite user")
 		c.JSON(membershipErrorStatus(err), helpers.ErrorResponse(err))
 		return
 	}
+	emailErr := email.Error
+	if emailErr != nil && urlErr != nil {
+		emailErr = fmt.Errorf("%w: %v", emailErr, urlErr)
+	}
 
-	c.JSON(http.StatusCreated, m)
+	c.JSON(http.StatusCreated, invitationResponse{CoreUserTenantMembership: m, emailOutcome: emailOutcomeOf(emailErr)})
+}
+
+// invitationResponse is the membership row plus whether the invitee was told.
+type invitationResponse struct {
+	repository.CoreUserTenantMembership
+	emailOutcome
 }
 
 // UpdateMemberRole updates a member's role in the tenant (requires ADMIN role)

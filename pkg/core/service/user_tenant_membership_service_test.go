@@ -1,6 +1,9 @@
 package service
 
 import (
+	"context"
+	"strings"
+
 	"ctoup.com/coreapp/pkg/shared/config"
 	"testing"
 	"time"
@@ -90,5 +93,15 @@ func TestEmailExpiryMatchesTheEnforcedTTL(t *testing.T) {
 	days := int(InvitationTTL / (24 * time.Hour))
 	if days != 14 {
 		t.Fatalf("the template promises %d days; keep it and InvitationTTL in step", days)
+	}
+}
+
+// The invitation mail used to fail into a log line only; the admin got a plain
+// success and the invitee never heard. The failure now comes back with its cause.
+func TestInvitationEmailWithoutAnAcceptLinkReportsWhy(t *testing.T) {
+	s := &UserTenantMembershipService{}
+	err := s.sendInvitationEmail(context.Background(), "a@example.com", "t1", "", "")
+	if err == nil || !strings.Contains(err.Error(), "no accept link") {
+		t.Fatalf("want an error naming the missing accept link, got %v", err)
 	}
 }

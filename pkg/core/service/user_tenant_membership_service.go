@@ -95,9 +95,24 @@ func (s *UserTenantMembershipService) GetPendingInvitations(ctx context.Context,
 // flow and email verification), and conflating the two would make a simple
 // invite carry all of that weight.
 func (s *UserTenantMembershipService) InviteUser(ctx context.Context, email, tenantID string, roles []core.Role, inviterID, acceptURL string) (repository.CoreUserTenantMembership, error) {
+	// The email outcome is logged by sendInvitationEmail; callers that must
+	// report it use InviteUserReportingEmail.
+	m, _, err := s.InviteUserReportingEmail(ctx, email, tenantID, roles, inviterID, acceptURL)
+	return m, err
+}
+
+// InvitationEmail is whether the invitee was told, and why not when they were not.
+type InvitationEmail struct {
+	Sent  bool
+	Error error
+}
+
+// InviteUserReportingEmail is InviteUser plus the outcome of the invitation
+// email, so an admin hears that the invitee was never told.
+func (s *UserTenantMembershipService) InviteUserReportingEmail(ctx context.Context, email, tenantID string, roles []core.Role, inviterID, acceptURL string) (repository.CoreUserTenantMembership, InvitationEmail, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
-		return repository.CoreUserTenantMembership{}, errors.New("an email is required")
+		return repository.CoreUserTenantMembership{}, InvitationEmail{}, errors.New("an email is required")
 	}
 	if len(roles) == 0 {
 		roles = []core.Role{core.USER}
@@ -106,9 +121,9 @@ func (s *UserTenantMembershipService) InviteUser(ctx context.Context, email, ten
 	user, err := s.store.GetUserByEmailGlobal(ctx, email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return repository.CoreUserTenantMembership{}, ErrUserNotFound
+			return repository.CoreUserTenantMembership{}, InvitationEmail{}, ErrUserNotFound
 		}
-		return repository.CoreUserTenantMembership{}, err
+		return repository.CoreUserTenantMembership{}, InvitationEmail{}, err
 	}
 
 	// Re-inviting an active member is a no-op the caller should hear about,
@@ -116,13 +131,13 @@ func (s *UserTenantMembershipService) InviteUser(ctx context.Context, email, ten
 	if existing, err := s.store.GetSharedUserTenantMembership(ctx, repository.GetSharedUserTenantMembershipParams{
 		UserID: user.ID, TenantID: tenantID,
 	}); err == nil && existing.Status == StatusActive {
-		return repository.CoreUserTenantMembership{}, ErrAlreadyMember
+		return repository.CoreUserTenantMembership{}, InvitationEmail{}, ErrAlreadyMember
 	}
 
 	// A pending invitation holds a seat. Without this, invitations are a way
 	// around max_learners: issue a thousand, watch them all accept.
 	if err := sharedservice.CheckSeatGuard(ctx, tenantID, roles); err != nil {
-		return repository.CoreUserTenantMembership{}, err
+		return repository.CoreUserTenantMembership{}, InvitationEmail{}, err
 	}
 
 	m, err := s.store.AddSharedUserToTenant(ctx, repository.AddSharedUserToTenantParams{
@@ -134,26 +149,26 @@ func (s *UserTenantMembershipService) InviteUser(ctx context.Context, email, ten
 		InvitedAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	})
 	if err != nil {
-		return repository.CoreUserTenantMembership{}, err
+		return repository.CoreUserTenantMembership{}, InvitationEmail{}, err
 	}
 
-	// Best-effort: the invitation EXISTS whether or not the mail goes out, and
-	// failing the request would leave the admin thinking nothing happened while
-	// a pending row sits there. Logged loudly instead — an invitation nobody was
-	// told about is the failure this whole change exists to prevent, so it must
-	// be visible.
-	s.sendInvitationEmail(ctx, email, tenantID, inviterID, acceptURL)
-	return m, nil
+	// The invitation EXISTS whether or not the mail goes out, so a failed mail
+	// does not fail the request — it is returned beside the membership so the
+	// admin is told the invitee does not know.
+	if err := s.sendInvitationEmail(ctx, email, tenantID, inviterID, acceptURL); err != nil {
+		return m, InvitationEmail{Error: err}, nil
+	}
+	return m, InvitationEmail{Sent: true}, nil
 }
 
 // sendInvitationEmail tells the invitee. Without this the flow is an API that
 // works and a person who never finds out.
-func (s *UserTenantMembershipService) sendInvitationEmail(ctx context.Context, email, tenantID, inviterID, acceptURL string) {
+func (s *UserTenantMembershipService) sendInvitationEmail(ctx context.Context, email, tenantID, inviterID, acceptURL string) error {
 	logger := util.GetLoggerFromCtx(ctx)
 	if acceptURL == "" {
 		logger.Warn().Str("tenant_id", tenantID).
 			Msg("membership: invitation created but no accept URL was built; no email sent")
-		return
+		return errors.New("no accept link could be built for this tenant, so no invitation email was sent")
 	}
 
 	tenantName := tenantID
@@ -189,14 +204,15 @@ func (s *UserTenantMembershipService) sendInvitationEmail(ctx context.Context, e
 		"You have been invited to "+tenantName, "")
 	if err := r.ParseTemplate("email-tenant-invitation.html", data); err != nil {
 		logger.Err(err).Str("tenant_id", tenantID).Msg("membership: could not render the invitation email")
-		return
+		return fmt.Errorf("render invitation email: %w", err)
 	}
 	if err := r.SendEmail(); err != nil {
 		logger.Err(err).Str("tenant_id", tenantID).
 			Msg("membership: INVITATION CREATED BUT EMAIL NOT SENT — the invitee does not know")
-		return
+		return fmt.Errorf("send invitation email: %w", err)
 	}
 	logger.Info().Str("tenant_id", tenantID).Msg("membership: invitation email sent")
+	return nil
 }
 
 // systemEmailFrom mirrors the from-address resolution the rest of core uses.
