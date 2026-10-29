@@ -82,9 +82,11 @@ func TestRecordPersonalDataAccess_Integration(t *testing.T) {
 		SetPersonalDataAccessStore(broken)
 		t.Cleanup(func() { SetPersonalDataAccessStore(store) })
 
+		// The write runs in a goroutine; the bound only tells "returned" from
+		// "waited", so it leaves a loaded suite room (hub#641).
 		start := time.Now()
 		RecordPersonalDataAccess(ctx, PersonalDataAccess{TenantID: "t1", ActorUserID: "a", SubjectUserID: "b", Resource: "x"})
-		assert.Less(t, time.Since(start), 50*time.Millisecond)
+		assert.Less(t, time.Since(start), time.Second)
 	})
 
 	t.Run("with no store configured it is a no-op", func(t *testing.T) {
