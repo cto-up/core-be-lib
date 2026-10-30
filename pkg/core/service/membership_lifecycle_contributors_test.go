@@ -86,12 +86,12 @@ func (c *exportContributor) Export(context.Context, string) (any, error) {
 func TestExportSections_AFailedSectionIsNamedWithItsCause(t *testing.T) {
 	modules, failed := exportSections(context.Background(), "u1", []sharedservice.UserDataContributor{
 		&exportContributor{name: "lms"},
-		&exportContributor{name: "aiemployee", fail: errors.New("relation aiem_runs does not exist")},
+		&exportContributor{name: "agent", fail: errors.New("relation aiem_runs does not exist")},
 	})
 
 	assert.Contains(t, modules, "lms")
-	assert.NotContains(t, modules, "aiemployee")
+	assert.NotContains(t, modules, "agent")
 	require.Len(t, failed, 1)
-	assert.Equal(t, "aiemployee", failed[0].Name)
+	assert.Equal(t, "agent", failed[0].Name)
 	assert.Equal(t, "relation aiem_runs does not exist", failed[0].Error)
 }

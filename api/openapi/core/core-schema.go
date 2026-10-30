@@ -589,7 +589,7 @@ type PersonalDataAccess struct {
 	AccessedAt  time.Time `json:"accessedAt"`
 	ActorUserId string    `json:"actorUserId"`
 
-	// Resource what was read, as "<module>.<kind>", e.g. "aiemployee.run"
+	// Resource what was read, as "<module>.<kind>", e.g. "agent.run"
 	Resource      string  `json:"resource"`
 	ResourceId    *string `json:"resourceId"`
 	SubjectUserId string  `json:"subjectUserId"`
@@ -965,7 +965,7 @@ type UserDataExport struct {
 	FailedSections *[]UserDataExportFailure `json:"failedSections,omitempty"`
 	Memberships    []TenantMembership       `json:"memberships"`
 
-	// Modules Keyed by contributor name (`lms`, `aiemployee`, …). The shape of each value is the contributing module's business, not core's.
+	// Modules Keyed by contributor name (`lms`, `agent`, …). The shape of each value is the contributing module's business, not core's.
 	Modules map[string]interface{} `json:"modules"`
 	User    User                   `json:"user"`
 }

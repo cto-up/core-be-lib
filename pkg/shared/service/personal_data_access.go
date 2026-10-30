@@ -14,7 +14,7 @@ import (
 
 // PersonalDataAccess is one read of SubjectUserID's personal data by
 // ActorUserID. Resource names the kind of record as "<module>.<kind>"
-// ("aiemployee.run"); ResourceID, when there is one, which record. Never put
+// ("agent.run"); ResourceID, when there is one, which record. Never put
 // the content read here. TenantID defaults to the request's tenant when ctx is
 // the *gin.Context.
 type PersonalDataAccess struct {

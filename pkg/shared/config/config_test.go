@@ -19,7 +19,7 @@ import (
 //
 // Any deployment that did not set SYSTEM_EMAIL signed its users' mail with
 // somebody else's brand, in a library sold on sovereign hosting and per-tenant
-// isolation. aiemployee-lib had the identical bug with a different literal and
+// isolation. agent-lib had the identical bug with a different literal and
 // fixed it; this is the same fix, nine times over.
 
 func TestSystemEmailPrefersTheConfiguredSender(t *testing.T) {

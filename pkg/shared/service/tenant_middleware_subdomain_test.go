@@ -44,7 +44,7 @@ func TestInfrastructureSubdomainsAreTenantless(t *testing.T) {
 		{"example.com", true, "apex"},
 		{"acme.example.com", false, "a real tenant must still resolve"},
 	} {
-		req := httptest.NewRequest(http.MethodGet, "/public-api/v1/aiemployee/oauth/callback", nil)
+		req := httptest.NewRequest(http.MethodGet, "/public-api/v1/agent/oauth/callback", nil)
 		req.Host = tc.host // deliberately no Origin header
 
 		c, _ := gin.CreateTestContext(httptest.NewRecorder())

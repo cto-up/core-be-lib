@@ -37,14 +37,14 @@ func TestRecordPersonalDataAccess_Integration(t *testing.T) {
 		reset()
 		RecordPersonalDataAccess(ctx, PersonalDataAccess{
 			TenantID: "t1", ActorUserID: "admin", SubjectUserID: "learner",
-			Resource: "aiemployee.run", ResourceID: "run-1",
+			Resource: "agent.run", ResourceID: "run-1",
 		})
 		require.Eventually(t, func() bool { return len(rows()) == 1 }, 5*time.Second, 20*time.Millisecond)
 		r := rows()[0]
 		assert.Equal(t, "t1", r.TenantID)
 		assert.Equal(t, "admin", r.ActorUserID)
 		assert.Equal(t, "learner", r.SubjectUserID)
-		assert.Equal(t, "aiemployee.run", r.Resource)
+		assert.Equal(t, "agent.run", r.Resource)
 		assert.Equal(t, "run-1", r.ResourceID.String)
 		assert.WithinDuration(t, time.Now(), r.AccessedAt, time.Minute)
 	})
@@ -52,7 +52,7 @@ func TestRecordPersonalDataAccess_Integration(t *testing.T) {
 	t.Run("reading one's own record writes nothing", func(t *testing.T) {
 		reset()
 		RecordPersonalDataAccess(ctx, PersonalDataAccess{
-			TenantID: "t1", ActorUserID: "learner", SubjectUserID: "learner", Resource: "aiemployee.run",
+			TenantID: "t1", ActorUserID: "learner", SubjectUserID: "learner", Resource: "agent.run",
 		})
 		// A marker written after it proves the writer had time to run.
 		RecordPersonalDataAccess(ctx, PersonalDataAccess{

@@ -25,9 +25,9 @@ func TestListPersonalDataAccess_Integration(t *testing.T) {
 	store := testutils.NewTestStore(t)
 	ctx := context.Background()
 	for _, r := range []repository.InsertPersonalDataAccessParams{
-		{TenantID: "t1", ActorUserID: "admin1", SubjectUserID: "learnerA", Resource: "aiemployee.run", ResourceID: pgtype.Text{String: "r1", Valid: true}},
-		{TenantID: "t1", ActorUserID: "admin2", SubjectUserID: "learnerB", Resource: "aiemployee.conversation"},
-		{TenantID: "t2", ActorUserID: "admin3", SubjectUserID: "learnerA", Resource: "aiemployee.run"},
+		{TenantID: "t1", ActorUserID: "admin1", SubjectUserID: "learnerA", Resource: "agent.run", ResourceID: pgtype.Text{String: "r1", Valid: true}},
+		{TenantID: "t1", ActorUserID: "admin2", SubjectUserID: "learnerB", Resource: "agent.conversation"},
+		{TenantID: "t2", ActorUserID: "admin3", SubjectUserID: "learnerA", Resource: "agent.run"},
 	} {
 		require.NoError(t, store.InsertPersonalDataAccess(ctx, r))
 	}

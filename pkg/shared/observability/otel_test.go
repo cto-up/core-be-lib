@@ -54,7 +54,7 @@ func TestATraceArrivesWholeWithItsTreeAndIdentity(t *testing.T) {
 
 	err := ExportSpans(context.Background(),
 		OTLPTarget{Endpoint: srv.URL + "/api/public/otel", Headers: map[string]string{"Authorization": "Basic abc"}},
-		[]attribute.KeyValue{attribute.String("service.name", "aiemployee")},
+		[]attribute.KeyValue{attribute.String("service.name", "agent")},
 		spans)
 
 	require.NoError(t, err)

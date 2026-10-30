@@ -13,7 +13,7 @@
 //   - care: service-layer authorization helpers (IsUserMemberOfCircle,
 //     IsUserAdminOfCircle) short-circuit to "authorized" when the
 //     flag is set, giving pro operators tenant-wide reach.
-//   - aiemployee: the care_audit_template / care_update_template
+//   - agent: the care_audit_template / care_update_template
 //     tools refuse unless the flag is set. Without the bridge, every
 //     chat-driven invocation would be blocked even from a SUPER_ADMIN.
 //

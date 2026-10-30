@@ -303,7 +303,7 @@ components:
           type: object
           additionalProperties: true
           description: >
-            Keyed by contributor name (`lms`, `aiemployee`, …). The shape of each
+            Keyed by contributor name (`lms`, `agent`, …). The shape of each
             value is the contributing module's business, not core's.
         failedSections:
           type: array
@@ -635,7 +635,7 @@ components:
           type: string
         resource:
           type: string
-          description: what was read, as "<module>.<kind>", e.g. "aiemployee.run"
+          description: what was read, as "<module>.<kind>", e.g. "agent.run"
         resourceId:
           type: string
           nullable: true
