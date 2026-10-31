@@ -1,5 +1,11 @@
 # Core Application: Modular Monolith Framework
 
+> **OBSOLETE.** This repository and its module path `ctoup.com/coreapp` are no
+> longer maintained. Development continues in
+> [github.com/cto-up/core-lib](https://github.com/cto-up/core-lib), module path
+> `github.com/cto-up/core-lib`. Replace `ctoup.com/coreapp` with
+> `github.com/cto-up/core-lib` in your imports and `go.mod`.
+
 A production-ready **Go** framework designed for building scalable, multi-tenant modular monoliths. This repository provides a contract-first development workflow with advanced identity management and type-safe persistence.
 
 ## Key Capabilities
