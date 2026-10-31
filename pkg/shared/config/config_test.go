@@ -106,6 +106,10 @@ func TestTheLibraryDoesNotReadTheEnvironment(t *testing.T) {
 		// read belongs.
 		"shared/config/from_env.go": "FromEnv is the strategy",
 
+		// Feeds that strategy: turns /run/secrets files into the environment
+		// FromEnv reads, and must not overwrite a variable the host already set.
+		"shared/config/secret_files.go": "LoadSecretFiles fills the environment FromEnv reads",
+
 		// Google's ADC convention. The blob client resolves ADC by itself; the
 		// read here only parses the same file for its project_id. Routing it
 		// through Config would mean re-implementing credential discovery the
