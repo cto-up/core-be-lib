@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. Use the domain map below to identify which module docs to read
 2. Glob-triggered rules in `.claude/rules/` load automatically when you touch matching files
-3. Architecture Decision Records are in `docs/adr`folder
+3. Docs and core's ADRs (core ADR 001…) live in platform-docs: `auth/` and `libs/core/` (see `docs/README.md`)
 4. If touching database, OpenAPI, or a frontend — those rules files enforce mandatory workflows
 5. The application is using ctoup.com/coreapp for user, tenant management. If improvement is required for ctoup.com/coreapp , source code is found in folder: ../core-be-lib
 6. Never modify vendor folder directly

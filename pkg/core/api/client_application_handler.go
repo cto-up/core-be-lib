@@ -21,7 +21,7 @@ import (
 // Tenant scoping: every method derives its scope from the request via
 // c.GetString(auth.AUTH_TENANT_ID_KEY) — a tenant ID for tenant-specific
 // resources, "" for global (SUPER_ADMIN) ones. Scoping is strict: tenants never
-// see globals and vice versa. See docs/CLIENT_APPLICATIONS_TENANT_SCOPING.md.
+// see globals and vice versa. See libs/core/client-applications.md in platform-docs.
 type ClientApplicationHandler struct {
 	store            *db.Store
 	clientAppService *access.ClientApplicationService
